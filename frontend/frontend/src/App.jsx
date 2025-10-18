@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { AuthProvider, useAuth } from './context/AuthContext'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { useAuth } from './context/AuthContext'
 import StrategyInput from './components/StrategyInput'
 import CodeDisplay from './components/CodeDisplay'
 import LoadingSpinner from './components/LoadingSpinner'
@@ -10,6 +11,7 @@ import Login from './components/Login'
 import Signup from './components/Signup'
 import BotLibrary from './components/BotLibrary'
 import LandingPage from './components/LandingPage'
+import CommunityPage from './pages/CommunityPage'
 import './index.css'
 
 function AppContent() {
@@ -18,6 +20,8 @@ function AppContent() {
     return <div className="min-h-screen bg-dark-bg flex items-center justify-center text-white">Loading...</div>
   }
   const { user, isAuthenticated, signout, getAuthHeaders } = auth
+  const navigate = useNavigate()
+  const location = useLocation()
   const [strategy, setStrategy] = useState(null)
   const [generatedCode, setGeneratedCode] = useState(null)
   const [backtestResults, setBacktestResults] = useState(null)
@@ -432,6 +436,7 @@ function AppContent() {
       <main className="max-w-7xl mx-auto px-6 py-8">
         {/* Navigation */}
         <div className="flex items-center justify-between mb-6">
+          {/* Left: Logo */}
           <button
             onClick={() => setShowLanding(true)}
             className="text-white hover:opacity-80 transition-opacity"
@@ -439,7 +444,26 @@ function AppContent() {
             <span className="text-2xl font-serif italic">Mobius</span>
           </button>
 
+          {/* Right: Action Buttons & Auth */}
           <div className="flex items-center gap-3">
+            {/* Dashboard & Community buttons */}
+            <button
+              onClick={handleGetStarted}
+              className="px-4 py-2 text-sm font-light rounded-lg border border-white/20 transition-colors text-white/80 hover:border-accent hover:text-accent"
+            >
+              Dashboard
+            </button>
+            <button
+              onClick={() => navigate('/community')}
+              className={`px-4 py-2 text-sm font-light rounded-lg border border-white/20 transition-colors ${
+                location.pathname === '/community' 
+                  ? 'border-accent text-accent' 
+                  : 'text-white/80 hover:border-accent hover:text-accent'
+              }`}
+            >
+              Community
+            </button>
+            
             {isAuthenticated ? (
               <>
                 {generatedCode && backtestResults && (
@@ -658,16 +682,13 @@ function AppContent() {
           onShowBotLibrary={() => setShowBotLibrary(true)}
         />
       )}
+
     </div>
   )
 }
 
 function App() {
-  return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
-  )
+  return <AppContent />
 }
 
 export default App

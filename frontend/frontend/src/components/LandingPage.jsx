@@ -1,5 +1,6 @@
 import { Brain, Zap, Code, BarChart3, TrendingUp, Check } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
+import { useNavigate } from 'react-router-dom'
 import { useState, lazy, Suspense } from 'react'
 import Login from './Login'
 import Signup from './Signup'
@@ -8,6 +9,7 @@ const ObservabilityGraph = lazy(() => import('./ObservabilityGraph'))
 
 export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOut, onShowBotLibrary }) {
   const { isAuthenticated } = useAuth()
+  const navigate = useNavigate()
   const [showLogin, setShowLogin] = useState(false)
   const [showSignup, setShowSignup] = useState(false)
 
@@ -32,9 +34,23 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
         </button>
         
         <div className="flex items-center gap-3">
+          {/* Dashboard & Community buttons - always visible */}
+          <button
+            onClick={onGetStarted}
+            className="px-4 py-2 text-sm font-light rounded-lg border border-white/20 text-white/80 hover:border-accent hover:text-accent transition-colors"
+          >
+            Dashboard
+          </button>
+          <button
+            onClick={() => navigate('/community')}
+            className="px-4 py-2 text-sm font-light rounded-lg border border-white/20 text-white/80 hover:border-accent hover:text-accent transition-colors"
+          >
+            Community
+          </button>
+          
           {isAuthenticated ? (
             // Authenticated user - show name and settings
-            <div className="flex items-center gap-2 pl-3">
+            <div className="flex items-center gap-2 pl-3 border-l border-gray-700">
               <span className="text-sm text-gray-400">
                 {user?.full_name ? user.full_name.split(' ')[0] : user?.email}
               </span>
