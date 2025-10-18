@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     """Application settings from environment variables"""
 
     # AI API Keys
-    anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
+    gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
 
     # Trading API Keys (Alpaca)
     alpaca_api_key: str = os.getenv("ALPACA_API_KEY", "")

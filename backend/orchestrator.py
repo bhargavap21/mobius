@@ -11,7 +11,7 @@ This module handles:
 import json
 import logging
 from typing import Dict, List, Any, Optional, Callable
-from anthropic import Anthropic
+import google.generativeai as genai
 from config import settings
 
 # Set up logging
@@ -21,13 +21,13 @@ logger = logging.getLogger(__name__)
 
 class TradingBotOrchestrator:
     """
-    Main orchestrator that uses Claude to understand requests and coordinate tools
+    Main orchestrator that uses Gemini to understand requests and coordinate tools
     """
 
     def __init__(self):
-        """Initialize the orchestrator with Claude client and tool registry"""
-        self.client = Anthropic(api_key=settings.anthropic_api_key)
-        self.model = "claude-sonnet-4-5-20250929"
+        """Initialize the orchestrator with Gemini client and tool registry"""
+        genai.configure(api_key=settings.gemini_api_key)
+        self.client = genai.GenerativeModel('gemini-2.0-flash-exp')
         self.tools: Dict[str, Callable] = {}
         self.tool_schemas: List[Dict[str, Any]] = []
 

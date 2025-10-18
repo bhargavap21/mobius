@@ -9,35 +9,35 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from backend.config import settings
 
 
-def test_claude_api():
-    """Test Claude API connection"""
-    print("\n🤖 Testing Claude API...")
+def test_gemini_api():
+    """Test Gemini API connection"""
+    print("\n🤖 Testing Gemini API...")
 
-    if not settings.anthropic_api_key:
-        print("❌ ANTHROPIC_API_KEY not set in .env")
+    if not settings.gemini_api_key:
+        print("❌ GEMINI_API_KEY not set in .env")
         return False
 
     try:
-        from anthropic import Anthropic
+        import google.generativeai as genai
 
-        client = Anthropic(api_key=settings.anthropic_api_key)
+        genai.configure(api_key=settings.gemini_api_key)
+        model = genai.GenerativeModel('gemini-2.0-flash-exp')
 
         # Simple test message
-        response = client.messages.create(
-            model="claude-sonnet-4-5-20250929",
-            max_tokens=100,
-            messages=[{
-                "role": "user",
-                "content": "Say 'API connection successful' and nothing else."
-            }]
+        response = model.generate_content(
+            "Say 'API connection successful' and nothing else.",
+            generation_config=genai.GenerationConfig(
+                max_output_tokens=100,
+                temperature=0.7,
+            )
         )
 
-        result = response.content[0].text
-        print(f"✅ Claude API: {result}")
+        result = response.text
+        print(f"✅ Gemini API: {result}")
         return True
 
     except Exception as e:
-        print(f"❌ Claude API Error: {e}")
+        print(f"❌ Gemini API Error: {e}")
         return False
 
 
@@ -107,7 +107,7 @@ def main():
     print("=" * 60)
 
     results = {
-        "Claude API": test_claude_api(),
+        "Gemini API": test_gemini_api(),
         "Alpaca API": test_alpaca_api(),
         "Reddit API": test_reddit_api()
     }
@@ -127,7 +127,7 @@ def main():
     print("\n")
 
     # Check if critical APIs are working
-    critical_apis = ["Claude API", "Alpaca API"]
+    critical_apis = ["Gemini API", "Alpaca API"]
     if all(results.get(api) for api in critical_apis):
         print("🎉 All critical APIs are working! Ready to proceed.")
         return 0

@@ -339,12 +339,8 @@ class CodeGeneratorAgent(BaseAgent):
         logger.info(f"Refining existing code: {refinement_instructions[:100]}")
 
         try:
-            # Use Claude to understand refinement instructions and apply them
-            from anthropic import Anthropic
-            import os
+            from llm_client import generate_json
             import json
-
-            client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
             # Build prompt for code refinement
             prompt = f"""You are a trading strategy code refinement expert. You need to modify existing trading strategy code based on user instructions.
@@ -381,24 +377,7 @@ Respond in this exact JSON format:
   "explanation": "Brief explanation of what was modified"
 }}"""
 
-            response = client.messages.create(
-                model="claude-sonnet-4-20250514",
-                max_tokens=4000,
-                messages=[{
-                    "role": "user",
-                    "content": prompt
-                }]
-            )
-
-            response_text = response.content[0].text
-
-            # Parse JSON response
-            import re
-            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-            if not json_match:
-                raise Exception("Could not parse refinement response")
-
-            result_data = json.loads(json_match.group(0))
+            result_data = generate_json(prompt, max_tokens=4000)
 
             updated_strategy = result_data.get('updated_strategy')
             changes_made = result_data.get('changes_made', [])

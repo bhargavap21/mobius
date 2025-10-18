@@ -1,20 +1,16 @@
 """
 Code Generation Tools - Generate Python trading bot code from strategies
 
-Uses Claude to generate clean, production-ready trading bot code
+Uses Gemini to generate clean, production-ready trading bot code
 """
 
 import logging
 import json
 import ast
 from typing import Dict, List, Any, Optional
-from anthropic import Anthropic
-from config import settings
+from llm_client import generate_json, generate_text
 
 logger = logging.getLogger(__name__)
-
-# Initialize Claude client
-client = Anthropic(api_key=settings.anthropic_api_key)
 
 
 def parse_strategy(strategy_description: str) -> Dict[str, Any]:
@@ -84,33 +80,16 @@ CRITICAL PARSING RULES:
 
 Return ONLY valid JSON, no other text."""
 
-        response = client.messages.create(
-            model="claude-sonnet-4-5-20250929",
-            max_tokens=2000,
-            messages=[{"role": "user", "content": prompt}],
-        )
+        parsed = generate_json(prompt, max_tokens=2000)
 
-        # Extract JSON from response
-        content = response.content[0].text
+        logger.info(f"✅ Parsed strategy: {parsed['name']}")
+        logger.info(f"   Asset: {parsed.get('asset')}")
+        logger.info(f"   Data sources: {parsed.get('data_sources')}")
 
-        # Try to find JSON in the response
-        json_start = content.find("{")
-        json_end = content.rfind("}") + 1
-
-        if json_start != -1 and json_end > json_start:
-            json_str = content[json_start:json_end]
-            parsed = json.loads(json_str)
-
-            logger.info(f"✅ Parsed strategy: {parsed['name']}")
-            logger.info(f"   Asset: {parsed.get('asset')}")
-            logger.info(f"   Data sources: {parsed.get('data_sources')}")
-
-            return {
-                "success": True,
-                "strategy": parsed,
-            }
-        else:
-            raise ValueError("No valid JSON found in response")
+        return {
+            "success": True,
+            "strategy": parsed,
+        }
 
     except Exception as e:
         logger.error(f"❌ Error parsing strategy: {e}")
@@ -221,14 +200,7 @@ Generate the COMPLETE, working code. Include all logic for:
 
 Make it copy-paste ready!"""
 
-        response = client.messages.create(
-            model="claude-sonnet-4-5-20250929",
-            max_tokens=4096,
-            messages=[{"role": "user", "content": prompt}],
-        )
-
-        # Extract code from response
-        content = response.content[0].text
+        content = generate_text(prompt, max_tokens=4096)
 
         # Try to extract code blocks
         if "```python" in content:
