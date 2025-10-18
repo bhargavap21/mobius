@@ -100,7 +100,7 @@ Return ONLY valid JSON, no other text."""
 
 
 def generate_trading_bot_code(
-    strategy: Dict[str, Any], include_backtest: bool = False
+    strategy: Dict[str, Any], include_backtest: bool = False, politician_data: Dict[str, Any] = None
 ) -> Dict[str, Any]:
     """
     Generate Python trading bot code from parsed strategy
@@ -108,6 +108,7 @@ def generate_trading_bot_code(
     Args:
         strategy: Parsed strategy parameters
         include_backtest: Whether to include backtesting code
+        politician_data: Real politician trading data from QuiverQuant API (optional)
 
     Returns:
         Generated Python code
@@ -115,12 +116,35 @@ def generate_trading_bot_code(
     try:
         logger.info(f"🤖 Generating code for strategy: {strategy.get('name')}")
 
+        # Add politician data context to prompt if available
+        politician_context = ""
+        if politician_data:
+            trades_count = len(politician_data.get('trades', []))
+            tickers = politician_data.get('tickers', [])
+            logger.info(f"🏛️ Including {trades_count} real politician trades in code generation")
+            politician_context = f"""
+
+IMPORTANT: Real Politician Trading Data Available:
+- {trades_count} recent trades from QuiverQuant API
+- Portfolio tickers: {tickers[:10] if tickers else 'N/A'}
+- Summary: {json.dumps(politician_data.get('summary', {}), indent=2)}
+
+Recent trades sample:
+{json.dumps(politician_data.get('trades', [])[:5], indent=2)}
+
+You MUST use this REAL data in your trading bot. Do NOT scrape Google News or use mock data.
+Import the politician trading tools:
+from tools.politician_trades import get_politician_trades, get_pelosi_portfolio_tickers
+
+Use these functions to get real-time politician trading data in your bot.
+"""
+
         # Build prompt for code generation
         prompt = f"""You are an expert Python developer specializing in algorithmic trading.
 
 Generate a complete, production-ready Python trading bot based on this strategy:
 
-{json.dumps(strategy, indent=2)}
+{json.dumps(strategy, indent=2)}{politician_context}
 
 Requirements:
 1. Use the Alpaca API for trading (alpaca-py library)

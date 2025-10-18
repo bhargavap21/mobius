@@ -259,19 +259,17 @@ class RealHistoricalDataAggregator:
 
     def __init__(self):
         self.providers = {
-            'alpha_vantage': AlphaVantageProvider(),
+            # Removed Alpha Vantage - 25 req/day is too restrictive
             'finnhub': FinnhubProvider(),
             'iex': IEXCloudProvider()
         }
         self.cache = {}
         self.request_count = {
-            'alpha_vantage': 0,
             'finnhub': 0,
             'iex': 0
         }
         # Track when we started counting for rate limiting
         self.rate_limit_window_start = {
-            'alpha_vantage': time.time(),
             'finnhub': time.time(),
             'iex': time.time()
         }
@@ -300,10 +298,9 @@ class RealHistoricalDataAggregator:
 
         if preferred_sources is None:
             # Default priority order
-            # Alpha Vantage first (best historical coverage but limited requests)
-            # Finnhub second (good coverage, high rate limits)
+            # Finnhub first (60 req/min, good historical coverage)
             # IEX as backup
-            preferred_sources = ['finnhub', 'alpha_vantage', 'iex']
+            preferred_sources = ['finnhub', 'iex']
 
         sentiments = []
         sources_used = []
@@ -318,13 +315,7 @@ class RealHistoricalDataAggregator:
                 # Rate limiting with proper time windows
                 current_time = time.time()
 
-                if source == 'alpha_vantage':
-                    # Alpha Vantage: 25 requests per day
-                    if self.request_count['alpha_vantage'] >= 25:
-                        logger.warning("Alpha Vantage daily limit reached (25 requests)")
-                        continue
-
-                elif source == 'finnhub':
+                if source == 'finnhub':
                     # Finnhub: 60 requests per minute
                     # Check if we need to reset the counter (new minute window)
                     time_elapsed = current_time - self.rate_limit_window_start['finnhub']

@@ -49,6 +49,7 @@ class CodeGeneratorAgent(BaseAgent):
         previous_strategy = input_data.get('previous_strategy')
         iteration = input_data.get('iteration', 1)
         data_insights = input_data.get('data_insights')
+        politician_data = input_data.get('politician_data')
 
         changes_made = []
 
@@ -73,8 +74,8 @@ class CodeGeneratorAgent(BaseAgent):
                 }
             strategy = result.get('strategy', {})
 
-        # Generate code
-        code_result = generate_trading_bot_code(strategy)
+        # Generate code with politician data context if available
+        code_result = generate_trading_bot_code(strategy, politician_data=politician_data)
         if not code_result.get('success'):
             return {
                 'success': False,

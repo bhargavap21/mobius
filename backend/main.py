@@ -37,6 +37,11 @@ from tools.code_generator import (
     CODE_GENERATION_TOOLS,
 )
 from tools.backtester import backtest_strategy
+from tools.politician_trades import (
+    get_politician_trades,
+    get_pelosi_portfolio_tickers,
+    POLITICIAN_TRADING_TOOLS,
+)
 
 # Import routes
 from routes.auth_routes import router as auth_router
@@ -104,6 +109,15 @@ async def startup_event():
 
     # Register code generation tools
     for tool in CODE_GENERATION_TOOLS:
+        orchestrator.register_tool(
+            tool["name"],
+            tool["description"],
+            tool["input_schema"],
+            eval(tool["name"]),
+        )
+
+    # Register politician trading tools
+    for tool in POLITICIAN_TRADING_TOOLS:
         orchestrator.register_tool(
             tool["name"],
             tool["description"],

@@ -1,10 +1,13 @@
 """Configuration management using environment variables"""
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from root .env file
+root_dir = Path(__file__).parent.parent
+env_path = root_dir / '.env'
+load_dotenv(dotenv_path=env_path)
 
 
 class Settings(BaseSettings):
@@ -12,6 +15,7 @@ class Settings(BaseSettings):
 
     # AI API Keys
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
+    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")  # Development default
 
     # Trading API Keys (Alpaca)
     alpaca_api_key: str = os.getenv("ALPACA_API_KEY", "")

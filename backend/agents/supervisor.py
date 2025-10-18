@@ -82,6 +82,41 @@ class SupervisorAgent(BaseAgent):
             await progress.emit_supervisor_start(session_id, user_query)
             logger.info(f"✅ Event emitted")
 
+        # STEP -1: Check if this is a politician trading strategy and fetch real data
+        politician_data = None
+        query_lower = user_query.lower()
+        if 'pelosi' in query_lower or 'politician' in query_lower or 'congress' in query_lower or 'senator' in query_lower:
+            logger.info(f"🏛️ Detected politician trading request, fetching real data...")
+            try:
+                from tools.politician_trades import get_politician_trades, get_pelosi_portfolio_tickers
+
+                # Determine which politician
+                politician_name = None
+                if 'pelosi' in query_lower:
+                    politician_name = "Pelosi"
+
+                # Fetch recent trades
+                trades_data = get_politician_trades(politician_name=politician_name, days_back=180)
+                logger.info(f"✅ Fetched {len(trades_data.get('trades', []))} politician trades")
+
+                # Get portfolio tickers if Pelosi-specific
+                if politician_name == "Pelosi":
+                    tickers = get_pelosi_portfolio_tickers()
+                    logger.info(f"✅ Fetched {len(tickers)} Pelosi portfolio tickers: {tickers[:5]}")
+                    politician_data = {
+                        'trades': trades_data.get('trades', []),
+                        'tickers': tickers,
+                        'summary': trades_data.get('summary', {})
+                    }
+                else:
+                    politician_data = {
+                        'trades': trades_data.get('trades', []),
+                        'summary': trades_data.get('summary', {})
+                    }
+            except Exception as e:
+                logger.error(f"❌ Error fetching politician data: {e}")
+                politician_data = None
+
         # STEP 0: Generate insights configuration (only once at start)
         logger.info(f"🔍 Analyzing query to determine helpful visualizations...")
         if progress:
@@ -129,6 +164,11 @@ class SupervisorAgent(BaseAgent):
                 'previous_strategy': strategy,
                 'iteration': iteration
             }
+
+            # Pass politician trading data if available
+            if politician_data:
+                code_input['politician_data'] = politician_data
+                logger.info(f"🏛️ Passing {len(politician_data.get('trades', []))} politician trades to CodeGenerator...")
 
             # If we have data insights from previous iteration, include them
             if iteration > 1 and 'data_insights' in locals() and data_insights:
