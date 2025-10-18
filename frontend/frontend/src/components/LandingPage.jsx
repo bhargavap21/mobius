@@ -117,11 +117,11 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
           {/* Center - 3D Logo */}
           <div className="w-1/2 h-full absolute left-1/2 -translate-x-1/2 top-0 flex items-center justify-center" style={{ isolation: 'isolate' }}>
             <div className="w-full h-full flex items-center justify-center">
-              <iframe 
-                src='https://my.spline.design/mobiusmiamisunset-ArOELRR7PU5HgXYf0VhmkKmZ/' 
-                frameBorder='0' 
-                width='100%' 
-                height='100%'
+              <iframe
+                src='https://my.spline.design/mobiusmiamisunsetcopy-MUm2jAuBTZuFMA3QOb3Rzp1a/'
+                frameBorder='0'
+                width='1500'
+                height='1500'
                 title="Mobius 3D Logo"
                 style={{ border: 'none' }}
               />
