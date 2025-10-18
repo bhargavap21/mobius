@@ -472,7 +472,7 @@ function AgentPlacard({ agent, onLike, onDownload, onSaveToMyBots, onRemix, isAu
             <span className="rounded-full border border-white/10 bg-transparent px-2 py-0.5 text-xs text-white/60">
               +{agent.tags.length - 3}
             </span>
-          ))}
+          )}
         </div>
 
         {/* Engagement Stats */}
