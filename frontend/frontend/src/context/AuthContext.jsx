@@ -15,15 +15,68 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Load user from localStorage on mount
+  // Load user from localStorage on mount and handle email confirmation
   useEffect(() => {
+    const handleEmailConfirmation = () => {
+      // Check if there are access tokens in the URL hash (from email confirmation)
+      const hash = window.location.hash;
+      if (hash && hash.includes('access_token=')) {
+        try {
+          // Parse the hash parameters
+          const params = new URLSearchParams(hash.substring(1)); // Remove the # symbol
+          const accessToken = params.get('access_token');
+          const tokenType = params.get('token_type');
+          const expiresIn = params.get('expires_in');
+          const refreshToken = params.get('refresh_token');
+          
+          if (accessToken) {
+            // Store the tokens
+            localStorage.setItem('access_token', accessToken);
+            if (refreshToken) {
+              localStorage.setItem('refresh_token', refreshToken);
+            }
+            
+            // Clear the hash from URL
+            window.history.replaceState(null, null, window.location.pathname);
+            
+            // Fetch user data using the access token
+            fetch('http://localhost:8000/auth/me', {
+              headers: {
+                'Authorization': `Bearer ${accessToken}`
+              }
+            })
+            .then(response => response.json())
+            .then(userData => {
+              localStorage.setItem('user', JSON.stringify(userData));
+              setToken(accessToken);
+              setUser(userData);
+              
+              // Redirect to AI dashboard after successful email confirmation
+              // This will trigger a page reload to show the AI building interface
+              window.location.href = '/';
+            })
+            .catch(error => {
+              console.error('Error fetching user data:', error);
+            });
+          }
+        } catch (error) {
+          console.error('Error parsing email confirmation tokens:', error);
+        }
+      }
+    };
+
+    // Handle email confirmation first
+    handleEmailConfirmation();
+
+    // Then load from localStorage if no email confirmation tokens
     const storedToken = localStorage.getItem('access_token');
     const storedUser = localStorage.getItem('user');
 
-    if (storedToken && storedUser) {
+    if (storedToken && storedUser && !window.location.hash.includes('access_token=')) {
       setToken(storedToken);
       setUser(JSON.parse(storedUser));
     }
+    
     setLoading(false);
   }, []);
 
