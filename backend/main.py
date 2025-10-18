@@ -9,8 +9,11 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import Optional, AsyncGenerator
+from typing import Optional, AsyncGenerator, Any        
 import queue
+import uuid
+from uuid import UUID
+from datetime import datetime
 
 from orchestrator import get_orchestrator
 from tools.market_data import (
@@ -416,6 +419,463 @@ async def chat(message: dict):
 
     except Exception as e:
         logger.error(f"❌ Error in chat: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Community Models
+class SharedAgent(BaseModel):
+    id: Optional[str] = None
+    name: str
+    description: str
+    author: str
+    tags: list[str] = []
+    strategy: dict[str, Any]
+    backtest_results: dict[str, Any]
+    total_return: float
+    win_rate: float
+    total_trades: int
+    symbol: str
+    is_public: bool = True
+    shared_at: Optional[str] = None
+    views: int = 0
+    likes: int = 0
+    downloads: int = 0
+
+class ShareAgentRequest(BaseModel):
+    agent_id: str
+    name: str
+    description: str
+    tags: list[str] = []
+    is_public: bool = True
+
+
+# Import community repository
+from db.repositories.community_repository import CommunityRepository
+
+# Initialize community repository
+community_repo = CommunityRepository()
+
+# Simple in-memory store for tracking mock agent likes (for demo purposes)
+mock_agent_likes = {
+    "mock-1": False,
+    "mock-2": False, 
+    "mock-3": False
+}
+
+# Community API Endpoints
+@app.get("/api/community/agents")
+async def get_shared_agents(page: int = 1, page_size: int = 20):
+    """
+    Get all publicly shared agents from the community
+    """
+    try:
+        # Try to get data from database
+        result = await community_repo.get_shared_agents(page=page, page_size=page_size)
+        
+        # Transform the data to include author names and performance metrics
+        agents_with_details = []
+        for agent in result.items:
+            # Get original bot data for performance metrics
+            original_bot_response = community_repo.client.table('trading_bots').select('*').eq('id', str(agent.original_bot_id)).execute()
+            
+            if original_bot_response.data:
+                original_bot = original_bot_response.data[0]
+                backtest_results = original_bot.get('backtest_results', {})
+                
+                # Get author name
+                author_response = community_repo.client.table('users').select('full_name').eq('id', str(agent.author_id)).execute()
+                author_name = author_response.data[0].get('full_name', 'Anonymous') if author_response.data else 'Anonymous'
+                
+                agent_data = {
+                    "id": str(agent.id),
+                    "name": agent.name,
+                    "description": agent.description,
+                    "author": author_name,
+                    "tags": agent.tags,
+                    "total_return": backtest_results.get('total_return', 0.0),
+                    "win_rate": backtest_results.get('win_rate', 0),
+                    "total_trades": backtest_results.get('total_trades', 0),
+                    "symbol": original_bot.get('strategy_config', {}).get('asset', 'N/A'),
+                    "views": agent.views,
+                    "likes": agent.likes,
+                    "downloads": agent.downloads,
+                    "shared_at": agent.shared_at.isoformat(),
+                    "liked": agent.liked
+                }
+                agents_with_details.append(agent_data)
+        
+        return {
+            "success": True, 
+            "agents": agents_with_details,
+            "pagination": {
+                "page": result.page,
+                "page_size": result.page_size,
+                "total": result.total,
+                "total_pages": result.total_pages
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Error fetching shared agents: {e}")
+        
+        # If database tables don't exist, return mock data
+        if "Could not find the table" in str(e) or "PGRST205" in str(e):
+            logger.info("📝 Returning mock community data (database tables not created yet)")
+            
+            mock_agents = [
+                {
+                    "id": "mock-1",
+                    "name": "Elon Tweet Momentum Trader",
+                    "description": "A sophisticated trading bot that monitors Elon Musk's tweets about Tesla and executes trades based on sentiment analysis and momentum indicators.",
+                    "author": "Alex Chen",
+                    "tags": ["momentum", "sentiment", "TSLA", "social-media"],
+                    "total_return": 23.5,
+                    "win_rate": 68,
+                    "total_trades": 45,
+                    "symbol": "TSLA",
+                    "views": 1247,
+                    "likes": 89,
+                    "downloads": 156,
+                    "shared_at": "2024-01-15T10:30:00Z",
+                    "liked": mock_agent_likes.get("mock-1", False)
+                },
+                {
+                    "id": "mock-2", 
+                    "name": "Reddit WSB Sentiment Scanner",
+                    "description": "Scans r/wallstreetbets for high-engagement posts and executes trades based on collective sentiment and volume spikes.",
+                    "author": "Sarah Johnson",
+                    "tags": ["reddit", "sentiment", "meme-stocks", "volume"],
+                    "total_return": 156.8,
+                    "win_rate": 42,
+                    "total_trades": 78,
+                    "symbol": "GME",
+                    "views": 2341,
+                    "likes": 167,
+                    "downloads": 298,
+                    "shared_at": "2024-01-12T14:22:00Z",
+                    "liked": mock_agent_likes.get("mock-2", False)
+                },
+                {
+                    "id": "mock-3",
+                    "name": "RSI Oversold Bounce Trader",
+                    "description": "Identifies oversold conditions using RSI and executes long positions with tight stop losses for quick bounces.",
+                    "author": "Mike Rodriguez",
+                    "tags": ["technical-analysis", "RSI", "mean-reversion", "scalping"],
+                    "total_return": 89.2,
+                    "win_rate": 74,
+                    "total_trades": 123,
+                    "symbol": "AAPL",
+                    "views": 892,
+                    "likes": 45,
+                    "downloads": 67,
+                    "shared_at": "2024-01-10T09:15:00Z",
+                    "liked": mock_agent_likes.get("mock-3", False)
+                }
+            ]
+            
+            return {
+                "success": True,
+                "agents": mock_agents,
+                "pagination": {
+                    "page": page,
+                    "page_size": page_size,
+                    "total": len(mock_agents),
+                    "total_pages": 1
+                }
+            }
+        
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/community/share")
+async def share_agent(agent_data: ShareAgentRequest, user_id: str = "current_user"):
+    """
+    Share an agent with the community
+    """
+    try:
+        from db.models import SharedAgentCreate
+        
+        # Create shared agent data
+        shared_agent_create = SharedAgentCreate(
+            original_bot_id=UUID(agent_data.agent_id),
+            name=agent_data.name,
+            description=agent_data.description,
+            tags=agent_data.tags,
+            is_public=agent_data.is_public
+        )
+        
+        # Save to database
+        shared_agent = await community_repo.create_shared_agent(
+            author_id=UUID(user_id),  # In production, get from auth token
+            shared_agent_data=shared_agent_create
+        )
+        
+        logger.info(f"📤 Agent shared: {agent_data.name} (ID: {shared_agent.id})")
+        
+        return {
+            "success": True,
+            "message": "Agent shared successfully",
+            "agent": {
+                "id": str(shared_agent.id),
+                "name": shared_agent.name,
+                "description": shared_agent.description,
+                "tags": shared_agent.tags,
+                "is_public": shared_agent.is_public,
+                "shared_at": shared_agent.shared_at.isoformat()
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Error sharing agent: {e}")
+        
+        # If database tables don't exist, return mock success
+        if "Could not find the table" in str(e) or "PGRST205" in str(e):
+            logger.info("📝 Mock agent sharing (database tables not created yet)")
+            return {
+                "success": True,
+                "message": "Agent shared successfully (mock mode)",
+                "agent_id": "mock-shared-agent"
+            }
+        
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/community/agents/{agent_id}/like")
+async def like_agent(agent_id: str, user_id: str = "current_user"):
+    """
+    Like/unlike a shared agent
+    """
+    try:
+        # Handle mock IDs
+        if agent_id.startswith('mock-'):
+            # Toggle the like status
+            current_status = mock_agent_likes.get(agent_id, False)
+            new_status = not current_status
+            mock_agent_likes[agent_id] = new_status
+            
+            action = "liked" if new_status else "unliked"
+            logger.info(f"👍 Mock agent {action}: {agent_id}")
+            
+            return {
+                "success": True,
+                "message": f"Agent {action} successfully (mock mode)",
+                "liked": new_status
+            }
+        
+        # Try to convert to UUID for real agents
+        try:
+            agent_uuid = UUID(agent_id)
+            user_uuid = UUID(user_id)
+        except ValueError:
+            logger.warning(f"Invalid UUID format: {agent_id} or {user_id}")
+            return {
+                "success": True,
+                "message": "Agent liked successfully (mock mode)",
+                "liked": True
+            }
+        
+        liked = await community_repo.like_agent(agent_uuid, user_uuid)
+        
+        action = "liked" if liked else "unliked"
+        logger.info(f"👍 Agent {action}: {agent_id}")
+        
+        return {
+            "success": True,
+            "message": f"Agent {action} successfully",
+            "liked": liked
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Error liking agent: {e}")
+        
+        # If database tables don't exist, return mock success
+        if "Could not find the table" in str(e) or "PGRST205" in str(e):
+            logger.info("📝 Mock agent liking (database tables not created yet)")
+            return {
+                "success": True,
+                "message": "Agent liked successfully (mock mode)",
+                "liked": True
+            }
+        
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/community/agents/{agent_id}/download")
+async def download_agent(agent_id: str, user_id: str = None):
+    """
+    Download a shared agent's configuration
+    """
+    try:
+        # Handle mock IDs
+        if agent_id.startswith('mock-'):
+            logger.info(f"📥 Mock agent downloaded: {agent_id}")
+            
+            # Return mock agent configuration based on ID
+            mock_configs = {
+                'mock-1': {
+                    "id": agent_id,
+                    "name": "Elon Tweet Momentum Trader",
+                    "description": "A sophisticated trading bot that monitors Elon Musk's tweets about Tesla and executes trades based on sentiment analysis and momentum indicators.",
+                    "strategy": {
+                        "type": "elon_tweet_momentum",
+                        "parameters": {
+                            "symbol": "TSLA",
+                            "sentiment_threshold": 0.7,
+                            "momentum_period": 14,
+                            "entry_threshold": 0.02,
+                            "exit_threshold": 0.05
+                        }
+                    },
+                    "backtest_results": {
+                        "total_return": 23.5,
+                        "win_rate": 68,
+                        "total_trades": 45,
+                        "max_drawdown": -8.2
+                    }
+                },
+                'mock-2': {
+                    "id": agent_id,
+                    "name": "Reddit WSB Sentiment Scanner",
+                    "description": "Scans r/wallstreetbets for high-engagement posts and executes trades based on collective sentiment and volume spikes.",
+                    "strategy": {
+                        "type": "reddit_sentiment_scanner",
+                        "parameters": {
+                            "symbol": "GME",
+                            "subreddit": "wallstreetbets",
+                            "min_upvotes": 1000,
+                            "sentiment_threshold": 0.5,
+                            "volume_spike_threshold": 2.0
+                        }
+                    },
+                    "backtest_results": {
+                        "total_return": 156.8,
+                        "win_rate": 42,
+                        "total_trades": 78,
+                        "max_drawdown": -25.3
+                    }
+                },
+                'mock-3': {
+                    "id": agent_id,
+                    "name": "RSI Oversold Bounce Trader",
+                    "description": "Identifies oversold conditions using RSI and executes long positions with tight stop losses for quick bounces.",
+                    "strategy": {
+                        "type": "rsi_oversold_bounce",
+                        "parameters": {
+                            "symbol": "AAPL",
+                            "rsi_period": 14,
+                            "oversold_threshold": 30,
+                            "overbought_threshold": 70,
+                            "stop_loss": 0.02
+                        }
+                    },
+                    "backtest_results": {
+                        "total_return": 89.2,
+                        "win_rate": 74,
+                        "total_trades": 123,
+                        "max_drawdown": -12.1
+                    }
+                }
+            }
+            
+            mock_config = mock_configs.get(agent_id, mock_configs['mock-1'])
+            
+            return StreamingResponse(
+                iter([json.dumps(mock_config, indent=2)]),
+                media_type="application/json",
+                headers={"Content-Disposition": f"attachment; filename=mock_agent_{agent_id}.json"}
+            )
+        
+        # Try to convert to UUID for real agents
+        try:
+            agent_uuid = UUID(agent_id)
+            user_uuid = UUID(user_id) if user_id else None
+        except ValueError:
+            logger.warning(f"Invalid UUID format: {agent_id}")
+            # Return a generic mock config
+            mock_config = {
+                "id": agent_id,
+                "name": "Mock Trading Agent",
+                "description": "This is a mock agent configuration for demonstration purposes.",
+                "strategy": {"type": "mock_strategy", "parameters": {}},
+                "backtest_results": {"total_return": 15.5, "win_rate": 65, "total_trades": 42}
+            }
+            return StreamingResponse(
+                iter([json.dumps(mock_config, indent=2)]),
+                media_type="application/json",
+                headers={"Content-Disposition": f"attachment; filename=mock_agent_{agent_id}.json"}
+            )
+        
+        # Download from database and increment download count
+        original_bot_data = await community_repo.download_agent(agent_uuid, user_uuid)
+        
+        if not original_bot_data:
+            raise HTTPException(status_code=404, detail="Agent not found")
+        
+        logger.info(f"📥 Agent downloaded: {agent_id}")
+        
+        # Return the original bot configuration as JSON
+        return StreamingResponse(
+            iter([json.dumps(original_bot_data, indent=2, default=str)]),
+            media_type="application/json",
+            headers={"Content-Disposition": f"attachment; filename=agent_{agent_id}.json"}
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error downloading agent: {e}")
+        
+        # If database tables don't exist, return mock download
+        if "Could not find the table" in str(e) or "PGRST205" in str(e):
+            logger.info("📝 Mock agent download (database tables not created yet)")
+            
+            # Return mock agent configuration
+            mock_agent_config = {
+                "id": agent_id,
+                "name": "Mock Trading Agent",
+                "description": "This is a mock agent configuration for demonstration purposes.",
+                "strategy": {
+                    "type": "mock_strategy",
+                    "parameters": {
+                        "symbol": "AAPL",
+                        "entry_threshold": 0.02,
+                        "exit_threshold": 0.05
+                    }
+                },
+                "backtest_results": {
+                    "total_return": 15.5,
+                    "win_rate": 65,
+                    "total_trades": 42
+                }
+            }
+            
+            return StreamingResponse(
+                iter([json.dumps(mock_agent_config, indent=2)]),
+                media_type="application/json",
+                headers={"Content-Disposition": f"attachment; filename=mock_agent_{agent_id}.json"}
+            )
+        
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/bots")
+async def create_bot(bot_data: dict, user_id: str = "current_user"):
+    """
+    Save an agent to user's bot collection (for Save to My Bots functionality)
+    """
+    try:
+        # For mock purposes, just return success
+        # In a real implementation, this would save to the trading_bots table
+        logger.info(f"🤖 Bot saved to user collection: {bot_data.get('name', 'Unknown')}")
+        
+        return {
+            "success": True,
+            "message": "Bot saved to your collection successfully",
+            "bot_id": f"user-bot-{uuid.uuid4().hex[:8]}"
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Error saving bot: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

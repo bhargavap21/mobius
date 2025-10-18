@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { AuthProvider, useAuth } from './context/AuthContext'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { useAuth } from './context/AuthContext'
 import StrategyInput from './components/StrategyInput'
 import CodeDisplay from './components/CodeDisplay'
 import LoadingSpinner from './components/LoadingSpinner'
@@ -9,10 +10,13 @@ import AgentActivityLogPolling from './components/AgentActivityLogPolling'
 import Login from './components/Login'
 import Signup from './components/Signup'
 import BotLibrary from './components/BotLibrary'
+import CommunityPage from './pages/CommunityPage'
 import './index.css'
 
 function AppContent() {
   const { user, isAuthenticated, signout, getAuthHeaders } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
   const [strategy, setStrategy] = useState(null)
   const [generatedCode, setGeneratedCode] = useState(null)
   const [backtestResults, setBacktestResults] = useState(null)
@@ -359,6 +363,14 @@ function AppContent() {
             </div>
 
             <div className="flex items-center gap-3">
+              {/* Community tab - accessible to everyone */}
+              <button
+                onClick={() => navigate('/community')}
+                className="btn btn-secondary text-sm"
+              >
+                👥 Community
+              </button>
+              
               {isAuthenticated ? (
                 <>
                   <button
@@ -563,16 +575,13 @@ function AppContent() {
           onLoadBot={handleLoadBot}
         />
       )}
+
     </div>
   )
 }
 
 function App() {
-  return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
-  )
+  return <AppContent />
 }
 
 export default App

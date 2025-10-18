@@ -54,6 +54,77 @@ CREATE INDEX IF NOT EXISTS idx_trading_bots_created_at ON public.trading_bots(cr
 CREATE INDEX IF NOT EXISTS idx_trading_bots_is_favorite ON public.trading_bots(user_id, is_favorite);
 
 -- ============================================================================
+-- COMMUNITY SHARED AGENTS TABLE
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.shared_agents (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    original_bot_id UUID NOT NULL REFERENCES public.trading_bots(id) ON DELETE CASCADE,
+    author_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    
+    -- Shared agent metadata
+    name TEXT NOT NULL,
+    description TEXT NOT NULL,
+    tags TEXT[] DEFAULT '{}',
+    
+    -- Community metrics
+    views INTEGER DEFAULT 0,
+    likes INTEGER DEFAULT 0,
+    downloads INTEGER DEFAULT 0,
+    
+    -- Privacy settings
+    is_public BOOLEAN DEFAULT TRUE,
+    
+    -- Timestamps
+    shared_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    -- Constraints
+    CONSTRAINT shared_agents_name_check CHECK (char_length(name) > 0 AND char_length(name) <= 255),
+    CONSTRAINT shared_agents_description_check CHECK (char_length(description) > 0 AND char_length(description) <= 2000)
+);
+
+-- ============================================================================
+-- COMMUNITY LIKES TABLE
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.agent_likes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    shared_agent_id UUID NOT NULL REFERENCES public.shared_agents(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    liked_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    -- Ensure one like per user per agent
+    UNIQUE(shared_agent_id, user_id)
+);
+
+-- ============================================================================
+-- COMMUNITY DOWNLOADS TABLE
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.agent_downloads (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    shared_agent_id UUID NOT NULL REFERENCES public.shared_agents(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES public.users(id) ON DELETE SET NULL, -- Allow anonymous downloads
+    downloaded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    ip_address INET, -- Track anonymous downloads by IP
+    user_agent TEXT -- Track browser/client info
+);
+
+-- Create indexes for community tables
+CREATE INDEX IF NOT EXISTS idx_shared_agents_author_id ON public.shared_agents(author_id);
+CREATE INDEX IF NOT EXISTS idx_shared_agents_shared_at ON public.shared_agents(shared_at DESC);
+CREATE INDEX IF NOT EXISTS idx_shared_agents_is_public ON public.shared_agents(is_public);
+CREATE INDEX IF NOT EXISTS idx_shared_agents_views ON public.shared_agents(views DESC);
+CREATE INDEX IF NOT EXISTS idx_shared_agents_likes ON public.shared_agents(likes DESC);
+CREATE INDEX IF NOT EXISTS idx_shared_agents_downloads ON public.shared_agents(downloads DESC);
+CREATE INDEX IF NOT EXISTS idx_shared_agents_tags ON public.shared_agents USING GIN(tags);
+
+CREATE INDEX IF NOT EXISTS idx_agent_likes_shared_agent_id ON public.agent_likes(shared_agent_id);
+CREATE INDEX IF NOT EXISTS idx_agent_likes_user_id ON public.agent_likes(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_agent_downloads_shared_agent_id ON public.agent_downloads(shared_agent_id);
+CREATE INDEX IF NOT EXISTS idx_agent_downloads_user_id ON public.agent_downloads(user_id);
+CREATE INDEX IF NOT EXISTS idx_agent_downloads_downloaded_at ON public.agent_downloads(downloaded_at DESC);
+
+-- ============================================================================
 -- BOT EXECUTIONS TABLE (optional - for tracking live runs)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.bot_executions (

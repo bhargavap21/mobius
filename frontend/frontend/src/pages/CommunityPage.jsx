@@ -1,0 +1,651 @@
+import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Share2, Users, Star, TrendingUp, Eye, Download, Heart, ArrowLeft, Plus, Save, Sparkles } from 'lucide-react'
+
+export default function CommunityPage({ userAgents = [], isAuthenticated = false }) {
+  const navigate = useNavigate()
+  const [activeTab, setActiveTab] = useState('shared')
+  const [sharedAgents, setSharedAgents] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [showShareForm, setShowShareForm] = useState(false)
+
+  // Fetch shared agents from community
+  useEffect(() => {
+    fetchSharedAgents()
+  }, [])
+
+  const fetchSharedAgents = async () => {
+    setLoading(true)
+    try {
+      const response = await fetch('http://localhost:8000/api/community/agents')
+      if (response.ok) {
+        const data = await response.json()
+        setSharedAgents(data.agents)
+      } else {
+        console.error('Failed to fetch shared agents')
+      }
+    } catch (error) {
+      console.error('Error fetching shared agents:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleShareAgent = async (agentData) => {
+    try {
+      const response = await fetch('http://localhost:8000/api/community/share', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(agentData),
+      })
+
+      if (response.ok) {
+        setShowShareForm(false)
+        fetchSharedAgents() // Refresh the list
+      }
+    } catch (error) {
+      console.error('Error sharing agent:', error)
+    }
+  }
+
+  const handleLikeAgent = async (agentId) => {
+    if (!isAuthenticated) {
+      alert('Please sign in to like agents')
+      return
+    }
+
+    try {
+      // Optimistically update the UI
+      setSharedAgents(prevAgents => 
+        prevAgents.map(agent => 
+          agent.id === agentId 
+            ? { ...agent, liked: !agent.liked }
+            : agent
+        )
+      )
+
+      const response = await fetch(`http://localhost:8000/api/community/agents/${agentId}/like`, {
+        method: 'POST',
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        console.log('Like response:', result.message)
+        // Refresh to get the actual state from server
+        fetchSharedAgents()
+      } else {
+        // Revert optimistic update on error
+        setSharedAgents(prevAgents => 
+          prevAgents.map(agent => 
+            agent.id === agentId 
+              ? { ...agent, liked: !agent.liked }
+              : agent
+          )
+        )
+        console.error('Failed to like agent')
+      }
+    } catch (error) {
+      console.error('Error liking agent:', error)
+      // Revert optimistic update on error
+      setSharedAgents(prevAgents => 
+        prevAgents.map(agent => 
+          agent.id === agentId 
+            ? { ...agent, liked: !agent.liked }
+            : agent
+        )
+      )
+    }
+  }
+
+  const handleDownloadAgent = async (agentId) => {
+    try {
+      const response = await fetch(`http://localhost:8000/api/community/agents/${agentId}/download`)
+      if (response.ok) {
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `trading-agent-${agentId}.json`
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+        
+        // Show success message
+        console.log(`✅ Downloaded agent configuration: ${agentId}`)
+        
+        // Refresh the agents list to update download counts
+        fetchSharedAgents()
+      } else {
+        console.error('Failed to download agent')
+        alert('Failed to download agent. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error downloading agent:', error)
+      alert('Error downloading agent. Please try again.')
+    }
+  }
+
+  const handleSaveToMyBots = async (agentId) => {
+    if (!isAuthenticated) {
+      alert('Please sign in to save agents to your collection')
+      return
+    }
+
+    try {
+      // Get the agent configuration
+      const response = await fetch(`http://localhost:8000/api/community/agents/${agentId}/download`)
+      if (response.ok) {
+        const agentConfig = await response.json()
+        
+        // Save to user's bot collection
+        const saveResponse = await fetch('http://localhost:8000/api/bots', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: `${agentConfig.name} (Saved)`,
+            description: `Saved from community: ${agentConfig.description}`,
+            strategy_config: agentConfig.strategy,
+            backtest_results: agentConfig.backtest_results,
+            source: 'community',
+            original_agent_id: agentId
+          }),
+        })
+
+        if (saveResponse.ok) {
+          console.log(`✅ Agent saved to My Bots: ${agentId}`)
+          alert('Agent saved to your My Bots collection!')
+        } else {
+          console.error('Failed to save agent')
+          alert('Failed to save agent. Please try again.')
+        }
+      } else {
+        console.error('Failed to get agent configuration')
+        alert('Failed to get agent configuration. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error saving agent:', error)
+      alert('Error saving agent. Please try again.')
+    }
+  }
+
+  const handleRemixAgent = (agentId) => {
+    if (!isAuthenticated) {
+      alert('Please sign in to remix agents')
+      return
+    }
+
+    // Navigate to main page with remix mode
+    navigate(`/?remix=${agentId}`)
+  }
+
+  const handleGoCreateAgents = () => {
+    navigate('/')
+  }
+
+  return (
+    <div className="min-h-screen bg-dark-bg">
+      {/* Header */}
+      <div className="bg-dark-surface border-b border-dark-border">
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => navigate('/')}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <ArrowLeft className="w-6 h-6" />
+              </button>
+              <div>
+                <h1 className="text-2xl font-bold text-white">Community</h1>
+                <p className="text-sm text-gray-400">Share your trading agents and discover strategies from other traders</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleGoCreateAgents}
+                className="btn btn-primary text-sm flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Create Agents
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        {/* Tab Navigation */}
+        <div className="flex space-x-1 mb-8 bg-dark-surface p-1 rounded-lg w-fit">
+          <button
+            onClick={() => setActiveTab('shared')}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeTab === 'shared'
+                ? 'bg-accent-primary text-white'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <Users className="w-4 h-4 inline mr-2" />
+            Shared Agents
+          </button>
+          {isAuthenticated && (
+            <button
+              onClick={() => setActiveTab('share')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'share'
+                  ? 'bg-accent-primary text-white'
+                  : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <Share2 className="w-4 h-4 inline mr-2" />
+              Share Agent
+            </button>
+          )}
+        </div>
+
+        {/* Content */}
+        {activeTab === 'shared' && (
+          <SharedAgentsList 
+            agents={sharedAgents} 
+            loading={loading}
+            onLike={handleLikeAgent}
+            onDownload={handleDownloadAgent}
+            onSaveToMyBots={handleSaveToMyBots}
+            onRemix={handleRemixAgent}
+            isAuthenticated={isAuthenticated}
+          />
+        )}
+
+        {activeTab === 'share' && !isAuthenticated && (
+          <div className="bg-dark-surface rounded-xl border border-dark-border p-8 text-center">
+            <Share2 className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-white mb-2">Sign In to Share Agents</h3>
+            <p className="text-gray-400 mb-6">You need to be signed in to share your trading agents with the community.</p>
+            <div className="flex gap-4 justify-center">
+              <button
+                onClick={() => setActiveTab('shared')}
+                className="bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 transition-colors"
+              >
+                Browse Community Instead
+              </button>
+              <button
+                onClick={handleGoCreateAgents}
+                className="bg-accent-primary text-white px-6 py-3 rounded-lg hover:bg-accent-primary/90 transition-colors"
+              >
+                Create Your First Agent
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'share' && isAuthenticated && (
+          <ShareAgentForm 
+            userAgents={userAgents}
+            onShare={handleShareAgent}
+            onCancel={() => setActiveTab('shared')}
+          />
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Shared Agents List Component
+function SharedAgentsList({ agents, loading, onLike, onDownload, onSaveToMyBots, onRemix, isAuthenticated }) {
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className="bg-dark-surface rounded-xl border border-dark-border overflow-hidden animate-pulse">
+            {/* Image placeholder */}
+            <div className="h-48 bg-gray-700"></div>
+            
+            {/* Content placeholder */}
+            <div className="p-6">
+              <div className="h-6 bg-gray-700 rounded mb-3"></div>
+              <div className="h-4 bg-gray-700 rounded mb-2"></div>
+              <div className="h-4 bg-gray-700 rounded mb-4 w-3/4"></div>
+              
+              {/* Metrics placeholder */}
+              <div className="grid grid-cols-2 gap-4 mb-4 p-4 bg-gray-800 rounded-lg">
+                <div className="text-center">
+                  <div className="h-6 bg-gray-700 rounded mb-1"></div>
+                  <div className="h-3 bg-gray-700 rounded"></div>
+                </div>
+                <div className="text-center">
+                  <div className="h-6 bg-gray-700 rounded mb-1"></div>
+                  <div className="h-3 bg-gray-700 rounded"></div>
+                </div>
+              </div>
+              
+              {/* Tags placeholder */}
+              <div className="flex gap-2 mb-4">
+                <div className="h-6 bg-gray-700 rounded-full w-16"></div>
+                <div className="h-6 bg-gray-700 rounded-full w-20"></div>
+              </div>
+              
+              {/* Buttons placeholder */}
+              <div className="flex gap-3">
+                <div className="flex-1 h-12 bg-gray-700 rounded-lg"></div>
+                <div className="flex-1 h-12 bg-gray-700 rounded-lg"></div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  if (agents.length === 0) {
+    return (
+      <div className="bg-dark-surface rounded-xl border border-dark-border p-8 text-center">
+        <Users className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+        <h3 className="text-xl font-semibold text-white mb-2">No Agents Shared Yet</h3>
+        <p className="text-gray-400 mb-6">Be the first to share a trading agent with the community!</p>
+        <button
+          onClick={() => window.location.href = '/'}
+          className="bg-accent-primary text-white px-6 py-3 rounded-lg hover:bg-accent-primary/90 transition-colors"
+        >
+          Create Your First Agent
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {agents.map((agent) => (
+        <AgentPlacard 
+          key={agent.id} 
+          agent={agent} 
+          onLike={onLike}
+          onDownload={onDownload}
+          onSaveToMyBots={onSaveToMyBots}
+          onRemix={onRemix}
+          isAuthenticated={isAuthenticated}
+        />
+      ))}
+    </div>
+  )
+}
+
+// Agent Placard Component
+function AgentPlacard({ agent, onLike, onDownload, onSaveToMyBots, onRemix, isAuthenticated }) {
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    })
+  }
+
+  const getPerformanceColor = (returnPct) => {
+    if (returnPct > 0) return 'text-green-400'
+    if (returnPct < 0) return 'text-red-400'
+    return 'text-gray-400'
+  }
+
+  // Get placeholder image based on agent type/tags
+  const getPlaceholderImage = (agent) => {
+    const tags = agent.tags || []
+    if (tags.some(tag => tag.toLowerCase().includes('elon') || tag.toLowerCase().includes('tweet'))) {
+      return '🚀' // Rocket for Elon/Twitter strategies
+    } else if (tags.some(tag => tag.toLowerCase().includes('reddit') || tag.toLowerCase().includes('wsb'))) {
+      return '📈' // Chart for Reddit strategies
+    } else if (tags.some(tag => tag.toLowerCase().includes('rsi') || tag.toLowerCase().includes('technical'))) {
+      return '📊' // Bar chart for technical strategies
+    } else if (tags.some(tag => tag.toLowerCase().includes('crypto'))) {
+      return '₿' // Bitcoin for crypto strategies
+    } else if (tags.some(tag => tag.toLowerCase().includes('momentum'))) {
+      return '⚡' // Lightning for momentum strategies
+    } else {
+      return '🤖' // Default robot icon
+    }
+  }
+
+  return (
+    <div className="bg-dark-surface rounded-xl border border-dark-border overflow-hidden hover:border-accent-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-accent-primary/10 group">
+      {/* Placeholder Image */}
+      <div className="h-48 bg-gradient-to-br from-accent-primary/20 to-purple-500/20 flex items-center justify-center relative overflow-hidden">
+        <div className="text-8xl opacity-80 group-hover:scale-110 transition-transform duration-300">
+          {getPlaceholderImage(agent)}
+        </div>
+        
+        {/* Performance Badge */}
+        <div className="absolute top-4 right-4">
+          <div className={`px-3 py-1 rounded-full text-sm font-bold ${
+            agent.total_return > 0 
+              ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+              : 'bg-red-500/20 text-red-400 border border-red-500/30'
+          }`}>
+            {agent.total_return > 0 ? '+' : ''}{agent.total_return.toFixed(1)}%
+          </div>
+        </div>
+
+        {/* Symbol Badge */}
+        <div className="absolute top-4 left-4">
+          <div className="px-3 py-1 bg-white/10 backdrop-blur-sm rounded-full text-sm font-medium text-white border border-white/20">
+            {agent.symbol}
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="p-6">
+        {/* Header */}
+        <div className="mb-4">
+          <h3 className="text-xl font-bold text-white mb-2 line-clamp-2 group-hover:text-accent-primary transition-colors">
+            {agent.name}
+          </h3>
+          <p className="text-sm text-gray-400 mb-3">by {agent.author || agent.author_name}</p>
+          <p className="text-sm text-gray-300 line-clamp-3 leading-relaxed">
+            {agent.description}
+          </p>
+        </div>
+
+        {/* Performance Metrics */}
+        <div className="grid grid-cols-2 gap-4 mb-4 p-4 bg-dark-bg rounded-lg">
+          <div className="text-center">
+            <div className="text-lg font-bold text-white">{agent.win_rate}%</div>
+            <div className="text-xs text-gray-400">Win Rate</div>
+          </div>
+          <div className="text-center">
+            <div className="text-lg font-bold text-white">{agent.total_trades}</div>
+            <div className="text-xs text-gray-400">Trades</div>
+          </div>
+        </div>
+
+        {/* Tags */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          {agent.tags?.slice(0, 3).map((tag, index) => (
+            <span key={index} className="px-3 py-1 bg-accent-primary/20 text-accent-primary text-xs rounded-full font-medium">
+              {tag}
+            </span>
+          ))}
+          {agent.tags?.length > 3 && (
+            <span className="px-3 py-1 bg-gray-700/50 text-gray-300 text-xs rounded-full font-medium">
+              +{agent.tags.length - 3}
+            </span>
+          )}
+        </div>
+
+        {/* Engagement Stats */}
+        <div className="flex items-center justify-between mb-4 text-sm text-gray-400">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-1">
+              <Eye className="w-4 h-4" />
+              <span>{agent.views?.toLocaleString() || 0}</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <Heart className="w-4 h-4" />
+              <span>{agent.likes}</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <Download className="w-4 h-4" />
+              <span>{agent.downloads}</span>
+            </div>
+          </div>
+          <div className="text-xs">
+            {formatDate(agent.shared_at)}
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="space-y-3">
+          {/* Primary Actions Row */}
+          <div className="flex gap-3">
+            <button
+              onClick={() => onLike(agent.id)}
+              className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all duration-200 flex items-center justify-center space-x-2 ${
+                agent.liked
+                  ? 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30'
+                  : 'bg-gray-700/50 text-gray-300 border border-gray-600/50 hover:bg-gray-600/50 hover:text-white'
+              }`}
+            >
+              <Heart className={`w-4 h-4 ${agent.liked ? 'fill-current' : ''}`} />
+              <span>{agent.liked ? 'Liked' : 'Like'}</span>
+            </button>
+            <button
+              onClick={() => onDownload(agent.id)}
+              className="flex-1 py-3 px-4 bg-accent-primary text-white rounded-lg font-medium hover:bg-accent-primary/90 transition-all duration-200 flex items-center justify-center space-x-2"
+            >
+              <Download className="w-4 h-4" />
+              <span>Download</span>
+            </button>
+          </div>
+
+          {/* Secondary Actions Row - Only show for authenticated users */}
+          {isAuthenticated && (
+            <div className="flex gap-3">
+              <button
+                onClick={() => onSaveToMyBots(agent.id)}
+                className="flex-1 py-2 px-4 bg-green-500/20 text-green-400 border border-green-500/30 rounded-lg font-medium hover:bg-green-500/30 transition-all duration-200 flex items-center justify-center space-x-2"
+              >
+                <Save className="w-4 h-4" />
+                <span>Save to My Bots</span>
+              </button>
+              <button
+                onClick={() => onRemix(agent.id)}
+                className="flex-1 py-2 px-4 bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded-lg font-medium hover:bg-purple-500/30 transition-all duration-200 flex items-center justify-center space-x-2"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Remix</span>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Share Agent Form Component
+function ShareAgentForm({ userAgents, onShare, onCancel }) {
+  const [selectedAgent, setSelectedAgent] = useState('')
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [tags, setTags] = useState('')
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    if (!selectedAgent || !name || !description) return
+
+    const agentData = {
+      original_bot_id: selectedAgent,
+      name,
+      description,
+      tags: tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0)
+    }
+
+    onShare(agentData)
+  }
+
+  return (
+    <div className="bg-dark-surface rounded-xl border border-dark-border p-6">
+      <h3 className="text-xl font-semibold text-white mb-6">Share Your Agent</h3>
+      
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-2">
+            Select Agent to Share
+          </label>
+          <select
+            value={selectedAgent}
+            onChange={(e) => setSelectedAgent(e.target.value)}
+            className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-lg text-white focus:outline-none focus:border-accent-primary"
+            required
+          >
+            <option value="">Choose an agent...</option>
+            {userAgents.map((agent) => (
+              <option key={agent.id} value={agent.id}>
+                {agent.name} - {agent.description}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-2">
+            Display Name
+          </label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-lg text-white focus:outline-none focus:border-accent-primary"
+            placeholder="Give your agent a catchy name..."
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-2">
+            Description
+          </label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-lg text-white focus:outline-none focus:border-accent-primary h-24 resize-none"
+            placeholder="Describe what makes your agent special..."
+            required
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-2">
+            Tags (comma-separated)
+          </label>
+          <input
+            type="text"
+            value={tags}
+            onChange={(e) => setTags(e.target.value)}
+            className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-lg text-white focus:outline-none focus:border-accent-primary"
+            placeholder="momentum, scalping, crypto, etc."
+          />
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="px-6 py-2 bg-accent-primary text-white rounded-lg hover:bg-accent-primary/90 transition-colors"
+          >
+            Share Agent
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
