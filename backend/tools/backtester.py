@@ -5,7 +5,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 import pandas as pd
-import pandas_ta as ta
+import talib as ta
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
@@ -209,14 +209,13 @@ class Backtester:
         if df.empty:
             raise ValueError(f"No historical data available for {symbol}")
 
-        # Calculate technical indicators
-        df['rsi'] = ta.rsi(df['close'], length=14)
-        df['sma_20'] = ta.sma(df['close'], length=20)
-        df['sma_50'] = ta.sma(df['close'], length=50)
-        macd = ta.macd(df['close'])
-        if macd is not None and not macd.empty:
-            df['macd'] = macd.iloc[:, 0]
-            df['macd_signal'] = macd.iloc[:, 1]
+        # Calculate technical indicators using TA-Lib
+        df['rsi'] = ta.RSI(df['close'].values, timeperiod=14)
+        df['sma_20'] = ta.SMA(df['close'].values, timeperiod=20)
+        df['sma_50'] = ta.SMA(df['close'].values, timeperiod=50)
+        macd, macd_signal, macd_hist = ta.MACD(df['close'].values, fastperiod=12, slowperiod=26, signalperiod=9)
+        df['macd'] = macd
+        df['macd_signal'] = macd_signal
 
         # Parse strategy conditions - convert to list format for flexibility
         entry_conditions_raw = strategy.get('entry_conditions', {})
