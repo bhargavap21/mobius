@@ -8,14 +8,29 @@ export default function LandingPage() {
   return (
     <div className="w-full">
       {/* Hero Section with 3D */}
-      <section className="w-full h-screen overflow-hidden relative">
-        <iframe
-          src="https://my.spline.design/untitled-d60805fcfc4322f8deb736b6722c1f49/"
-          width="100%"
-          height="100%"
-          className="w-full h-full border-0"
-          title="3D Trading Bot Visualization"
-        />
+      <section className="w-full h-screen overflow-hidden relative bg-black">
+        <div className="max-w-7xl mx-auto h-full px-6 flex items-center">
+          {/* Left side - Text */}
+          <div className="w-1/2 z-10">
+            <h1 className="text-6xl md:text-7xl font-light text-white mb-6 leading-tight">
+              AI-Powered Trading from <span className="italic font-serif">Strategy to Deployment</span>
+            </h1>
+            <p className="text-xl md:text-2xl text-gray-400 leading-relaxed">
+              Mobius delivers proven algorithms, automated backtesting, and production-ready code to traders, quants, and developers.
+            </p>
+          </div>
+
+          {/* Right side - 3D Book */}
+          <div className="w-1/2 h-full absolute right-0 top-0">
+            <iframe
+              src="https://my.spline.design/untitled-d60805fcfc4322f8deb736b6722c1f49/"
+              width="100%"
+              height="100%"
+              className="w-full h-full border-0"
+              title="3D Trading Bot Visualization"
+            />
+          </div>
+        </div>
 
         {/* Scroll indicator */}
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 animate-bounce">

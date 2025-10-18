@@ -19,6 +19,10 @@ export default {
           warning: '#f59e0b',
           danger: '#ef4444',
         }
+      },
+      animation: {
+        'spin-slow': 'spin 8s linear infinite',
+        'spin-reverse': 'spin 10s linear infinite reverse',
       }
     },
   },
