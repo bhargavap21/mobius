@@ -91,3 +91,16 @@ input::placeholder {
 .animate-pulse-slow {
   animation: pulseSlow 4s ease-in-out infinite;
 }
+
+/* Spline embed styling */
+.spline-embed {
+  /* Zoom out to show the entire scene */
+  transform: scale(0.8) translateY(-5%);
+  transform-origin: center center;
+}
+
+@media (max-width: 768px) {
+  .spline-embed {
+    transform: scale(0.9) translateY(-3%);
+  }
+}

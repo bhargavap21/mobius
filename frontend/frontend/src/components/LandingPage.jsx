@@ -1,8 +1,10 @@
 import { Brain, Zap, Code, BarChart3, TrendingUp, Check } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
-import { useState } from 'react'
+import { useState, lazy, Suspense } from 'react'
 import Login from './Login'
 import Signup from './Signup'
+
+const SplineLogo = lazy(() => import('./SplineLogo'))
 
 export default function LandingPage({ onGetStarted }) {
   const { isAuthenticated } = useAuth()
@@ -46,15 +48,15 @@ export default function LandingPage({ onGetStarted }) {
             </div>
           </div>
 
-          {/* Right side - 3D Book */}
-          <div className="w-1/2 h-full absolute right-0 top-0">
-            <iframe
-              src="https://my.spline.design/untitled-d60805fcfc4322f8deb736b6722c1f49/"
-              width="100%"
-              height="100%"
-              className="w-full h-full border-0"
-              title="3D Trading Bot Visualization"
-            />
+          {/* Right side - 3D Logo */}
+          <div className="w-1/2 h-full absolute right-0 top-0 flex items-center justify-center">
+            <Suspense fallback={
+              <div className="flex items-center justify-center w-full h-full">
+                <div className="animate-pulse text-white/50">Loading...</div>
+              </div>
+            }>
+              <SplineLogo height={560} />
+            </Suspense>
           </div>
         </div>
 
