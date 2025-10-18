@@ -20,7 +20,13 @@
       "Bash(kill:*)",
       "Bash(awk:*)",
       "Bash(pkill:*)",
-      "Bash(npm ls:*)"
+      "Bash(npm ls:*)",
+      "Bash(pip3 install -r requirements.txt)",
+      "Bash(pip3 install anthropic openai fastapi \"uvicorn[standard]\" python-multipart alpaca-py yfinance pandas numpy TA-Lib backtrader praw tweepy beautifulsoup4 lxml playwright requests textblob vaderSentiment python-dotenv pydantic pydantic-settings sqlalchemy python-dateutil pytz aiohttp matplotlib plotly)",
+      "Bash(pip3 install pandas-ta --no-deps)",
+      "Bash(pip3 install git+https://github.com/twopirllc/pandas-ta.git@0.3.14b)",
+      "Bash(pip3 install pandas_ta)",
+      "Bash(pip3 install supabase)"
     ],
     "deny": [],
     "ask": []

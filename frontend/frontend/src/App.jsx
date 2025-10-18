@@ -9,10 +9,15 @@ import AgentActivityLogPolling from './components/AgentActivityLogPolling'
 import Login from './components/Login'
 import Signup from './components/Signup'
 import BotLibrary from './components/BotLibrary'
+import LandingPage from './components/LandingPage'
 import './index.css'
 
 function AppContent() {
-  const { user, isAuthenticated, signout, getAuthHeaders } = useAuth()
+  const auth = useAuth()
+  if (!auth) {
+    return <div className="min-h-screen bg-dark-bg flex items-center justify-center text-white">Loading...</div>
+  }
+  const { user, isAuthenticated, signout, getAuthHeaders } = auth
   const [strategy, setStrategy] = useState(null)
   const [generatedCode, setGeneratedCode] = useState(null)
   const [backtestResults, setBacktestResults] = useState(null)
@@ -34,6 +39,9 @@ function AppContent() {
   const [showLogin, setShowLogin] = useState(false)
   const [showSignup, setShowSignup] = useState(false)
   const [showBotLibrary, setShowBotLibrary] = useState(false)
+
+  // View state - show landing page by default
+  const [showLanding, setShowLanding] = useState(true)
 
   const handleGenerateStrategy = async (userInput, useMultiAgent = true) => {
     setLoading(true)
@@ -291,6 +299,7 @@ function AppContent() {
     setGeneratedCode(null)
     setBacktestResults(null)
     setError(null)
+    setShowLanding(true)
   }
 
   const handleSaveBot = async () => {
@@ -342,21 +351,130 @@ function AppContent() {
     setInsightsConfig(botData.insights_config)
   }
 
+  const handleGetStarted = () => {
+    setShowLanding(false)
+  }
+
+  // Show landing page if user hasn't started
+  if (showLanding && !generatedCode && !loading) {
+    return (
+      <div className="min-h-screen bg-dark-bg">
+        {/* Header */}
+        <header className="border-b border-dark-border bg-dark-surface/50 backdrop-blur-sm sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-6 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-accent-primary to-blue-600 rounded-lg flex items-center justify-center">
+                  <span className="text-2xl">🤖</span>
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-white">AI Trading Bot Generator</h1>
+                  <p className="text-xs text-gray-400">Transform strategies into code with AI</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {isAuthenticated ? (
+                  <>
+                    <button
+                      onClick={() => setShowBotLibrary(true)}
+                      className="btn btn-secondary text-sm"
+                    >
+                      📚 My Bots
+                    </button>
+                    <div className="flex items-center gap-2 pl-3 border-l border-gray-700">
+                      <span className="text-sm text-gray-400">{user?.email}</span>
+                      <button
+                        onClick={signout}
+                        className="text-sm text-gray-400 hover:text-white"
+                      >
+                        Sign Out
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => setShowLogin(true)}
+                      className="btn btn-secondary text-sm"
+                    >
+                      Sign In
+                    </button>
+                    <button
+                      onClick={() => setShowSignup(true)}
+                      className="btn btn-primary text-sm"
+                    >
+                      Sign Up
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <LandingPage onGetStarted={handleGetStarted} />
+
+        {/* Footer */}
+        <footer className="border-t border-dark-border py-6">
+          <div className="max-w-7xl mx-auto px-6 text-center text-sm text-gray-500">
+            <p>Built for DubHacks 2025 • Powered by Claude AI & Alpaca</p>
+          </div>
+        </footer>
+
+        {/* Auth Modals */}
+        {showLogin && (
+          <Login
+            onClose={() => setShowLogin(false)}
+            onSwitchToSignup={() => {
+              setShowLogin(false)
+              setShowSignup(true)
+            }}
+          />
+        )}
+
+        {showSignup && (
+          <Signup
+            onClose={() => setShowSignup(false)}
+            onSwitchToLogin={() => {
+              setShowSignup(false)
+              setShowLogin(true)
+            }}
+          />
+        )}
+
+        {/* Bot Library Modal */}
+        {showBotLibrary && (
+          <BotLibrary
+            onClose={() => setShowBotLibrary(false)}
+            onLoadBot={(botData) => {
+              handleLoadBot(botData)
+              setShowLanding(false)
+            }}
+          />
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-dark-bg">
       {/* Header */}
       <header className="border-b border-dark-border bg-dark-surface/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowLanding(true)}
+              className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+            >
               <div className="w-10 h-10 bg-gradient-to-br from-accent-primary to-blue-600 rounded-lg flex items-center justify-center">
                 <span className="text-2xl">🤖</span>
               </div>
-              <div>
+              <div className="text-left">
                 <h1 className="text-xl font-bold text-white">AI Trading Bot Generator</h1>
                 <p className="text-xs text-gray-400">Transform strategies into code with AI</p>
               </div>
-            </div>
+            </button>
 
             <div className="flex items-center gap-3">
               {isAuthenticated ? (
