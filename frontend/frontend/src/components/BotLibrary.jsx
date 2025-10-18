@@ -22,13 +22,21 @@ const BotLibrary = ({ onClose, onLoadBot }) => {
         ? 'http://localhost:8000/bots/favorites'
         : 'http://localhost:8000/bots?page=1&page_size=50';
 
+      const headers = getAuthHeaders();
+      console.log('[BotLibrary] Auth headers:', headers);
+
       const response = await fetch(url, {
         headers: {
-          ...getAuthHeaders(),
+          ...headers,
         },
       });
 
+      console.log('[BotLibrary] Response status:', response.status);
+
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Authentication failed. Please try signing out and back in.');
+        }
         throw new Error('Failed to load bots');
       }
 
