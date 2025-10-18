@@ -201,8 +201,8 @@ export default function CommunityPage({ userAgents = [], isAuthenticated = false
                 <ArrowLeft className="w-6 h-6" />
               </button>
               <div>
-                <h1 className="text-2xl font-bold text-white">Community</h1>
-                <p className="text-sm text-gray-400">Share your trading agents and discover strategies from other traders</p>
+                <h1 className="text-3xl md:text-4xl font-light tracking-tight text-white">Community</h1>
+                <p className="mt-1 text-sm text-gray-400">Share your trading agents and discover strategies from other traders</p>
               </div>
             </div>
             
@@ -302,7 +302,7 @@ function SharedAgentsList({ agents, loading, onLike, onDownload, onSaveToMyBots,
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {[...Array(6)].map((_, i) => (
-          <div key={i} className="bg-dark-surface rounded-xl border border-dark-border overflow-hidden animate-pulse">
+          <div key={i} className="rounded-2xl border border-white/10 bg-transparent overflow-hidden animate-pulse">
             {/* Image placeholder */}
             <div className="h-48 bg-gray-700"></div>
             
@@ -344,13 +344,13 @@ function SharedAgentsList({ agents, loading, onLike, onDownload, onSaveToMyBots,
 
   if (agents.length === 0) {
     return (
-      <div className="bg-dark-surface rounded-xl border border-dark-border p-8 text-center">
+      <div className="rounded-2xl border border-white/10 bg-transparent p-8 text-center">
         <Users className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-        <h3 className="text-xl font-semibold text-white mb-2">No Agents Shared Yet</h3>
-        <p className="text-gray-400 mb-6">Be the first to share a trading agent with the community!</p>
+        <h3 className="text-xl font-light text-white mb-2">No Agents Shared Yet</h3>
+        <p className="font-light text-gray-400 mb-6">Be the first to share a trading agent with the community!</p>
         <button
           onClick={() => window.location.href = '/'}
-          className="bg-accent-primary text-white px-6 py-3 rounded-lg hover:bg-accent-primary/90 transition-colors"
+          className="bg-accent-primary text-white px-6 py-3 rounded-lg font-light hover:bg-accent-primary/90 transition-colors"
         >
           Create Your First Agent
         </button>
@@ -410,73 +410,64 @@ function AgentPlacard({ agent, onLike, onDownload, onSaveToMyBots, onRemix, isAu
   }
 
   return (
-    <div className="bg-dark-surface rounded-xl border border-dark-border overflow-hidden hover:border-accent-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-accent-primary/10 group">
-      {/* Placeholder Image */}
-      <div className="h-48 bg-gradient-to-br from-accent-primary/20 to-purple-500/20 flex items-center justify-center relative overflow-hidden">
-        <div className="text-8xl opacity-80 group-hover:scale-110 transition-transform duration-300">
-          {getPlaceholderImage(agent)}
-        </div>
-        
-        {/* Performance Badge */}
-        <div className="absolute top-4 right-4">
-          <div className={`px-3 py-1 rounded-full text-sm font-bold ${
-            agent.total_return > 0 
-              ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
-              : 'bg-red-500/20 text-red-400 border border-red-500/30'
-          }`}>
-            {agent.total_return > 0 ? '+' : ''}{agent.total_return.toFixed(1)}%
-          </div>
-        </div>
-
-        {/* Symbol Badge */}
-        <div className="absolute top-4 left-4">
-          <div className="px-3 py-1 bg-white/10 backdrop-blur-sm rounded-full text-sm font-medium text-white border border-white/20">
-            {agent.symbol}
-          </div>
-        </div>
-      </div>
-
+    <div className="group relative flex flex-col h-full rounded-2xl border border-white/10 bg-transparent overflow-hidden transition hover:border-accent/40 hover:bg-white/5 focus-within:ring-2 focus-within:ring-accent">
       {/* Content */}
-      <div className="p-6">
+      <div className="p-6 flex flex-col h-full">
         {/* Header */}
-        <div className="mb-4">
-          <h3 className="text-xl font-bold text-white mb-2 line-clamp-2 group-hover:text-accent-primary transition-colors">
-            {agent.name}
-          </h3>
-          <p className="text-sm text-gray-400 mb-3">by {agent.author || agent.author_name}</p>
-          <p className="text-sm text-gray-300 line-clamp-3 leading-relaxed">
+        <div className="mb-4 flex-shrink-0">
+          <div className="flex items-start justify-between gap-3 mb-2 min-h-[56px]">
+            <h3 className="text-base font-light tracking-tight text-white group-hover:text-accent-primary transition-colors flex-1 leading-snug">
+              {agent.name}
+            </h3>
+            <div className={`px-3 py-1 rounded-full text-sm font-light whitespace-nowrap flex-shrink-0 self-start ${
+              agent.total_return > 0 
+                ? 'bg-transparent text-green-400 border border-green-500/30' 
+                : 'bg-transparent text-red-400 border border-red-500/30'
+            }`}>
+              {agent.total_return > 0 ? '+' : ''}{agent.total_return.toFixed(1)}%
+            </div>
+          </div>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="px-3 py-1 bg-transparent rounded-full text-sm font-light text-white border border-white/20 flex-shrink-0">
+              {agent.symbol}
+            </span>
+            <span className="text-sm font-light text-gray-400">
+              by {agent.author || agent.author_name}
+            </span>
+          </div>
+          <p className="text-sm font-light text-gray-300 leading-relaxed min-h-[60px]">
             {agent.description}
           </p>
         </div>
 
         {/* Performance Metrics */}
-        <div className="grid grid-cols-2 gap-4 mb-4 p-4 bg-dark-bg rounded-lg">
+        <div className="grid grid-cols-2 gap-4 mb-4 p-4 bg-transparent border border-white/10 rounded-lg flex-shrink-0">
           <div className="text-center">
-            <div className="text-lg font-bold text-white">{agent.win_rate}%</div>
-            <div className="text-xs text-gray-400">Win Rate</div>
+            <div className="text-lg font-light text-white">{agent.win_rate}%</div>
+            <div className="text-xs font-light text-gray-400">Win Rate</div>
           </div>
           <div className="text-center">
-            <div className="text-lg font-bold text-white">{agent.total_trades}</div>
-            <div className="text-xs text-gray-400">Trades</div>
+            <div className="text-lg font-light text-white">{agent.total_trades}</div>
+            <div className="text-xs font-light text-gray-400">Trades</div>
           </div>
         </div>
 
         {/* Tags */}
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div className="flex flex-wrap gap-2 mb-4 flex-shrink-0">
           {agent.tags?.slice(0, 3).map((tag, index) => (
-            <span key={index} className="px-3 py-1 bg-accent-primary/20 text-accent-primary text-xs rounded-full font-medium">
+            <span key={index} className="px-3 py-1 bg-accent-primary/20 text-accent-primary text-xs rounded-full font-light">
               {tag}
             </span>
           ))}
           {agent.tags?.length > 3 && (
-            <span className="px-3 py-1 bg-gray-700/50 text-gray-300 text-xs rounded-full font-medium">
+            <span className="px-3 py-1 bg-gray-700/50 text-gray-300 text-xs rounded-full font-light">
               +{agent.tags.length - 3}
             </span>
           )}
         </div>
 
         {/* Engagement Stats */}
-        <div className="flex items-center justify-between mb-4 text-sm text-gray-400">
+        <div className="flex items-center justify-between mb-4 text-sm font-light text-gray-400 flex-shrink-0">
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-1">
               <Eye className="w-4 h-4" />
@@ -491,21 +482,21 @@ function AgentPlacard({ agent, onLike, onDownload, onSaveToMyBots, onRemix, isAu
               <span>{agent.downloads}</span>
             </div>
           </div>
-          <div className="text-xs">
+          <div className="text-xs font-light">
             {formatDate(agent.shared_at)}
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="space-y-3">
+        <div className="space-y-3 mt-auto">
           {/* Primary Actions Row */}
           <div className="flex gap-3">
             <button
               onClick={() => onLike(agent.id)}
-              className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all duration-200 flex items-center justify-center space-x-2 ${
+              className={`flex-1 py-3 px-4 rounded-lg font-light transition-all duration-200 flex items-center justify-center space-x-2 ${
                 agent.liked
-                  ? 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30'
-                  : 'bg-gray-700/50 text-gray-300 border border-gray-600/50 hover:bg-gray-600/50 hover:text-white'
+                  ? 'bg-transparent text-red-400 border border-red-500/30 hover:bg-red-500/10'
+                  : 'bg-transparent text-gray-300 border border-white/20 hover:border-accent/40 hover:text-white'
               }`}
             >
               <Heart className={`w-4 h-4 ${agent.liked ? 'fill-current' : ''}`} />
@@ -513,7 +504,7 @@ function AgentPlacard({ agent, onLike, onDownload, onSaveToMyBots, onRemix, isAu
             </button>
             <button
               onClick={() => onDownload(agent.id)}
-              className="flex-1 py-3 px-4 bg-accent-primary text-white rounded-lg font-medium hover:bg-accent-primary/90 transition-all duration-200 flex items-center justify-center space-x-2"
+              className="flex-1 py-3 px-4 bg-transparent text-accent border border-accent/30 rounded-lg font-light hover:bg-accent/10 transition-all duration-200 flex items-center justify-center space-x-2"
             >
               <Download className="w-4 h-4" />
               <span>Download</span>
@@ -525,14 +516,14 @@ function AgentPlacard({ agent, onLike, onDownload, onSaveToMyBots, onRemix, isAu
             <div className="flex gap-3">
               <button
                 onClick={() => onSaveToMyBots(agent.id)}
-                className="flex-1 py-2 px-4 bg-green-500/20 text-green-400 border border-green-500/30 rounded-lg font-medium hover:bg-green-500/30 transition-all duration-200 flex items-center justify-center space-x-2"
+                className="flex-1 py-2 px-4 bg-transparent text-green-400 border border-green-500/30 rounded-lg font-light hover:bg-green-500/10 transition-all duration-200 flex items-center justify-center space-x-2"
               >
                 <Save className="w-4 h-4" />
-                <span>Save to My Bots</span>
+                <span>Save</span>
               </button>
               <button
                 onClick={() => onRemix(agent.id)}
-                className="flex-1 py-2 px-4 bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded-lg font-medium hover:bg-purple-500/30 transition-all duration-200 flex items-center justify-center space-x-2"
+                className="flex-1 py-2 px-4 bg-transparent text-purple-400 border border-purple-500/30 rounded-lg font-light hover:bg-purple-500/10 transition-all duration-200 flex items-center justify-center space-x-2"
               >
                 <Sparkles className="w-4 h-4" />
                 <span>Remix</span>
