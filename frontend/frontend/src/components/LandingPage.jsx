@@ -28,10 +28,10 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
   return (
     <div className="w-full">
       {/* Navbar - always visible */}
-      <div className="sticky top-0 z-50 flex items-center justify-between p-6 border-b border-gray-700 bg-dark-surface/50 backdrop-blur-sm">
+      <div className="sticky top-0 z-50 flex items-center justify-between px-6 py-6 border-b border-gray-700 bg-dark-surface/50 backdrop-blur-sm">
         <button
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-          className="text-white hover:opacity-80 transition-opacity"
+          className="text-white hover:opacity-80 transition-opacity -ml-6 pl-6"
         >
           <span className="text-2xl font-serif italic">Mobius</span>
         </button>
