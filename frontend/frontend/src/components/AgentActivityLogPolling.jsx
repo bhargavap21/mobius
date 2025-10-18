@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import PropTypes from 'prop-types'
 
 const AgentActivityLogPolling = ({ sessionId, onComplete }) => {
   const [events, setEvents] = useState([])
   const [isComplete, setIsComplete] = useState(false)
   const [error, setError] = useState(null)
+  const scrollRef = useRef(null)
 
   useEffect(() => {
     if (!sessionId) return
@@ -14,10 +15,13 @@ const AgentActivityLogPolling = ({ sessionId, onComplete }) => {
 
     const pollForEvents = async () => {
       try {
-        const response = await fetch(`http://localhost:8000/api/strategy/events/${sessionId}?from=${eventIndex}`)
+        const url = `http://localhost:8000/api/strategy/events/${sessionId}?from=${eventIndex}`
+        console.log('[AgentActivityLogPolling] Polling:', url)
+        const response = await fetch(url)
 
         if (!response.ok) {
           if (response.status === 404) {
+            console.log('[AgentActivityLogPolling] Session not found yet (404), will retry...')
             // Session not found yet, keep polling
             return
           }
@@ -25,9 +29,10 @@ const AgentActivityLogPolling = ({ sessionId, onComplete }) => {
         }
 
         const data = await response.json()
+        console.log('[AgentActivityLogPolling] Poll response:', data)
 
         if (data.events && data.events.length > 0) {
-          console.log('[AgentActivityLogPolling] Received events:', data.events)
+          console.log('[AgentActivityLogPolling] Received', data.events.length, 'new events')
           setEvents(prev => [...prev, ...data.events])
           eventIndex += data.events.length
 
@@ -55,8 +60,8 @@ const AgentActivityLogPolling = ({ sessionId, onComplete }) => {
     // Start polling immediately
     pollForEvents()
 
-    // Poll every second
-    intervalId = setInterval(pollForEvents, 1000)
+    // Poll every 300ms for more responsive updates
+    intervalId = setInterval(pollForEvents, 300)
 
     return () => {
       if (intervalId) {
@@ -64,6 +69,13 @@ const AgentActivityLogPolling = ({ sessionId, onComplete }) => {
       }
     }
   }, [sessionId, onComplete])
+
+  // Auto-scroll to bottom when new events arrive
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
+  }, [events])
 
   if (!sessionId) {
     return null
@@ -125,7 +137,7 @@ const AgentActivityLogPolling = ({ sessionId, onComplete }) => {
   }
 
   return (
-    <div className="space-y-2 max-h-64 overflow-y-auto">
+    <div ref={scrollRef} className="space-y-2 max-h-64 overflow-y-auto scroll-smooth">
       {events.map((event, index) => (
         <div
           key={index}

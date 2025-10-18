@@ -70,15 +70,37 @@ function RenderVisualization({ visualization, data }) {
   const additionalMetrics = data_to_collect?.additional_metrics || []
   const thresholds = data_to_collect?.thresholds || {}
 
-  // Check if data has the required metrics
-  const hasData = data.some(point => primaryMetric in point)
+  // Check if data has the required metrics - be more flexible with naming
+  const hasData = data.some(point => {
+    if (primaryMetric in point) return true
+
+    // Try common variations of the metric name
+    const metricLower = primaryMetric?.toLowerCase()
+    for (const key of Object.keys(point)) {
+      const keyLower = key.toLowerCase()
+      if (keyLower.includes(metricLower) || metricLower?.includes(keyLower)) {
+        return true
+      }
+    }
+    return false
+  })
 
   if (!hasData) {
+    // Debug: show available data keys
+    const availableKeys = data.length > 0 ? Object.keys(data[0]).filter(k => k !== 'date' && k !== 'price') : []
+
     return (
       <div className="bg-dark-surface rounded-lg p-4 border border-dark-border">
         <h3 className="text-lg font-semibold text-white mb-2">{title}</h3>
         <p className="text-sm text-gray-400">{description}</p>
         <p className="text-sm text-yellow-500 mt-2">⚠️ No data available for this visualization</p>
+        <details className="mt-2">
+          <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-400">Debug Info</summary>
+          <div className="mt-2 text-xs text-gray-600">
+            <p>Looking for: <span className="text-blue-400">{primaryMetric}</span></p>
+            <p>Available metrics: <span className="text-green-400">{availableKeys.join(', ') || 'none'}</span></p>
+          </div>
+        </details>
       </div>
     )
   }
@@ -119,11 +141,12 @@ function RenderVisualization({ visualization, data }) {
           {chart_config?.zones && chart_config.zones.map((zone, zoneIdx) => (
             <Area
               key={`zone-${zoneIdx}`}
-              dataKey={() => zone.end}
+              dataKey="price"
               fill={zone.color === 'red' ? '#ef4444' : zone.color === 'green' ? '#22c55e' : '#3b82f6'}
               fillOpacity={0.1}
               stroke="none"
               name={zone.label}
+              type="monotone"
             />
           ))}
 
@@ -154,7 +177,7 @@ function RenderVisualization({ visualization, data }) {
             stroke="#3b82f6"
             strokeWidth={2}
             dot={false}
-            name={primaryMetric.replace(/_/g, ' ').toUpperCase()}
+            name={primaryMetric?.replace(/_/g, ' ').toUpperCase() || 'Main Metric'}
           />
 
           {/* Additional metrics */}

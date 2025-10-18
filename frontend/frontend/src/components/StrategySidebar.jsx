@@ -58,6 +58,20 @@ Requested changes: ${refinementRequest}`;
         },
         body: JSON.stringify({
           message: userMessage,
+          bot_context: {
+            id: currentStrategy?.id,
+            name: currentStrategy?.name,
+            asset: currentStrategy?.asset,
+            strategy_type: currentStrategy?.strategy_type,
+            code: currentStrategy?.code,
+            backtest_results: currentStrategy?.backtest_results,
+            parameters: {
+              rsi_period: currentStrategy?.rsi_period,
+              rsi_oversold: currentStrategy?.rsi_oversold,
+              rsi_overbought: currentStrategy?.rsi_overbought,
+              sentiment_threshold: currentStrategy?.sentiment_threshold,
+            }
+          }
         }),
       });
 
@@ -267,30 +281,59 @@ Requested changes: ${refinementRequest}`;
               <h3 className="text-sm font-semibold text-white mb-3">📊 Strategy Analysis</h3>
 
               <div className="space-y-3 text-sm">
+                {/* Performance Summary */}
                 <div>
                   <div className="text-gray-400 mb-1">Performance</div>
-                  <div className="text-yellow-400">
-                    ⚠️ 0 trades executed - conditions too restrictive
-                  </div>
+                  {currentStrategy?.backtest_results?.summary && (
+                    <div className="text-gray-300 space-y-1 text-xs">
+                      <div>Trades: {currentStrategy.backtest_results.summary.total_trades || 0}</div>
+                      <div>Win Rate: {currentStrategy.backtest_results.summary.win_rate?.toFixed(1) || 0}%</div>
+                      <div>Total Return: {currentStrategy.backtest_results.summary.total_return?.toFixed(2) || 0}%</div>
+                      <div>Sharpe Ratio: {currentStrategy.backtest_results.summary.sharpe_ratio?.toFixed(2) || 'N/A'}</div>
+                    </div>
+                  )}
                 </div>
 
-                <div>
-                  <div className="text-gray-400 mb-1">Issue Detected</div>
-                  <div className="text-gray-300">
-                    RSI &lt; 30 (oversold) rarely occurs when sentiment is bullish.
-                    These conditions conflict.
+                {/* Overall Analysis */}
+                {currentStrategy?.final_analysis?.analysis && (
+                  <div>
+                    <div className="text-gray-400 mb-1">Analysis</div>
+                    <div className="text-gray-300 text-xs">
+                      {currentStrategy.final_analysis.analysis}
+                    </div>
                   </div>
-                </div>
+                )}
 
-                <div>
-                  <div className="text-gray-400 mb-1">Recommendations</div>
-                  <ul className="text-gray-300 space-y-1 text-xs">
-                    <li>• Increase RSI threshold to 40-50</li>
-                    <li>• Lower sentiment requirement to 0.1</li>
-                    <li>• Use OR logic instead of AND</li>
-                    <li>• Remove one of the filters</li>
-                  </ul>
-                </div>
+                {/* Issues Detected */}
+                {currentStrategy?.final_analysis?.issues && currentStrategy.final_analysis.issues.length > 0 && (
+                  <div>
+                    <div className="text-gray-400 mb-1">Issues Detected</div>
+                    <ul className="text-yellow-400 space-y-1 text-xs">
+                      {currentStrategy.final_analysis.issues.map((issue, idx) => (
+                        <li key={idx}>⚠️ {issue}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Recommendations */}
+                {currentStrategy?.final_analysis?.suggestions && currentStrategy.final_analysis.suggestions.length > 0 && (
+                  <div>
+                    <div className="text-gray-400 mb-1">Recommendations</div>
+                    <ul className="text-gray-300 space-y-1 text-xs">
+                      {currentStrategy.final_analysis.suggestions.map((suggestion, idx) => (
+                        <li key={idx}>• {suggestion}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Fallback if no analysis data */}
+                {!currentStrategy?.final_analysis && (
+                  <div className="text-gray-500 text-xs text-center py-4">
+                    No analysis data available yet
+                  </div>
+                )}
               </div>
             </div>
 

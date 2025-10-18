@@ -204,66 +204,91 @@ When you have a complete answer, provide it clearly."""
         }
 
     def chat(
-        self, user_message: str, conversation_history: Optional[List] = None
+        self, user_message: str, bot_context: Optional[Dict[str, Any]] = None, conversation_history: Optional[List] = None
     ) -> Dict[str, Any]:
         """
-        Simple chat interface for testing
+        Context-aware chat interface for trading strategy assistance
 
         Args:
             user_message: User's message
+            bot_context: Current bot/strategy context (code, backtest results, parameters)
             conversation_history: Previous messages (optional)
 
         Returns:
             Response and updated conversation
         """
+        from llm_client import generate_text
+
         if conversation_history is None:
             conversation_history = []
 
         conversation_history.append({"role": "user", "content": user_message})
 
         try:
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=2048,
-                tools=self.tool_schemas if self.tool_schemas else None,
-                messages=conversation_history,
+            # Build context string from bot data
+            context_str = ""
+            if bot_context:
+                context_str = f"""
+CURRENT STRATEGY CONTEXT:
+- Bot ID: {bot_context.get('id', 'N/A')}
+- Name: {bot_context.get('name', 'N/A')}
+- Asset: {bot_context.get('asset', 'N/A')}
+- Strategy Type: {bot_context.get('strategy_type', 'N/A')}
+"""
+
+                # Add parameters
+                params = bot_context.get('parameters', {})
+                if params:
+                    context_str += "\nPARAMETERS:\n"
+                    for key, value in params.items():
+                        if value is not None:
+                            context_str += f"- {key}: {value}\n"
+
+                # Add backtest results summary
+                backtest = bot_context.get('backtest_results', {})
+                if backtest:
+                    context_str += f"""
+BACKTEST RESULTS:
+- Total Trades: {backtest.get('total_trades', 0)}
+- Win Rate: {backtest.get('win_rate', 0)}%
+- Total Return: {backtest.get('total_return', 0)}%
+- Buy & Hold Return: {backtest.get('buy_hold_return', 0)}%
+- Max Drawdown: {backtest.get('max_drawdown', 0)}%
+"""
+
+                # Add code snippet (first 500 chars)
+                code = bot_context.get('code', '')
+                if code:
+                    code_preview = code[:500] + "..." if len(code) > 500 else code
+                    context_str += f"\nSTRATEGY CODE (preview):\n```python\n{code_preview}\n```\n"
+
+            # Build conversation context for Gemini
+            conversation_text = context_str + "\n\n" + "\n\n".join([
+                f"{msg['role'].upper()}: {msg['content']}"
+                for msg in conversation_history
+            ])
+
+            system_instruction = """You are an expert trading strategy assistant with deep knowledge of:
+- Technical analysis (RSI, MACD, moving averages, etc.)
+- Sentiment analysis from social media
+- Backtesting methodology and interpretation
+- Python trading bot code (using backtrader, pandas, etc.)
+
+Your role is to help users understand and improve their trading strategies by:
+1. Analyzing backtest results and explaining why strategies performed as they did
+2. Suggesting specific improvements based on the data
+3. Explaining technical concepts clearly
+4. Identifying issues in strategy logic or parameters
+5. Recommending appropriate parameter ranges
+
+Always be specific, data-driven, and reference the actual strategy context provided.
+If the strategy has 0 trades, explain the likely reasons (conditions too strict, market data issues, etc.)."""
+
+            response_text = generate_text(
+                prompt=conversation_text,
+                system_instruction=system_instruction,
+                max_tokens=2048
             )
-
-            # Handle tool use
-            if response.stop_reason == "tool_use":
-                conversation_history.append(
-                    {"role": "assistant", "content": response.content}
-                )
-
-                tool_uses = [
-                    block for block in response.content if block.type == "tool_use"
-                ]
-                tool_results = []
-
-                for tool_use in tool_uses:
-                    result = self.execute_tool(tool_use.name, tool_use.input)
-                    tool_results.append(
-                        {
-                            "type": "tool_result",
-                            "tool_use_id": tool_use.id,
-                            "content": json.dumps(result, default=str),
-                        }
-                    )
-
-                conversation_history.append({"role": "user", "content": tool_results})
-
-                # Get final response
-                response = self.client.messages.create(
-                    model=self.model,
-                    max_tokens=2048,
-                    messages=conversation_history,
-                )
-
-            # Extract text
-            text_blocks = [
-                block.text for block in response.content if hasattr(block, "text")
-            ]
-            response_text = "\n".join(text_blocks)
 
             conversation_history.append({"role": "assistant", "content": response_text})
 

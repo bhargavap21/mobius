@@ -7,6 +7,7 @@ that abstracts away the specific API details.
 
 import json
 import logging
+import traceback
 import google.generativeai as genai
 from config import settings
 
@@ -48,10 +49,15 @@ def generate_text(prompt: str, system_instruction: str = None, max_tokens: int =
             )
         )
 
-        return response.text
+        # Access the text from the response
+        if response.candidates and len(response.candidates) > 0:
+            return response.candidates[0].content.parts[0].text
+        else:
+            raise ValueError("No response generated from Gemini")
 
     except Exception as e:
         logger.error(f"Error generating text with Gemini: {e}")
+        logger.error(f"Full traceback: {traceback.format_exc()}")
         raise
 
 

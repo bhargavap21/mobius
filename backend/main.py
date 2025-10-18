@@ -239,8 +239,12 @@ async def get_events(session_id: str, from_index: int = 0):
     """
     from progress_manager import progress_manager
 
+    logger.info(f"📡 Polling request: session={session_id[:8]}, from_index={from_index}")
+    logger.info(f"📡 Available sessions: {list(progress_manager.event_history.keys())}")
+
     # Initialize session if it doesn't exist
     if session_id not in progress_manager.event_history:
+        logger.warning(f"⚠️ Session {session_id[:8]} not found in event_history, creating empty...")
         progress_manager.event_history[session_id] = []
         # Also create the queue session if needed
         if session_id not in progress_manager.sessions:
@@ -249,9 +253,11 @@ async def get_events(session_id: str, from_index: int = 0):
 
     # Get events from history
     all_events = progress_manager.event_history.get(session_id, [])
+    logger.info(f"📡 Total events for session {session_id[:8]}: {len(all_events)}")
 
     # Return events from the requested index
     events = all_events[from_index:] if from_index < len(all_events) else []
+    logger.info(f"📡 Returning {len(events)} events (from index {from_index})")
 
     return {
         "events": events,
@@ -528,19 +534,22 @@ async def refine_strategy(request: RefineStrategyRequest):
 @app.post("/api/chat")
 async def chat(message: dict):
     """
-    Chat with the AI for general queries
+    Chat with the AI about the current trading strategy
 
-    Useful for:
-    - Asking about strategies
-    - Getting market data
-    - Sentiment analysis
+    Provides context-aware assistance including:
+    - Strategy code and parameters
+    - Backtest results analysis
+    - Suggestions for improvements
+    - Answers to specific questions
     """
     try:
         user_message = message.get("message", "")
+        bot_context = message.get("bot_context", {})
+
         if not user_message:
             raise HTTPException(status_code=400, detail="Message is required")
 
-        result = orchestrator.chat(user_message)
+        result = orchestrator.chat(user_message, bot_context=bot_context)
 
         if not result["success"]:
             raise HTTPException(status_code=500, detail=result.get("error"))

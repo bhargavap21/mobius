@@ -1,8 +1,14 @@
-import { Brain, Zap, Code, BarChart3, TrendingUp, Check } from 'lucide-react'
+import { Brain, Zap, Code, BarChart3, TrendingUp, Check, ArrowRight } from 'lucide-react'
 
-export default function LandingPage() {
+export default function LandingPage({ onGetStarted }) {
   const scrollToSection = (id) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  const goToDashboard = () => {
+    if (onGetStarted) {
+      onGetStarted()
+    }
   }
 
   return (
@@ -16,6 +22,23 @@ export default function LandingPage() {
           className="w-full h-full border-0"
           title="3D Trading Bot Visualization"
         />
+
+        {/* CTA Button Overlay */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 text-center">
+          <h1 className="text-5xl md:text-7xl font-light text-white mb-6 drop-shadow-2xl">
+            Trading bots, <span className="italic font-serif">effortlessly.</span>
+          </h1>
+          <p className="text-xl md:text-2xl text-gray-300 mb-8 drop-shadow-lg">
+            Build production-ready algorithms in minutes, not months
+          </p>
+          <button
+            onClick={goToDashboard}
+            className="group px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white text-lg font-medium rounded-full transition-all duration-300 flex items-center gap-2 mx-auto shadow-2xl hover:shadow-blue-500/50 hover:scale-105"
+          >
+            Get Started
+            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+          </button>
+        </div>
 
         {/* Scroll indicator */}
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 animate-bounce">
@@ -232,6 +255,25 @@ class TradingBot:
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Final CTA Section */}
+      <section className="bg-gradient-to-b from-black to-dark-bg py-24 px-6">
+        <div className="max-w-4xl mx-auto text-center">
+          <h2 className="text-5xl md:text-6xl font-light text-white mb-6">
+            Ready to build your trading bot?
+          </h2>
+          <p className="text-xl text-gray-400 mb-10">
+            Start creating profitable trading algorithms in minutes
+          </p>
+          <button
+            onClick={goToDashboard}
+            className="group px-10 py-5 bg-blue-600 hover:bg-blue-700 text-white text-xl font-medium rounded-full transition-all duration-300 inline-flex items-center gap-3 shadow-2xl hover:shadow-blue-500/50 hover:scale-105"
+          >
+            Launch Dashboard
+            <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
+          </button>
         </div>
       </section>
     </div>
