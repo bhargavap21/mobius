@@ -35,28 +35,28 @@ export default function StrategyInput({ onGenerate }) {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold text-white mb-3">
+        <h2 className="text-4xl md:text-5xl font-light text-fg mb-3 leading-tight">
           Describe Your Trading Strategy
         </h2>
-        <p className="text-gray-400">
+        <p className="text-lg text-fg-muted">
           Use plain English to create a professional trading bot in seconds
         </p>
       </div>
 
       {/* Examples */}
       <div className="mb-6">
-        <p className="text-sm text-gray-400 mb-3">Try an example:</p>
+        <p className="text-sm text-fg-muted mb-3">Try an example:</p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {EXAMPLE_STRATEGIES.map((example, idx) => (
             <button
               key={idx}
               onClick={() => loadExample(example)}
-              className="card text-left hover:border-accent-primary transition-colors group"
+              className="rounded-2xl border border-line bg-white/5 p-4 text-left text-fg hover:bg-white/7 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 transition-colors group"
             >
-              <h3 className="font-medium text-white group-hover:text-accent-primary transition-colors mb-1">
+              <h3 className="text-sm font-medium group-hover:text-accent transition-colors mb-1">
                 {example.title}
               </h3>
-              <p className="text-xs text-gray-400 line-clamp-2">
+              <p className="text-xs text-fg-muted line-clamp-2">
                 {example.description}
               </p>
             </button>
@@ -66,8 +66,8 @@ export default function StrategyInput({ onGenerate }) {
 
       {/* Input Form */}
       <form onSubmit={handleSubmit}>
-        <div className="card">
-          <label htmlFor="strategy" className="block text-sm font-medium text-gray-300 mb-2">
+        <div className="rounded-2xl bg-white/5 p-6">
+          <label htmlFor="strategy" className="mb-2 block text-sm font-medium text-fg">
             Strategy Description
           </label>
           <textarea
@@ -75,18 +75,19 @@ export default function StrategyInput({ onGenerate }) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Example: Buy TSLA when Elon Musk tweets positively about Tesla and the stock is below $500. Sell at +2% profit or -1% stop loss."
-            className="textarea w-full h-40"
+            className="min-h-[180px] w-full rounded-2xl border border-line bg-white/5 p-4 text-fg placeholder:text-fg-muted focus:ring-2 focus:ring-accent-400 focus:outline-none resize-none"
             required
           />
 
           <div className="mt-4 flex items-center justify-between">
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-fg-muted">
               {input.length} characters
             </p>
             <button
               type="submit"
               disabled={!input.trim() || isGenerating}
-              className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              aria-busy={isGenerating}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-accent-dark px-5 py-3 font-medium text-white shadow-md transition hover:bg-accent disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400"
             >
               {isGenerating ? (
                 <>
@@ -106,37 +107,15 @@ export default function StrategyInput({ onGenerate }) {
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     />
                   </svg>
-                  Generating...
+                  Generating…
                 </>
               ) : (
-                <>
-                  <span>✨</span>
-                  Generate Trading Bot
-                </>
+                'Generate Trading Bot'
               )}
             </button>
           </div>
         </div>
       </form>
-
-      {/* Features */}
-      <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-        <div className="p-4">
-          <div className="text-2xl mb-2">⚡</div>
-          <p className="text-sm font-medium text-gray-300">Instant Generation</p>
-          <p className="text-xs text-gray-500 mt-1">Code ready in seconds</p>
-        </div>
-        <div className="p-4">
-          <div className="text-2xl mb-2">🎯</div>
-          <p className="text-sm font-medium text-gray-300">Production Ready</p>
-          <p className="text-xs text-gray-500 mt-1">Clean, tested code</p>
-        </div>
-        <div className="p-4">
-          <div className="text-2xl mb-2">🤖</div>
-          <p className="text-sm font-medium text-gray-300">AI Powered</p>
-          <p className="text-xs text-gray-500 mt-1">Claude Sonnet 4.5</p>
-        </div>
-      </div>
     </div>
   )
 }

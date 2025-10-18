@@ -43,7 +43,7 @@ const Login = ({ onClose, onSwitchToSignup, onSuccess }) => {
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-900 bg-opacity-50 border border-red-500 rounded text-red-200 text-sm">
+          <div className="mb-4 p-3 bg-red-900 bg-opacity-50 rounded text-red-200 text-sm">
             {error}
           </div>
         )}
@@ -57,7 +57,7 @@ const Login = ({ onClose, onSwitchToSignup, onSuccess }) => {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:border-blue-500"
+              className="w-full px-4 py-2 bg-gray-700 rounded text-white focus:outline-none focus:ring-2 focus:ring-accent"
               placeholder="you@example.com"
               required
             />
@@ -71,7 +71,7 @@ const Login = ({ onClose, onSwitchToSignup, onSuccess }) => {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:border-blue-500"
+              className="w-full px-4 py-2 bg-gray-700 rounded text-white focus:outline-none focus:ring-2 focus:ring-accent"
               placeholder="••••••••"
               required
             />
@@ -80,7 +80,7 @@ const Login = ({ onClose, onSwitchToSignup, onSuccess }) => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white font-semibold py-2 px-4 rounded transition-colors"
+            className="w-full bg-gradient-to-r from-purple-800 to-purple-700 hover:from-purple-900 hover:to-purple-800 disabled:opacity-50 text-white font-semibold py-2 px-4 rounded transition-all"
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
@@ -91,7 +91,7 @@ const Login = ({ onClose, onSwitchToSignup, onSuccess }) => {
             Don't have an account?{' '}
             <button
               onClick={onSwitchToSignup}
-              className="text-blue-400 hover:text-blue-300"
+              className="text-accent hover:text-accent-light"
             >
               Sign up
             </button>

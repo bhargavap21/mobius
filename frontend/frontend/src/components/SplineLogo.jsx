@@ -11,7 +11,7 @@ export default function SplineLogo({
   return (
     <div
       className={`relative mx-auto w-full max-w-6xl overflow-hidden rounded-2xl bg-transparent md:aspect-[16/9] aspect-[4/3] ${className}`}
-      style={style}
+      style={{ ...style, willChange: 'transform', transform: 'translateZ(0)' }}
     >
       <iframe
         src={src}
@@ -20,6 +20,7 @@ export default function SplineLogo({
         loading="lazy"
         allow="fullscreen"
         referrerPolicy="no-referrer"
+        style={{ pointerEvents: 'auto', willChange: 'transform', transform: 'translateZ(0)' }}
       />
       <noscript>
         <div className="grid h-full place-items-center text-sm text-white/60">

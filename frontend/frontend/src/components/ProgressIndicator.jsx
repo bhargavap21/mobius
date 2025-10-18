@@ -48,14 +48,14 @@ export default function ProgressIndicator() {
               </div>
               <div className="flex-1">
                 <p
-                  className={`font-semibold text-sm ${
-                    isActive ? 'text-white' : 'text-gray-400'
+                  className={`font-light text-base ${
+                    isActive ? 'text-fg' : 'text-fg-muted'
                   }`}
                 >
                   {step.label}
                 </p>
                 {isActive && (
-                  <p className="text-xs text-gray-500 mt-1">{step.desc}</p>
+                  <p className="text-sm text-fg-muted mt-1">{step.desc}</p>
                 )}
               </div>
               {isActive && (
@@ -77,7 +77,7 @@ export default function ProgressIndicator() {
       </div>
 
       <div className="mt-4 text-center">
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-fg-muted">
           This may take 30-60 seconds for complex strategies
         </p>
       </div>
