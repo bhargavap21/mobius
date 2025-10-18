@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 
-const Signup = ({ onClose, onSwitchToLogin }) => {
+const Signup = ({ onClose, onSwitchToLogin, onSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -9,7 +9,7 @@ const Signup = ({ onClose, onSwitchToLogin }) => {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const { signup } = useAuth();
+  const { signup, signin } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -27,10 +27,21 @@ const Signup = ({ onClose, onSwitchToLogin }) => {
 
     if (result.success) {
       if (result.data.email_confirmed) {
-        setSuccess('Account created successfully! You can now sign in.');
-        setTimeout(() => {
-          onSwitchToLogin();
-        }, 2000);
+        setSuccess('Account created successfully! Signing you in...');
+        // Auto-login after successful signup
+        const loginResult = await signin(email, password);
+        if (loginResult.success) {
+          setTimeout(() => {
+            onClose();
+            if (onSuccess) {
+              onSuccess();
+            }
+          }, 1000);
+        } else {
+          setTimeout(() => {
+            onSwitchToLogin();
+          }, 2000);
+        }
       } else {
         setSuccess(result.data.message || 'Account created! Please check your email to confirm your account.');
       }

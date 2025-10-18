@@ -1,8 +1,26 @@
 import { Brain, Zap, Code, BarChart3, TrendingUp, Check } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
+import { useState } from 'react'
+import Login from './Login'
+import Signup from './Signup'
 
-export default function LandingPage() {
+export default function LandingPage({ onGetStarted }) {
+  const { isAuthenticated } = useAuth()
+  const [showLogin, setShowLogin] = useState(false)
+  const [showSignup, setShowSignup] = useState(false)
+
   const scrollToSection = (id) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  const handleBuildBot = () => {
+    if (isAuthenticated) {
+      // User is signed in, go to dashboard
+      onGetStarted?.()
+    } else {
+      // User is not signed in, show signup modal
+      setShowSignup(true)
+    }
   }
 
   return (
@@ -12,12 +30,20 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto h-full px-6 flex items-center">
           {/* Left side - Text */}
           <div className="w-1/2 z-10">
-            <h1 className="text-6xl md:text-7xl font-light text-white mb-6 leading-tight">
+            <h1 className="text-4xl md:text-5xl font-light text-white mb-6 leading-tight">
               AI-Powered Trading from <span className="italic font-serif">Strategy to Deployment</span>
             </h1>
-            <p className="text-xl md:text-2xl text-gray-400 leading-relaxed">
+            <p className="text-xl md:text-2xl text-gray-400 leading-relaxed mb-8">
               Mobius delivers proven algorithms, automated backtesting, and production-ready code to traders, quants, and developers.
             </p>
+            <div>
+              <button
+                onClick={handleBuildBot}
+                className="px-12 py-4 bg-white text-black text-lg font-medium rounded-xl hover:bg-gray-100 transition-colors inline-flex items-center gap-2"
+              >
+                Build Bot →
+              </button>
+            </div>
           </div>
 
           {/* Right side - 3D Book */}
@@ -249,6 +275,35 @@ class TradingBot:
           </div>
         </div>
       </section>
+
+      {/* Auth Modals */}
+      {showLogin && (
+        <Login
+          onClose={() => setShowLogin(false)}
+          onSwitchToSignup={() => {
+            setShowLogin(false)
+            setShowSignup(true)
+          }}
+          onSuccess={() => {
+            setShowLogin(false)
+            onGetStarted?.()
+          }}
+        />
+      )}
+
+      {showSignup && (
+        <Signup
+          onClose={() => setShowSignup(false)}
+          onSwitchToLogin={() => {
+            setShowSignup(false)
+            setShowLogin(true)
+          }}
+          onSuccess={() => {
+            setShowSignup(false)
+            onGetStarted?.()
+          }}
+        />
+      )}
     </div>
   )
 }

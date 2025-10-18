@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 
-const Login = ({ onClose, onSwitchToSignup }) => {
+const Login = ({ onClose, onSwitchToSignup, onSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -18,6 +18,10 @@ const Login = ({ onClose, onSwitchToSignup }) => {
 
     if (result.success) {
       onClose();
+      // Navigate to dashboard after successful login
+      if (onSuccess) {
+        onSuccess();
+      }
     } else {
       setError(result.error);
     }

@@ -302,6 +302,11 @@ function AppContent() {
     setShowLanding(true)
   }
 
+  const handleSignOut = () => {
+    signout()
+    setShowLanding(true)
+  }
+
   const handleSaveBot = async () => {
     if (!isAuthenticated) {
       setShowLogin(true)
@@ -385,7 +390,7 @@ function AppContent() {
                     <div className="flex items-center gap-2 pl-3 border-l border-gray-700">
                       <span className="text-sm text-gray-400">{user?.email}</span>
                       <button
-                        onClick={signout}
+                        onClick={handleSignOut}
                         className="text-sm text-gray-400 hover:text-white"
                       >
                         Sign Out
@@ -504,7 +509,7 @@ function AppContent() {
                   <div className="flex items-center gap-2 pl-3 border-l border-gray-700">
                     <span className="text-sm text-gray-400">{user?.email}</span>
                     <button
-                      onClick={signout}
+                      onClick={handleSignOut}
                       className="text-sm text-gray-400 hover:text-white"
                     >
                       Sign Out
