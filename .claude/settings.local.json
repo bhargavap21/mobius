@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir:*)",
+      "Bash(python3:*)",
+      "Bash(source:*)",
+      "Bash(pip install:*)",
+      "Bash(tree:*)",
+      "Bash(python:*)",
+      "Bash(npm install)",
+      "Bash(npx tailwindcss init:*)",
+      "Bash(npm create:*)",
+      "Bash(npm install:*)",
+      "Bash(chmod:*)",
+      "Bash(curl:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill:*)",
+      "Bash(find:*)",
+      "Bash(npm run dev:*)",
+      "Bash(kill:*)",
+      "Bash(awk:*)",
+      "Bash(pkill:*)",
+      "Bash(npm ls:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

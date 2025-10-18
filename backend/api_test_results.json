@@ -1,0 +1,19 @@
+{
+  "alpha_vantage": {
+    "status": "SUCCESS",
+    "articles_found": 50,
+    "sample": "EB Games Makes its Big Return with a New Concept Store in Montreal"
+  },
+  "finnhub": {
+    "status": "SUCCESS",
+    "articles_found": 13,
+    "date_range": "2025-10-08 to 2025-10-15",
+    "sample": "Crypto Treasury Firms Keep Buying Bitcoin. Outperforming ETFs Is the Hard Part"
+  },
+  "alpaca": {
+    "status": "SUCCESS",
+    "account_status": "ACTIVE",
+    "buying_power": "200000",
+    "equity": "100000"
+  }
+}
