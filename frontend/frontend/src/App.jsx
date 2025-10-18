@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import StrategyInput from './components/StrategyInput'
 import CodeDisplay from './components/CodeDisplay'
@@ -10,6 +10,7 @@ import Login from './components/Login'
 import Signup from './components/Signup'
 import BotLibrary from './components/BotLibrary'
 import LandingPage from './components/LandingPage'
+import StrategySidebar from './components/StrategySidebar'
 import './index.css'
 
 function AppContent() {
@@ -39,6 +40,40 @@ function AppContent() {
   const [showLogin, setShowLogin] = useState(false)
   const [showSignup, setShowSignup] = useState(false)
   const [showBotLibrary, setShowBotLibrary] = useState(false)
+  const [showSidebar, setShowSidebar] = useState(false)
+
+  // Current bot ID for tracking saves/updates
+  const [currentBotId, setCurrentBotId] = useState(null)
+
+  // Load last viewed bot on mount (if authenticated)
+  useEffect(() => {
+    const loadLastBot = async () => {
+      if (!isAuthenticated) return
+
+      try {
+        const response = await fetch('http://localhost:8000/bots?page=1&page_size=1', {
+          headers: getAuthHeaders()
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.data && data.data.length > 0) {
+            const lastBot = data.data[0]
+            setStrategy(lastBot.strategy_config)
+            setGeneratedCode(lastBot.generated_code)
+            setBacktestResults(lastBot.backtest_results)
+            setInsightsConfig(lastBot.insights_config)
+            setCurrentBotId(lastBot.id)
+            console.log('✅ Loaded last bot:', lastBot.name)
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load last bot:', err)
+      }
+    }
+
+    loadLastBot()
+  }, [isAuthenticated, getAuthHeaders])
 
   // View state - show landing page by default
   const [showLanding, setShowLanding] = useState(true)
@@ -109,6 +144,9 @@ function AppContent() {
         if (data.insights_config) {
           console.log(`📊 Generated ${data.insights_config.visualizations?.length || 0} custom visualizations`)
         }
+
+        // Auto-save new bot after generation completes
+        setTimeout(() => handleSaveBot(true), 1000)
       }
     } catch (err) {
       console.error('Error during job submission:', err)
@@ -300,11 +338,12 @@ function AppContent() {
     setBacktestResults(null)
     setError(null)
     setShowLanding(true)
+    setCurrentBotId(null)
   }
 
-  const handleSaveBot = async () => {
+  const handleSaveBot = async (autoSave = false) => {
     if (!isAuthenticated) {
-      setShowLogin(true)
+      if (!autoSave) setShowLogin(true)
       return
     }
 
@@ -312,10 +351,42 @@ function AppContent() {
       return
     }
 
-    const botName = prompt('Enter a name for this bot:', `${strategy.asset} ${strategy.strategy_type} Bot`)
-    if (!botName) return
-
     try {
+      // If we have a current bot ID, update it instead of creating new
+      if (currentBotId) {
+        const response = await fetch(`http://localhost:8000/bots/${currentBotId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            ...getAuthHeaders(),
+          },
+          body: JSON.stringify({
+            strategy_config: strategy,
+            generated_code: generatedCode,
+            backtest_results: backtestResults,
+            insights_config: insightsConfig,
+            session_id: sessionId,
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error('Failed to update bot')
+        }
+
+        if (!autoSave) {
+          alert('Bot updated successfully!')
+        }
+        console.log('✅ Bot auto-saved')
+        return
+      }
+
+      // Create new bot
+      const botName = autoSave
+        ? `${strategy.asset} ${strategy.strategy_type} Bot`
+        : prompt('Enter a name for this bot:', `${strategy.asset} ${strategy.strategy_type} Bot`)
+
+      if (!botName) return
+
       const response = await fetch('http://localhost:8000/bots', {
         method: 'POST',
         headers: {
@@ -337,10 +408,18 @@ function AppContent() {
         throw new Error('Failed to save bot')
       }
 
-      alert('Bot saved successfully!')
+      const data = await response.json()
+      setCurrentBotId(data.id)
+
+      if (!autoSave) {
+        alert('Bot saved successfully!')
+      }
+      console.log('✅ Bot saved with ID:', data.id)
     } catch (err) {
       console.error('Error saving bot:', err)
-      setError('Failed to save bot: ' + err.message)
+      if (!autoSave) {
+        setError('Failed to save bot: ' + err.message)
+      }
     }
   }
 
@@ -349,6 +428,64 @@ function AppContent() {
     setGeneratedCode(botData.code)
     setBacktestResults(botData.backtest_results)
     setInsightsConfig(botData.insights_config)
+    setCurrentBotId(botData.id)
+    setShowBotLibrary(false)
+    console.log('✅ Loaded bot:', botData.name)
+  }
+
+  const handleRefineStrategy = async (refinementPrompt) => {
+    // Close the sidebar
+    setShowSidebar(false)
+
+    // Clear previous results but keep the old strategy visible
+    setLoading(true)
+    setError(null)
+
+    // Generate new session ID
+    const newSessionId = crypto.randomUUID()
+    setSessionId(newSessionId)
+
+    try {
+      // Call the NEW refine endpoint instead of recreating from scratch
+      const response = await fetch('http://localhost:8000/api/strategy/refine', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          current_strategy: strategy,
+          current_code: generatedCode,
+          refinement_instructions: refinementPrompt,
+          session_id: newSessionId
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to refine strategy')
+      }
+
+      const data = await response.json()
+      setStrategy(data.strategy)
+      setGeneratedCode(data.code)
+      setBacktestResults(data.backtest_results)
+      setInsightsConfig(data.insights_config)
+
+      console.log('✅ Strategy refined successfully:', data.changes_made)
+      setLoading(false)
+
+      // Auto-save after refinement
+      setTimeout(() => handleSaveBot(true), 1000)
+    } catch (err) {
+      console.error('Error during refinement:', err)
+
+      // Try polling for result if connection dropped
+      if (newSessionId) {
+        pollForResult(newSessionId)
+      } else {
+        setError(err.message)
+        setLoading(false)
+      }
+    }
   }
 
   const handleGetStarted = () => {
@@ -458,10 +595,10 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen bg-dark-bg">
+    <div className="min-h-screen bg-dark-bg flex flex-col">
       {/* Header */}
       <header className="border-b border-dark-border bg-dark-surface/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="px-12 py-4">
           <div className="flex items-center justify-between">
             <button
               onClick={() => setShowLanding(true)}
@@ -541,16 +678,9 @@ function AppContent() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        {error && (
-          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400">
-            <p className="font-medium">Error</p>
-            <p className="text-sm mt-1">{error}</p>
-          </div>
-        )}
-
+      <main className="flex-1 flex flex-col overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center min-h-[400px]">
+          <div className="flex-1 flex items-center justify-center">
             <div className="text-center max-w-2xl w-full px-6">
               <div className="mb-6">
                 <LoadingSpinner />
@@ -577,9 +707,21 @@ function AppContent() {
             </div>
           </div>
         ) : !generatedCode ? (
-          <StrategyInput onGenerate={handleGenerateStrategy} />
+          <div className="max-w-7xl mx-auto px-6 py-8 w-full">
+            <StrategyInput onGenerate={handleGenerateStrategy} />
+          </div>
         ) : (
-          <div className="space-y-6">
+          <div className="flex flex-1 gap-0 overflow-hidden">
+            {/* Main Content */}
+            <div className="flex-1 overflow-y-auto px-12 py-8 max-w-[1600px]">
+            {error && (
+              <div className="mb-6 p-4 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400">
+                <p className="font-medium">Error</p>
+                <p className="text-sm mt-1">{error}</p>
+              </div>
+            )}
+
+            <div className="space-y-6">
             {/* Strategy Summary */}
             {strategy && (
               <div className="card">
@@ -638,20 +780,37 @@ function AppContent() {
             )}
 
             {/* Backtest Results */}
-            {backtestResults && <BacktestResults results={backtestResults} insightsConfig={insightsConfig} />}
+            {backtestResults && (
+              <div className="relative">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-white">📊 Backtest Results</h2>
+                  <button
+                    onClick={() => setShowSidebar(true)}
+                    className="btn btn-secondary text-sm"
+                  >
+                    🔧 Refine Strategy
+                  </button>
+                </div>
+                <BacktestResults results={backtestResults} insightsConfig={insightsConfig} />
+              </div>
+            )}
 
             {/* Generated Code */}
             <CodeDisplay code={generatedCode} strategyName={strategy?.name} />
+            </div>
+            </div>
+
+            {/* Strategy Sidebar - part of page layout */}
+            <StrategySidebar
+              isOpen={showSidebar}
+              onClose={() => setShowSidebar(false)}
+              currentStrategy={strategy}
+              onRefineStrategy={handleRefineStrategy}
+              onRunBacktest={handleRunBacktest}
+            />
           </div>
         )}
       </main>
-
-      {/* Footer */}
-      <footer className="border-t border-dark-border mt-12 py-6">
-        <div className="max-w-7xl mx-auto px-6 text-center text-sm text-gray-500">
-          <p>Built for DubHacks 2025 • Powered by Claude AI & Alpaca</p>
-        </div>
-      </footer>
 
       {/* Auth Modals */}
       {showLogin && (

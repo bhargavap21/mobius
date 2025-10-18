@@ -311,3 +311,120 @@ class CodeGeneratorAgent(BaseAgent):
             changes_made.append("No changes needed based on data analysis")
 
         return refined_strategy
+
+    async def refine_existing_code(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Refine existing strategy code based on user's refinement instructions
+        This modifies the existing code directly rather than regenerating from scratch
+
+        Args:
+            input_data: {
+                'current_strategy': dict,
+                'current_code': str,
+                'refinement_instructions': str
+            }
+
+        Returns:
+            {
+                'success': bool,
+                'strategy': dict,
+                'code': str,
+                'changes_made': list[str]
+            }
+        """
+        current_strategy = input_data.get('current_strategy')
+        current_code = input_data.get('current_code')
+        refinement_instructions = input_data.get('refinement_instructions')
+
+        logger.info(f"Refining existing code: {refinement_instructions[:100]}")
+
+        try:
+            # Use Claude to understand refinement instructions and apply them
+            from anthropic import Anthropic
+            import os
+            import json
+
+            client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+
+            # Build prompt for code refinement
+            prompt = f"""You are a trading strategy code refinement expert. You need to modify existing trading strategy code based on user instructions.
+
+CURRENT STRATEGY CONFIG:
+{json.dumps(current_strategy, indent=2)}
+
+USER'S REFINEMENT REQUEST:
+{refinement_instructions}
+
+CURRENT STRATEGY DESCRIPTION:
+- Asset: {current_strategy.get('asset')}
+- Strategy Type: {current_strategy.get('strategy_type')}
+- Entry Conditions: {current_strategy.get('entry_conditions')}
+- Exit Conditions: {current_strategy.get('exit_conditions')}
+
+YOUR TASK:
+1. Analyze what the user wants to change
+2. Modify the strategy config JSON to implement those changes
+3. List all changes made
+
+IMPORTANT RULES:
+- Only modify what the user requested
+- Preserve all other parameters
+- Make minimal changes to achieve the goal
+- If the user says "loosen RSI threshold", increase the threshold value
+- If the user says "lower sentiment requirement", decrease the threshold value
+- If the user says "use OR instead of AND", that means conditions should be less restrictive
+
+Respond in this exact JSON format:
+{{
+  "updated_strategy": {{ ... the modified strategy config ... }},
+  "changes_made": ["change 1", "change 2", ...],
+  "explanation": "Brief explanation of what was modified"
+}}"""
+
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=4000,
+                messages=[{
+                    "role": "user",
+                    "content": prompt
+                }]
+            )
+
+            response_text = response.content[0].text
+
+            # Parse JSON response
+            import re
+            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+            if not json_match:
+                raise Exception("Could not parse refinement response")
+
+            result_data = json.loads(json_match.group(0))
+
+            updated_strategy = result_data.get('updated_strategy')
+            changes_made = result_data.get('changes_made', [])
+
+            logger.info(f"✅ Refinement complete. Changes: {changes_made}")
+
+            # Regenerate code from updated strategy
+            code_result = generate_trading_bot_code(updated_strategy)
+            if not code_result.get('success'):
+                return {
+                    'success': False,
+                    'error': 'Failed to generate code from refined strategy'
+                }
+
+            return {
+                'success': True,
+                'strategy': updated_strategy,
+                'code': code_result.get('code'),
+                'changes_made': changes_made
+            }
+
+        except Exception as e:
+            logger.error(f"Error refining code: {e}")
+            import traceback
+            traceback.print_exc()
+            return {
+                'success': False,
+                'error': str(e)
+            }

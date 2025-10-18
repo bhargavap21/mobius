@@ -142,6 +142,13 @@ class BacktestResponse(BaseModel):
     error: Optional[str] = None
 
 
+class RefineStrategyRequest(BaseModel):
+    current_strategy: dict
+    current_code: str
+    refinement_instructions: str
+    session_id: Optional[str] = None
+
+
 # Routes
 @app.get("/")
 async def root():
@@ -387,6 +394,135 @@ async def get_strategy_result(session_id: str):
         )
 
     return result
+
+
+@app.post("/api/strategy/refine")
+async def refine_strategy(request: RefineStrategyRequest):
+    """
+    Refine an existing strategy by modifying the code directly
+
+    This is more efficient than regenerating from scratch because:
+    - Only modifies what needs to change
+    - Preserves working code and patterns
+    - Doesn't waste API credits on regenerating sentiment data
+    - Faster iteration cycle
+
+    Args:
+        request: Contains current strategy, code, and refinement instructions
+
+    Returns:
+        Refined strategy with updated code and backtest results
+    """
+    try:
+        session_id = request.session_id
+
+        logger.info(f"🔧 Refining strategy: {request.refinement_instructions[:100]}")
+
+        # Pre-create progress session
+        if session_id:
+            from progress_manager import progress_manager
+            progress_manager.create_session(session_id)
+            progress_manager.update_progress(
+                session_id,
+                agent="CodeGenerator",
+                status="Analyzing refinement request..."
+            )
+
+        from agents.code_generator import CodeGeneratorAgent
+        from agents.backtest_runner import BacktestRunnerAgent
+        from agents.analyst import StrategyAnalystAgent
+
+        # Initialize agents
+        code_gen = CodeGeneratorAgent()
+        backtest_runner = BacktestRunnerAgent()
+        analyst = StrategyAnalystAgent()
+
+        # Step 1: Refine the code
+        if session_id:
+            progress_manager.update_progress(
+                session_id,
+                agent="CodeGenerator",
+                status="Modifying strategy code..."
+            )
+
+        refine_result = await code_gen.refine_existing_code({
+            'current_strategy': request.current_strategy,
+            'current_code': request.current_code,
+            'refinement_instructions': request.refinement_instructions
+        })
+
+        if not refine_result.get('success'):
+            raise HTTPException(status_code=400, detail="Failed to refine strategy code")
+
+        refined_strategy = refine_result['strategy']
+        refined_code = refine_result['code']
+        changes_made = refine_result.get('changes_made', [])
+
+        logger.info(f"✅ Code refined. Changes: {', '.join(changes_made)}")
+
+        # Step 2: Run backtest on refined strategy
+        if session_id:
+            progress_manager.update_progress(
+                session_id,
+                agent="BacktestRunner",
+                status="Running backtest on refined strategy..."
+            )
+
+        backtest_result = await backtest_runner.process({
+            'strategy': refined_strategy,
+            'days': 180,
+            'initial_capital': 10000
+        })
+
+        if not backtest_result.get('success'):
+            raise HTTPException(status_code=400, detail="Backtest failed on refined strategy")
+
+        backtest_results = backtest_result['results']
+
+        # Step 3: Generate insights
+        if session_id:
+            progress_manager.update_progress(
+                session_id,
+                agent="StrategyAnalyst",
+                status="Generating insights..."
+            )
+
+        analysis_result = await analyst.process({
+            'strategy': refined_strategy,
+            'backtest_results': backtest_results,
+            'previous_results': None,
+            'iteration': 1
+        })
+
+        insights_config = analysis_result.get('insights_config')
+
+        # Mark workflow complete
+        if session_id:
+            progress_manager.complete_session(session_id)
+
+        response_data = {
+            "success": True,
+            "session_id": session_id,
+            "strategy": refined_strategy,
+            "code": refined_code,
+            "backtest_results": backtest_results,
+            "insights_config": insights_config,
+            "changes_made": changes_made,
+            "message": f"Strategy refined: {', '.join(changes_made)}"
+        }
+
+        # Store result
+        if session_id:
+            from job_storage import job_storage
+            job_storage.store_result(session_id, response_data)
+
+        return response_data
+
+    except Exception as e:
+        logger.error(f"❌ Error refining strategy: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/chat")
