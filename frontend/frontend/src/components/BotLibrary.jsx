@@ -182,7 +182,7 @@ const BotLibrary = ({ onClose, onLoadBot, user, onSignOut, onShowBotLibrary }) =
       {/* Main Content - Borderless page with grid */}
       <div className="flex-1 overflow-y-auto">
         <main className="mx-auto w-full max-w-6xl px-6 py-10">
-          <h1 className="mb-8 text-3xl font-semibold tracking-tight text-white">My Trading Bots</h1>
+          <h1 className="mb-8 text-4xl md:text-5xl font-light text-white leading-tight">My Trading Bots</h1>
 
           {error && (
             <div className="mb-6 p-4 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400">
