@@ -190,26 +190,26 @@ export default function CommunityPage({ userAgents = [], isAuthenticated = false
   return (
     <div className="min-h-screen bg-dark-bg">
       {/* Header */}
-      <div className="bg-dark-surface border-b border-dark-border">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+      <div className="bg-dark-surface/50 backdrop-blur-sm border-b border-white/10">
+        <div className="max-w-7xl mx-auto px-6 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
                 onClick={() => navigate('/')}
-                className="text-gray-400 hover:text-white transition-colors"
+                className="text-white/60 hover:text-white transition-colors"
               >
                 <ArrowLeft className="w-6 h-6" />
               </button>
               <div>
-                <h1 className="text-2xl font-bold text-white">Community</h1>
-                <p className="text-sm text-gray-400">Share your trading agents and discover strategies from other traders</p>
+                <h1 className="text-3xl md:text-4xl font-light text-white leading-tight">Community</h1>
+                <p className="mt-1 text-sm text-white/60">Share your trading agents and discover strategies from other traders</p>
               </div>
             </div>
             
             <div className="flex items-center gap-3">
               <button
                 onClick={handleGoCreateAgents}
-                className="btn btn-primary text-sm flex items-center gap-2"
+                className="px-4 py-2 rounded-lg bg-gradient-to-r from-accent-600 to-accent-400 text-sm font-medium text-black hover:opacity-95 transition-opacity flex items-center gap-2"
               >
                 <Plus className="w-4 h-4" />
                 Create Agents
@@ -222,13 +222,13 @@ export default function CommunityPage({ userAgents = [], isAuthenticated = false
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Tab Navigation */}
-        <div className="flex space-x-1 mb-8 bg-dark-surface p-1 rounded-lg w-fit">
+        <div className="flex space-x-1 mb-8 border border-white/10 bg-transparent p-1 rounded-lg w-fit">
           <button
             onClick={() => setActiveTab('shared')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`px-4 py-2 rounded-md text-sm font-light transition-colors ${
               activeTab === 'shared'
-                ? 'bg-accent-primary text-white'
-                : 'text-gray-400 hover:text-white'
+                ? 'bg-accent text-white'
+                : 'text-white/60 hover:text-white'
             }`}
           >
             <Users className="w-4 h-4 inline mr-2" />
@@ -237,10 +237,10 @@ export default function CommunityPage({ userAgents = [], isAuthenticated = false
           {isAuthenticated && (
             <button
               onClick={() => setActiveTab('share')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              className={`px-4 py-2 rounded-md text-sm font-light transition-colors ${
                 activeTab === 'share'
-                  ? 'bg-accent-primary text-white'
-                  : 'text-gray-400 hover:text-white'
+                  ? 'bg-accent text-white'
+                  : 'text-white/60 hover:text-white'
               }`}
             >
               <Share2 className="w-4 h-4 inline mr-2" />
@@ -263,20 +263,20 @@ export default function CommunityPage({ userAgents = [], isAuthenticated = false
         )}
 
         {activeTab === 'share' && !isAuthenticated && (
-          <div className="bg-dark-surface rounded-xl border border-dark-border p-8 text-center">
-            <Share2 className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-white mb-2">Sign In to Share Agents</h3>
-            <p className="text-gray-400 mb-6">You need to be signed in to share your trading agents with the community.</p>
+          <div className="bg-transparent rounded-2xl border border-white/10 p-12 text-center">
+            <Share2 className="w-16 h-16 text-white/40 mx-auto mb-4" />
+            <h3 className="text-xl font-light text-white mb-2">Sign In to Share Agents</h3>
+            <p className="text-white/60 mb-6">You need to be signed in to share your trading agents with the community.</p>
             <div className="flex gap-4 justify-center">
               <button
                 onClick={() => setActiveTab('shared')}
-                className="bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 transition-colors"
+                className="bg-transparent border border-white/20 text-white px-6 py-3 rounded-xl hover:border-accent/40 hover:text-accent transition-colors font-light"
               >
                 Browse Community Instead
               </button>
               <button
                 onClick={handleGoCreateAgents}
-                className="bg-accent-primary text-white px-6 py-3 rounded-lg hover:bg-accent-primary/90 transition-colors"
+                className="bg-gradient-to-r from-accent-600 to-accent-400 text-black px-6 py-3 rounded-xl hover:opacity-95 transition-opacity font-medium"
               >
                 Create Your First Agent
               </button>
@@ -302,38 +302,38 @@ function SharedAgentsList({ agents, loading, onLike, onDownload, onSaveToMyBots,
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {[...Array(6)].map((_, i) => (
-          <div key={i} className="bg-dark-surface rounded-xl border border-dark-border overflow-hidden animate-pulse">
+          <div key={i} className="bg-transparent rounded-2xl border border-white/10 overflow-hidden animate-pulse">
             {/* Image placeholder */}
-            <div className="h-48 bg-gray-700"></div>
+            <div className="aspect-[16/9] bg-white/5"></div>
             
             {/* Content placeholder */}
-            <div className="p-6">
-              <div className="h-6 bg-gray-700 rounded mb-3"></div>
-              <div className="h-4 bg-gray-700 rounded mb-2"></div>
-              <div className="h-4 bg-gray-700 rounded mb-4 w-3/4"></div>
+            <div className="p-5">
+              <div className="h-5 bg-white/10 rounded mb-2"></div>
+              <div className="h-3 bg-white/10 rounded mb-1 w-1/3"></div>
+              <div className="h-3 bg-white/10 rounded mb-4 w-2/3"></div>
               
               {/* Metrics placeholder */}
-              <div className="grid grid-cols-2 gap-4 mb-4 p-4 bg-gray-800 rounded-lg">
-                <div className="text-center">
-                  <div className="h-6 bg-gray-700 rounded mb-1"></div>
-                  <div className="h-3 bg-gray-700 rounded"></div>
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="border border-white/10 rounded-xl p-3">
+                  <div className="h-6 bg-white/10 rounded mb-1"></div>
+                  <div className="h-2 bg-white/10 rounded"></div>
                 </div>
-                <div className="text-center">
-                  <div className="h-6 bg-gray-700 rounded mb-1"></div>
-                  <div className="h-3 bg-gray-700 rounded"></div>
+                <div className="border border-white/10 rounded-xl p-3">
+                  <div className="h-6 bg-white/10 rounded mb-1"></div>
+                  <div className="h-2 bg-white/10 rounded"></div>
                 </div>
               </div>
               
               {/* Tags placeholder */}
               <div className="flex gap-2 mb-4">
-                <div className="h-6 bg-gray-700 rounded-full w-16"></div>
-                <div className="h-6 bg-gray-700 rounded-full w-20"></div>
+                <div className="h-5 bg-white/10 rounded-full w-16"></div>
+                <div className="h-5 bg-white/10 rounded-full w-20"></div>
               </div>
               
               {/* Buttons placeholder */}
               <div className="flex gap-3">
-                <div className="flex-1 h-12 bg-gray-700 rounded-lg"></div>
-                <div className="flex-1 h-12 bg-gray-700 rounded-lg"></div>
+                <div className="flex-1 h-10 bg-white/10 rounded-xl"></div>
+                <div className="flex-1 h-10 bg-white/10 rounded-xl"></div>
               </div>
             </div>
           </div>
@@ -344,13 +344,13 @@ function SharedAgentsList({ agents, loading, onLike, onDownload, onSaveToMyBots,
 
   if (agents.length === 0) {
     return (
-      <div className="bg-dark-surface rounded-xl border border-dark-border p-8 text-center">
-        <Users className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-        <h3 className="text-xl font-semibold text-white mb-2">No Agents Shared Yet</h3>
-        <p className="text-gray-400 mb-6">Be the first to share a trading agent with the community!</p>
+      <div className="bg-transparent rounded-2xl border border-white/10 p-12 text-center">
+        <Users className="w-16 h-16 text-white/40 mx-auto mb-4" />
+        <h3 className="text-xl font-light text-white mb-2">No Agents Shared Yet</h3>
+        <p className="text-white/60 mb-6">Be the first to share a trading agent with the community!</p>
         <button
           onClick={() => window.location.href = '/'}
-          className="bg-accent-primary text-white px-6 py-3 rounded-lg hover:bg-accent-primary/90 transition-colors"
+          className="bg-gradient-to-r from-accent-600 to-accent-400 text-black px-6 py-3 rounded-lg font-medium hover:opacity-95 transition-opacity"
         >
           Create Your First Agent
         </button>
@@ -410,9 +410,9 @@ function AgentPlacard({ agent, onLike, onDownload, onSaveToMyBots, onRemix, isAu
   }
 
   return (
-    <div className="bg-dark-surface rounded-xl border border-dark-border overflow-hidden hover:border-accent-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-accent-primary/10 group">
+    <article className="group relative flex flex-col rounded-2xl border border-white/10 bg-transparent transition hover:border-accent/40 hover:bg-white/5 focus-within:ring-2 focus-within:ring-accent overflow-hidden">
       {/* Placeholder Image */}
-      <div className="h-48 bg-gradient-to-br from-accent-primary/20 to-purple-500/20 flex items-center justify-center relative overflow-hidden">
+      <div className="aspect-[16/9] w-full bg-gradient-to-b from-white/10 to-transparent flex items-center justify-center relative overflow-hidden rounded-t-2xl">
         <div className="text-8xl opacity-80 group-hover:scale-110 transition-transform duration-300">
           {getPlaceholderImage(agent)}
         </div>
@@ -437,83 +437,83 @@ function AgentPlacard({ agent, onLike, onDownload, onSaveToMyBots, onRemix, isAu
       </div>
 
       {/* Content */}
-      <div className="p-6">
+      <div className="flex flex-1 flex-col gap-3 p-5">
         {/* Header */}
-        <div className="mb-4">
-          <h3 className="text-xl font-bold text-white mb-2 line-clamp-2 group-hover:text-accent-primary transition-colors">
+        <div>
+          <h3 className="text-lg font-semibold tracking-tight text-white group-hover:text-accent transition-colors mb-1">
             {agent.name}
           </h3>
-          <p className="text-sm text-gray-400 mb-3">by {agent.author || agent.author_name}</p>
-          <p className="text-sm text-gray-300 line-clamp-3 leading-relaxed">
+          <p className="text-xs text-white/60 mb-2">by {agent.author || agent.author_name}</p>
+          <p className="text-sm text-white/70 line-clamp-3 leading-relaxed">
             {agent.description}
           </p>
         </div>
 
         {/* Performance Metrics */}
-        <div className="grid grid-cols-2 gap-4 mb-4 p-4 bg-dark-bg rounded-lg">
-          <div className="text-center">
-            <div className="text-lg font-bold text-white">{agent.win_rate}%</div>
-            <div className="text-xs text-gray-400">Win Rate</div>
+        <div className="mt-2 grid grid-cols-2 gap-3">
+          <div className="rounded-xl border border-white/10 bg-transparent p-3 text-center">
+            <div className="text-xl font-semibold text-white">{agent.win_rate}%</div>
+            <div className="text-[11px] uppercase tracking-wide text-white/60">Win Rate</div>
           </div>
-          <div className="text-center">
-            <div className="text-lg font-bold text-white">{agent.total_trades}</div>
-            <div className="text-xs text-gray-400">Trades</div>
+          <div className="rounded-xl border border-white/10 bg-transparent p-3 text-center">
+            <div className="text-xl font-semibold text-white">{agent.total_trades}</div>
+            <div className="text-[11px] uppercase tracking-wide text-white/60">Trades</div>
           </div>
         </div>
 
         {/* Tags */}
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div className="mt-2 flex flex-wrap gap-2">
           {agent.tags?.slice(0, 3).map((tag, index) => (
-            <span key={index} className="px-3 py-1 bg-accent-primary/20 text-accent-primary text-xs rounded-full font-medium">
+            <span key={index} className="rounded-full border border-white/10 bg-transparent px-2 py-0.5 text-xs text-white/60">
               {tag}
             </span>
           ))}
           {agent.tags?.length > 3 && (
-            <span className="px-3 py-1 bg-gray-700/50 text-gray-300 text-xs rounded-full font-medium">
+            <span className="rounded-full border border-white/10 bg-transparent px-2 py-0.5 text-xs text-white/60">
               +{agent.tags.length - 3}
             </span>
-          )}
+          ))}
         </div>
 
         {/* Engagement Stats */}
-        <div className="flex items-center justify-between mb-4 text-sm text-gray-400">
-          <div className="flex items-center space-x-4">
+        <div className="flex items-center justify-between text-xs text-white/60 pt-2 border-t border-white/10">
+          <div className="flex items-center space-x-3">
             <div className="flex items-center space-x-1">
-              <Eye className="w-4 h-4" />
+              <Eye className="w-3.5 h-3.5" />
               <span>{agent.views?.toLocaleString() || 0}</span>
             </div>
             <div className="flex items-center space-x-1">
-              <Heart className="w-4 h-4" />
+              <Heart className="w-3.5 h-3.5" />
               <span>{agent.likes}</span>
             </div>
             <div className="flex items-center space-x-1">
-              <Download className="w-4 h-4" />
+              <Download className="w-3.5 h-3.5" />
               <span>{agent.downloads}</span>
             </div>
           </div>
-          <div className="text-xs">
+          <div>
             {formatDate(agent.shared_at)}
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="space-y-3">
+        <div className="mt-auto flex flex-col gap-3 pt-3">
           {/* Primary Actions Row */}
           <div className="flex gap-3">
             <button
               onClick={() => onLike(agent.id)}
-              className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all duration-200 flex items-center justify-center space-x-2 ${
+              className={`flex-1 rounded-xl border transition-colors px-4 py-2 text-sm flex items-center justify-center space-x-2 ${
                 agent.liked
-                  ? 'bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30'
-                  : 'bg-gray-700/50 text-gray-300 border border-gray-600/50 hover:bg-gray-600/50 hover:text-white'
+                  ? 'border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20'
+                  : 'border-white/15 bg-transparent text-white hover:border-accent/40 hover:text-accent'
               }`}
             >
               <Heart className={`w-4 h-4 ${agent.liked ? 'fill-current' : ''}`} />
-              <span>{agent.liked ? 'Liked' : 'Like'}</span>
+              <span className="font-light">{agent.liked ? 'Liked' : 'Like'}</span>
             </button>
             <button
               onClick={() => onDownload(agent.id)}
-              className="flex-1 py-3 px-4 bg-accent-primary text-white rounded-lg font-medium hover:bg-accent-primary/90 transition-all duration-200 flex items-center justify-center space-x-2"
+              className="flex-1 rounded-xl bg-gradient-to-r from-accent-600 to-accent-400 px-4 py-2 text-sm font-medium text-black hover:opacity-95 transition-opacity flex items-center justify-center space-x-2"
             >
               <Download className="w-4 h-4" />
               <span>Download</span>
@@ -525,14 +525,14 @@ function AgentPlacard({ agent, onLike, onDownload, onSaveToMyBots, onRemix, isAu
             <div className="flex gap-3">
               <button
                 onClick={() => onSaveToMyBots(agent.id)}
-                className="flex-1 py-2 px-4 bg-green-500/20 text-green-400 border border-green-500/30 rounded-lg font-medium hover:bg-green-500/30 transition-all duration-200 flex items-center justify-center space-x-2"
+                className="flex-1 py-2 px-4 bg-transparent text-green-400 border border-green-500/30 rounded-xl font-light hover:bg-green-500/10 transition-colors text-sm flex items-center justify-center space-x-2"
               >
                 <Save className="w-4 h-4" />
-                <span>Save to My Bots</span>
+                <span>Save</span>
               </button>
               <button
                 onClick={() => onRemix(agent.id)}
-                className="flex-1 py-2 px-4 bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded-lg font-medium hover:bg-purple-500/30 transition-all duration-200 flex items-center justify-center space-x-2"
+                className="flex-1 py-2 px-4 bg-transparent text-purple-400 border border-purple-500/30 rounded-xl font-light hover:bg-purple-500/10 transition-colors text-sm flex items-center justify-center space-x-2"
               >
                 <Sparkles className="w-4 h-4" />
                 <span>Remix</span>
@@ -567,18 +567,18 @@ function ShareAgentForm({ userAgents, onShare, onCancel }) {
   }
 
   return (
-    <div className="bg-dark-surface rounded-xl border border-dark-border p-6">
-      <h3 className="text-xl font-semibold text-white mb-6">Share Your Agent</h3>
+    <div className="bg-transparent rounded-2xl border border-white/10 p-6">
+      <h3 className="text-xl font-light text-white mb-6">Share Your Agent</h3>
       
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
+          <label className="block text-sm font-light text-white/80 mb-2">
             Select Agent to Share
           </label>
           <select
             value={selectedAgent}
             onChange={(e) => setSelectedAgent(e.target.value)}
-            className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-lg text-white focus:outline-none focus:border-accent-primary"
+            className="w-full px-3 py-2 bg-transparent border border-white/10 rounded-lg text-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent"
             required
           >
             <option value="">Choose an agent...</option>
@@ -591,41 +591,41 @@ function ShareAgentForm({ userAgents, onShare, onCancel }) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
+          <label className="block text-sm font-light text-white/80 mb-2">
             Display Name
           </label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-lg text-white focus:outline-none focus:border-accent-primary"
+            className="w-full px-3 py-2 bg-transparent border border-white/10 rounded-lg text-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent"
             placeholder="Give your agent a catchy name..."
             required
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
+          <label className="block text-sm font-light text-white/80 mb-2">
             Description
           </label>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-lg text-white focus:outline-none focus:border-accent-primary h-24 resize-none"
+            className="w-full px-3 py-2 bg-transparent border border-white/10 rounded-lg text-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent h-24 resize-none"
             placeholder="Describe what makes your agent special..."
             required
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
+          <label className="block text-sm font-light text-white/80 mb-2">
             Tags (comma-separated)
           </label>
           <input
             type="text"
             value={tags}
             onChange={(e) => setTags(e.target.value)}
-            className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-lg text-white focus:outline-none focus:border-accent-primary"
+            className="w-full px-3 py-2 bg-transparent border border-white/10 rounded-lg text-white focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent"
             placeholder="momentum, scalping, crypto, etc."
           />
         </div>
@@ -634,13 +634,13 @@ function ShareAgentForm({ userAgents, onShare, onCancel }) {
           <button
             type="button"
             onClick={onCancel}
-            className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+            className="px-6 py-2 bg-transparent border border-white/20 text-white rounded-xl hover:border-accent/40 hover:text-accent transition-colors font-light"
           >
             Cancel
           </button>
           <button
             type="submit"
-            className="px-6 py-2 bg-accent-primary text-white rounded-lg hover:bg-accent-primary/90 transition-colors"
+            className="px-6 py-2 bg-gradient-to-r from-accent-600 to-accent-400 text-black rounded-xl hover:opacity-95 transition-opacity font-medium"
           >
             Share Agent
           </button>
