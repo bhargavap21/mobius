@@ -1,16 +1,20 @@
 """
 Code Generation Tools - Generate Python trading bot code from strategies
 
-Uses Gemini to generate clean, production-ready trading bot code
+Uses Claude to generate clean, production-ready trading bot code
 """
 
 import logging
 import json
 import ast
 from typing import Dict, List, Any, Optional
-from llm_client import generate_json, generate_text
+from anthropic import Anthropic
+from config import settings
 
 logger = logging.getLogger(__name__)
+
+# Initialize Claude client
+client = Anthropic(api_key=settings.anthropic_api_key)
 
 
 def parse_strategy(strategy_description: str) -> Dict[str, Any]:
@@ -80,16 +84,33 @@ CRITICAL PARSING RULES:
 
 Return ONLY valid JSON, no other text."""
 
-        parsed = generate_json(prompt, max_tokens=2000)
+        response = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=2000,
+            messages=[{"role": "user", "content": prompt}],
+        )
 
-        logger.info(f"✅ Parsed strategy: {parsed['name']}")
-        logger.info(f"   Asset: {parsed.get('asset')}")
-        logger.info(f"   Data sources: {parsed.get('data_sources')}")
+        # Extract JSON from response
+        content = response.content[0].text
 
-        return {
-            "success": True,
-            "strategy": parsed,
-        }
+        # Try to find JSON in the response
+        json_start = content.find("{")
+        json_end = content.rfind("}") + 1
+
+        if json_start != -1 and json_end > json_start:
+            json_str = content[json_start:json_end]
+            parsed = json.loads(json_str)
+
+            logger.info(f"✅ Parsed strategy: {parsed['name']}")
+            logger.info(f"   Asset: {parsed.get('asset')}")
+            logger.info(f"   Data sources: {parsed.get('data_sources')}")
+
+            return {
+                "success": True,
+                "strategy": parsed,
+            }
+        else:
+            raise ValueError("No valid JSON found in response")
 
     except Exception as e:
         logger.error(f"❌ Error parsing strategy: {e}")
@@ -100,7 +121,7 @@ Return ONLY valid JSON, no other text."""
 
 
 def generate_trading_bot_code(
-    strategy: Dict[str, Any], include_backtest: bool = False, politician_data: Dict[str, Any] = None
+    strategy: Dict[str, Any], include_backtest: bool = False
 ) -> Dict[str, Any]:
     """
     Generate Python trading bot code from parsed strategy
@@ -108,7 +129,6 @@ def generate_trading_bot_code(
     Args:
         strategy: Parsed strategy parameters
         include_backtest: Whether to include backtesting code
-        politician_data: Real politician trading data from QuiverQuant API (optional)
 
     Returns:
         Generated Python code
@@ -116,93 +136,25 @@ def generate_trading_bot_code(
     try:
         logger.info(f"🤖 Generating code for strategy: {strategy.get('name')}")
 
-        # Add politician data context to prompt if available
-        politician_context = ""
-        politician_template = ""
-        if politician_data:
-            trades_count = len(politician_data.get('trades', []))
-            tickers = politician_data.get('tickers', [])
-            logger.info(f"🏛️ Including {trades_count} real politician trades in code generation")
+        # Build prompt for code generation
+        prompt = f"""You are an expert Python developer specializing in algorithmic trading.
 
-            # Determine politician name from strategy
-            politician_name = None
-            if 'pelosi' in strategy.get('name', '').lower():
-                politician_name = 'Pelosi'
+Generate a complete, production-ready Python trading bot based on this strategy:
 
-            politician_context = f"""
+{json.dumps(strategy, indent=2)}
 
-🏛️ CRITICAL REQUIREMENT - POLITICIAN TRADING DATA:
-This strategy requires real-time politician trading data from QuiverQuant API.
-- Available: {trades_count} recent congressional trades
-- DO NOT use web scraping, news APIs, or mock data
-- MUST import and use: from tools.politician_trades import get_politician_trades
+Requirements:
+1. Use the Alpaca API for trading (alpaca-py library)
+2. Include all necessary imports
+3. Implement entry and exit logic based on strategy
+4. Add proper error handling
+5. Include logging
+6. Calculate position sizes correctly
+7. Implement stop loss and take profit
+8. Add docstrings and comments
+9. Make it executable
 
-The politician_trades module is already available in your environment.
-"""
-
-            politician_template = f"""
-# REQUIRED IMPORTS for politician trading
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from tools.politician_trades import get_politician_trades
-
-class TradingBot:
-    def __init__(self, api_key: str, secret_key: str, paper: bool = True):
-        self.client = TradingClient(api_key, secret_key, paper=paper)
-        self.symbol = "{strategy.get('asset', 'SPY')}"
-        self.politician_name = {repr(politician_name)}  # e.g., "Pelosi" or None for all
-
-    def get_recent_politician_trades(self):
-        \"\"\"Fetch real-time politician trading data from QuiverQuant API\"\"\"
-        try:
-            trades_data = get_politician_trades(
-                politician_name=self.politician_name,
-                days_back=30  # Last 30 days of trades
-            )
-            return trades_data.get('trades', [])
-        except Exception as e:
-            logger.error(f"Error fetching politician trades: {{e}}")
-            return []
-
-    def check_entry_conditions(self) -> bool:
-        \"\"\"Check if politicians recently bought this stock\"\"\"
-        recent_trades = self.get_recent_politician_trades()
-
-        # Filter for BUY transactions of our target symbol
-        buy_trades = [
-            t for t in recent_trades
-            if t.get('Ticker') == self.symbol and t.get('Transaction') in ['Purchase', 'Buy']
-        ]
-
-        # Enter if politician bought within last 7 days
-        if buy_trades:
-            logger.info(f"🏛️ Found {{len(buy_trades)}} politician BUY trades for {{self.symbol}}")
-            return True
-        return False
-
-    def check_exit_conditions(self, position) -> bool:
-        \"\"\"Check if politicians recently sold this stock\"\"\"
-        recent_trades = self.get_recent_politician_trades()
-
-        # Filter for SELL transactions of our target symbol
-        sell_trades = [
-            t for t in recent_trades
-            if t.get('Ticker') == self.symbol and t.get('Transaction') in ['Sale', 'Sell']
-        ]
-
-        # Exit if politician sold recently
-        if sell_trades:
-            logger.info(f"🏛️ Found {{len(sell_trades)}} politician SELL trades for {{self.symbol}}")
-            return True
-        return False
-"""
-
-        # Build structure template based on whether we have politician data
-        if politician_template:
-            structure_section = f"REQUIRED Structure (follow this EXACTLY):\n```python\n{politician_template}\n```"
-        else:
-            structure_section = f"""Structure:
+Structure:
 ```python
 import logging
 from alpaca.trading.client import TradingClient
@@ -252,29 +204,6 @@ class TradingBot:
             time.sleep(60)  # Check every minute
 
 
-if __name__ == "__main__":"""
-
-        # Build prompt for code generation
-        prompt = f"""You are an expert Python developer specializing in algorithmic trading.
-
-Generate a complete, production-ready Python trading bot based on this strategy:
-
-{json.dumps(strategy, indent=2)}{politician_context}
-
-Requirements:
-1. Use the Alpaca API for trading (alpaca-py library)
-2. Include all necessary imports
-3. Implement entry and exit logic based on strategy
-4. Add proper error handling
-5. Include logging
-6. Calculate position sizes correctly
-7. Implement stop loss and take profit
-8. Add docstrings and comments
-9. Make it executable
-10. CRITICAL: Always check if indicator values (RSI, MACD, etc.) are None or NaN before using them in comparisons or calculations. Use checks like: if rsi is not None and rsi < 30:
-
-{structure_section}
-
 if __name__ == "__main__":
     # Initialize with your API keys
     bot = TradingBot(
@@ -292,7 +221,14 @@ Generate the COMPLETE, working code. Include all logic for:
 
 Make it copy-paste ready!"""
 
-        content = generate_text(prompt, max_tokens=4096)
+        response = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=4096,
+            messages=[{"role": "user", "content": prompt}],
+        )
+
+        # Extract code from response
+        content = response.content[0].text
 
         # Try to extract code blocks
         if "```python" in content:

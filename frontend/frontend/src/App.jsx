@@ -19,7 +19,7 @@ function AppContent() {
   if (!auth) {
     return <div className="min-h-screen bg-dark-bg flex items-center justify-center text-white">Loading...</div>
   }
-  const { user, isAuthenticated, signout, getAuthHeaders } = auth
+  const { user, isAuthenticated, signout, getAuthHeaders, tokenExpiredError, handleTokenExpired, clearExpiredError } = auth
   const navigate = useNavigate()
   const location = useLocation()
   const [strategy, setStrategy] = useState(null)
@@ -413,6 +413,11 @@ function AppContent() {
       })
 
       if (!response.ok) {
+        // Check for 401 Unauthorized (expired token)
+        if (response.status === 401) {
+          handleTokenExpired()
+          return
+        }
         throw new Error('Failed to save bot')
       }
 
@@ -567,6 +572,37 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-dark-bg">
+      {/* Token Expired Notification */}
+      {tokenExpiredError && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 max-w-md w-full mx-4">
+          <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 backdrop-blur-md">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 text-red-400 text-xl">⚠️</div>
+              <div className="flex-1">
+                <h3 className="text-red-400 font-semibold mb-1">Session Expired</h3>
+                <p className="text-red-200 text-sm mb-3">
+                  Your authentication token has expired. Please sign in again to continue.
+                </p>
+                <button
+                  onClick={() => {
+                    clearExpiredError()
+                    setShowLogin(true)
+                  }}
+                  className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm rounded-lg transition-colors"
+                >
+                  Sign In Again
+                </button>
+              </div>
+              <button
+                onClick={clearExpiredError}
+                className="flex-shrink-0 text-red-400 hover:text-red-300 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-8">

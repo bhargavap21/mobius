@@ -14,6 +14,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [tokenExpiredError, setTokenExpiredError] = useState(false);
 
   // Load user from localStorage on mount and handle email confirmation
   useEffect(() => {
@@ -151,11 +152,23 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const signout = () => {
+  const signout = (showExpiredMessage = false) => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('user');
     setToken(null);
     setUser(null);
+    if (showExpiredMessage) {
+      setTokenExpiredError(true);
+    }
+  };
+
+  const handleTokenExpired = () => {
+    console.error('🔐 Token expired - signing out user');
+    signout(true);
+  };
+
+  const clearExpiredError = () => {
+    setTokenExpiredError(false);
   };
 
   const getAuthHeaders = () => {
@@ -170,9 +183,12 @@ export const AuthProvider = ({ children }) => {
     token,
     loading,
     isAuthenticated: !!token && !!user,
+    tokenExpiredError,
     signup,
     signin,
     signout,
+    handleTokenExpired,
+    clearExpiredError,
     getAuthHeaders,
   };
 

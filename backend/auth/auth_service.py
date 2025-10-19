@@ -209,15 +209,26 @@ class AuthService:
             User UUID if token is valid, None otherwise
         """
         try:
+            # Log detailed diagnostics
+            token_prefix = access_token[:20] if len(access_token) > 20 else access_token
+            logger.info(f"🔐 Attempting to verify token starting with: {token_prefix}...")
+
             user_response = self.client.auth.get_user(access_token)
 
+            logger.info(f"🔐 Supabase auth.get_user() returned: {user_response}")
+
             if not user_response.user:
+                logger.warning(f"⚠️  Token verification: user_response.user is None")
                 return None
 
-            return UUID(user_response.user.id)
+            user_id = UUID(user_response.user.id)
+            logger.info(f"✅ Token verified successfully for user_id: {user_id}")
+            return user_id
 
         except Exception as e:
-            logger.error(f"❌ Token verification failed: {e}")
+            logger.error(f"❌ Token verification failed - Exception type: {type(e).__name__}")
+            logger.error(f"❌ Token verification failed - Exception message: {str(e)}")
+            logger.error(f"❌ Token verification failed - Exception details:", exc_info=True)
             return None
 
     async def refresh_token(self, refresh_token: str) -> AuthResponse:

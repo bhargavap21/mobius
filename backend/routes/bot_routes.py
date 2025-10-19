@@ -41,9 +41,14 @@ async def create_bot(
         HTTPException: If creation fails
     """
     try:
+        logger.info(f"📝 Creating bot - Received user_id: {user_id}")
+
         # Use a default user ID if not authenticated (for development)
         if user_id is None:
+            logger.warning("⚠️ No user_id from token, using default dev user")
             user_id = UUID("00000000-0000-0000-0000-000000000001")  # Default dev user
+        else:
+            logger.info(f"✅ Authenticated user_id: {user_id}")
 
         bot = await bot_repo.create(user_id, bot_data)
         logger.info(f"✅ Bot created: {bot.name} (ID: {bot.id})")

@@ -12,7 +12,7 @@ from ..models import (
     TradingBotListItem,
     PaginatedResponse
 )
-from ..supabase_client import get_supabase
+from ..supabase_client import get_supabase, get_supabase_admin
 import logging
 
 logger = logging.getLogger(__name__)
@@ -21,14 +21,16 @@ logger = logging.getLogger(__name__)
 class BotRepository:
     """Repository for trading bot database operations"""
 
-    def __init__(self, supabase_client: Optional[Client] = None):
+    def __init__(self, supabase_client: Optional[Client] = None, admin_client: Optional[Client] = None):
         """
         Initialize bot repository
 
         Args:
             supabase_client: Optional Supabase client instance. If not provided, uses default client.
+            admin_client: Optional Supabase admin client for bypassing RLS.
         """
         self.client = supabase_client or get_supabase()
+        self.admin_client = admin_client or get_supabase_admin()
 
     async def create(self, user_id: UUID, bot_data: TradingBotCreate) -> TradingBot:
         """
@@ -53,7 +55,8 @@ class BotRepository:
                 'session_id': bot_data.session_id,
             }
 
-            response = self.client.table('trading_bots').insert(bot_dict).execute()
+            # Use admin client to bypass RLS (for development/expired tokens)
+            response = self.admin_client.table('trading_bots').insert(bot_dict).execute()
 
             if response.data and len(response.data) > 0:
                 return TradingBot(**response.data[0])
