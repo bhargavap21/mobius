@@ -15,7 +15,7 @@ const EXAMPLE_STRATEGIES = [
   },
 ]
 
-export default function StrategyInput({ onGenerate }) {
+export default function StrategyInput({ onGenerate, fastMode = false, onFastModeChange }) {
   const [input, setInput] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
 
@@ -24,7 +24,7 @@ export default function StrategyInput({ onGenerate }) {
     if (!input.trim()) return
 
     setIsGenerating(true)
-    await onGenerate(input)
+    await onGenerate(input, true, fastMode)
     setIsGenerating(false)
   }
 
@@ -62,6 +62,24 @@ export default function StrategyInput({ onGenerate }) {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Fast Mode Toggle */}
+      <div className="mb-4">
+        <label className="flex items-center space-x-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={fastMode}
+            onChange={(e) => onFastModeChange?.(e.target.checked)}
+            className="w-4 h-4 text-accent-400 bg-transparent border-2 border-line rounded focus:ring-accent-400 focus:ring-2"
+          />
+          <div>
+            <span className="text-sm font-medium text-fg">Fast Mode</span>
+            <p className="text-xs text-fg-muted">
+              Generate bot in ~30 seconds (30 days backtest) vs ~2 minutes (90 days)
+            </p>
+          </div>
+        </label>
       </div>
 
       {/* Input Form */}

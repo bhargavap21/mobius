@@ -336,7 +336,7 @@ async def progress_stream(session_id: str):
 
 
 @app.post("/api/strategy/create_multi_agent")
-async def create_strategy_multi_agent(request: StrategyRequest):
+async def create_strategy_multi_agent(request: StrategyRequest, fast_mode: bool = False):
     """
     Create and optimize a trading strategy using multi-agent system
 
@@ -365,11 +365,16 @@ async def create_strategy_multi_agent(request: StrategyRequest):
 
         supervisor = SupervisorAgent()
 
+        # Adjust parameters based on fast mode
+        days = 30 if fast_mode else 90  # Ultra-fast mode uses only 30 days
+        initial_capital = 10000
+        
         result = await supervisor.process({
             'user_query': request.strategy_description,
-            'days': 180,
-            'initial_capital': 10000,
-            'session_id': session_id  # Pass session ID for progress updates
+            'days': days,
+            'initial_capital': initial_capital,
+            'session_id': session_id,  # Pass session ID for progress updates
+            'fast_mode': fast_mode
         })
 
         if not result.get('success'):
@@ -620,6 +625,7 @@ class ShareAgentRequest(BaseModel):
     description: str
     tags: list[str] = []
     is_public: bool = True
+    user_id: str = "demo_user"
 
 
 # Import community repository
@@ -647,17 +653,32 @@ async def get_shared_agents(page: int = 1, page_size: int = 20):
         
         # Transform the data to include author names and performance metrics
         agents_with_details = []
-        for agent in result.items:
+        logger.info(f"🔍 Processing {len(result.items)} shared agents...")
+        
+        # Use admin client for consistency
+        from db.supabase_client import get_supabase_admin
+        admin_client = get_supabase_admin()
+        
+        for i, agent in enumerate(result.items):
+            logger.info(f"📋 Processing agent {i+1}: {agent.name}")
+            
             # Get original bot data for performance metrics
-            original_bot_response = community_repo.client.table('trading_bots').select('*').eq('id', str(agent.original_bot_id)).execute()
+            original_bot_response = admin_client.table('trading_bots').select('*').eq('id', str(agent.original_bot_id)).execute()
             
             if original_bot_response.data:
                 original_bot = original_bot_response.data[0]
+                logger.info(f"  ✅ Found original bot: {original_bot.get('name')}")
+                
                 backtest_results = original_bot.get('backtest_results', {})
+                logger.info(f"  📊 Backtest results keys: {list(backtest_results.keys()) if backtest_results else 'None'}")
                 
                 # Get author name
-                author_response = community_repo.client.table('users').select('full_name').eq('id', str(agent.author_id)).execute()
+                author_response = admin_client.table('users').select('full_name').eq('id', str(agent.author_id)).execute()
                 author_name = author_response.data[0].get('full_name', 'Anonymous') if author_response.data else 'Anonymous'
+                logger.info(f"  👤 Author: {author_name}")
+                
+                # Get backtest summary
+                backtest_summary = backtest_results.get('summary', {}) if backtest_results else {}
                 
                 agent_data = {
                     "id": str(agent.id),
@@ -665,9 +686,9 @@ async def get_shared_agents(page: int = 1, page_size: int = 20):
                     "description": agent.description,
                     "author": author_name,
                     "tags": agent.tags,
-                    "total_return": backtest_results.get('total_return', 0.0),
-                    "win_rate": backtest_results.get('win_rate', 0),
-                    "total_trades": backtest_results.get('total_trades', 0),
+                    "total_return": backtest_summary.get('total_return', 0.0),
+                    "win_rate": backtest_summary.get('win_rate', 0),
+                    "total_trades": backtest_summary.get('total_trades', 0),
                     "symbol": original_bot.get('strategy_config', {}).get('asset', 'N/A'),
                     "views": agent.views,
                     "likes": agent.likes,
@@ -676,6 +697,11 @@ async def get_shared_agents(page: int = 1, page_size: int = 20):
                     "liked": agent.liked
                 }
                 agents_with_details.append(agent_data)
+                logger.info(f"  ✅ Added agent data: {agent_data['name']} by {agent_data['author']}")
+            else:
+                logger.error(f"  ❌ Original bot not found for agent: {agent.name}")
+        
+        logger.info(f"🎯 Final agents_with_details count: {len(agents_with_details)}")
         
         return {
             "success": True, 
@@ -691,82 +717,29 @@ async def get_shared_agents(page: int = 1, page_size: int = 20):
     except Exception as e:
         logger.error(f"❌ Error fetching shared agents: {e}")
         
-        # If database tables don't exist, return mock data
+        # If database tables don't exist, provide helpful error message
         if "Could not find the table" in str(e) or "PGRST205" in str(e):
-            logger.info("📝 Returning mock community data (database tables not created yet)")
-            
-            mock_agents = [
-                {
-                    "id": "mock-1",
-                    "name": "Elon Tweet Momentum Trader",
-                    "description": "A sophisticated trading bot that monitors Elon Musk's tweets about Tesla and executes trades based on sentiment analysis and momentum indicators.",
-                    "author": "Alex Chen",
-                    "tags": ["momentum", "sentiment", "TSLA", "social-media"],
-                    "total_return": 23.5,
-                    "win_rate": 68,
-                    "total_trades": 45,
-                    "symbol": "TSLA",
-                    "views": 1247,
-                    "likes": 89,
-                    "downloads": 156,
-                    "shared_at": "2024-01-15T10:30:00Z",
-                    "liked": mock_agent_likes.get("mock-1", False)
-                },
-                {
-                    "id": "mock-2", 
-                    "name": "Reddit WSB Sentiment Scanner",
-                    "description": "Scans r/wallstreetbets for high-engagement posts and executes trades based on collective sentiment and volume spikes.",
-                    "author": "Sarah Johnson",
-                    "tags": ["reddit", "sentiment", "meme-stocks", "volume"],
-                    "total_return": 156.8,
-                    "win_rate": 42,
-                    "total_trades": 78,
-                    "symbol": "GME",
-                    "views": 2341,
-                    "likes": 167,
-                    "downloads": 298,
-                    "shared_at": "2024-01-12T14:22:00Z",
-                    "liked": mock_agent_likes.get("mock-2", False)
-                },
-                {
-                    "id": "mock-3",
-                    "name": "RSI Oversold Bounce Trader",
-                    "description": "Identifies oversold conditions using RSI and executes long positions with tight stop losses for quick bounces.",
-                    "author": "Mike Rodriguez",
-                    "tags": ["technical-analysis", "RSI", "mean-reversion", "scalping"],
-                    "total_return": 89.2,
-                    "win_rate": 74,
-                    "total_trades": 123,
-                    "symbol": "AAPL",
-                    "views": 892,
-                    "likes": 45,
-                    "downloads": 67,
-                    "shared_at": "2024-01-10T09:15:00Z",
-                    "liked": mock_agent_likes.get("mock-3", False)
-                }
-            ]
-            
-            return {
-                "success": True,
-                "agents": mock_agents,
-                "pagination": {
-                    "page": page,
-                    "page_size": page_size,
-                    "total": len(mock_agents),
-                    "total_pages": 1
-                }
-            }
+            logger.error("❌ Database tables not found. Please run the database setup script.")
+            raise HTTPException(
+                status_code=503, 
+                detail="Database tables not found. Please contact administrator to set up community features."
+            )
         
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/community/share")
-async def share_agent(agent_data: ShareAgentRequest, user_id: str = "current_user"):
+async def share_agent(agent_data: ShareAgentRequest):
     """
     Share an agent with the community
     """
     try:
         from db.models import SharedAgentCreate
+        
+        logger.info(f"🔍 Share agent request received:")
+        logger.info(f"  - agent_id: {agent_data.agent_id}")
+        logger.info(f"  - user_id: {agent_data.user_id}")
+        logger.info(f"  - name: {agent_data.name}")
         
         # Create shared agent data
         shared_agent_create = SharedAgentCreate(
@@ -778,8 +751,38 @@ async def share_agent(agent_data: ShareAgentRequest, user_id: str = "current_use
         )
         
         # Save to database
+        # For demo purposes, use a default UUID if user_id is not a valid UUID
+        try:
+            author_uuid = UUID(agent_data.user_id)
+            logger.info(f"✅ Using provided user UUID: {author_uuid}")
+        except ValueError:
+            # Use a default demo user UUID
+            author_uuid = UUID("00000000-0000-0000-0000-000000000001")
+            logger.info(f"⚠️ Invalid user_id format, using demo user UUID: {author_uuid}")
+        
+        # Check if the bot exists and belongs to the user
+        from db.supabase_client import get_supabase_admin
+        client = get_supabase_admin()
+        
+        bot_response = client.table('trading_bots').select('*').eq('id', str(shared_agent_create.original_bot_id)).eq('user_id', str(author_uuid)).execute()
+        
+        if not bot_response.data:
+            logger.error(f"❌ Bot not found or not owned by user:")
+            logger.error(f"  - Bot ID: {shared_agent_create.original_bot_id}")
+            logger.error(f"  - User ID: {author_uuid}")
+            
+            # Let's see what bots exist for this user
+            user_bots = client.table('trading_bots').select('*').eq('user_id', str(author_uuid)).execute()
+            logger.error(f"  - User's bots: {len(user_bots.data)} found")
+            for bot in user_bots.data[:3]:
+                logger.error(f"    - {bot.get('name')} (ID: {bot.get('id')})")
+            
+            raise Exception("Original bot not found or not owned by user")
+        
+        logger.info(f"✅ Found bot: {bot_response.data[0].get('name')}")
+        
         shared_agent = await community_repo.create_shared_agent(
-            author_id=UUID(user_id),  # In production, get from auth token
+            author_id=author_uuid,
             shared_agent_data=shared_agent_create
         )
         
@@ -801,14 +804,13 @@ async def share_agent(agent_data: ShareAgentRequest, user_id: str = "current_use
     except Exception as e:
         logger.error(f"❌ Error sharing agent: {e}")
         
-        # If database tables don't exist, return mock success
+        # If database tables don't exist, provide helpful error message
         if "Could not find the table" in str(e) or "PGRST205" in str(e):
-            logger.info("📝 Mock agent sharing (database tables not created yet)")
-            return {
-                "success": True,
-                "message": "Agent shared successfully (mock mode)",
-                "agent_id": "mock-shared-agent"
-            }
+            logger.error("❌ Database tables not found. Please run the database setup script.")
+            raise HTTPException(
+                status_code=503, 
+                detail="Database tables not found. Please contact administrator to set up community features."
+            )
         
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -1032,14 +1034,15 @@ async def download_agent(agent_id: str, user_id: str = None):
 
 
 @app.post("/api/bots")
-async def create_bot(bot_data: dict, user_id: str = "current_user"):
+async def create_bot(bot_data: dict):
     """
     Save an agent to user's bot collection (for Save to My Bots functionality)
     """
     try:
         # For mock purposes, just return success
         # In a real implementation, this would save to the trading_bots table
-        logger.info(f"🤖 Bot saved to user collection: {bot_data.get('name', 'Unknown')}")
+        user_id = bot_data.get('user_id', 'demo_user')
+        logger.info(f"🤖 Bot saved to user collection: {bot_data.get('name', 'Unknown')} for user: {user_id}")
         
         return {
             "success": True,
