@@ -87,12 +87,12 @@ function AppContent() {
     setBacktestResults(null)
     setProgressSteps([])
     setCurrentIteration(0)
+    setSessionId(null) // Clear any old session ID
 
     // Generate session ID on frontend first
     const newSessionId = crypto.randomUUID()
     console.log('[App] Generated session ID:', newSessionId)
-    setSessionId(newSessionId)
-    console.log('[App] Session ID state updated')
+    // DON'T set sessionId state yet - wait for POST to succeed first!
 
     try {
       // Use multi-agent endpoint by default (includes auto-backtesting and refinement)
@@ -128,6 +128,11 @@ function AppContent() {
       }
 
       const data = await response.json()
+
+      // NOW set the session ID - POST succeeded, backend has the session
+      console.log('[App] POST succeeded, setting sessionId state')
+      setSessionId(newSessionId)
+
       setStrategy(data.strategy)
       setGeneratedCode(data.code)
 
