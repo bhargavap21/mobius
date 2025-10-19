@@ -746,9 +746,9 @@ function AppContent() {
         )}
 
         {loading ? (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center max-w-2xl w-full px-6">
-              <div className="mb-6">
+          <div className="flex-1 flex items-center justify-center min-h-screen">
+            <div className="flex flex-col items-center text-center max-w-2xl w-full px-6">
+              <div className="mb-6 flex flex-col items-center">
                 <LoadingSpinner />
                 <p className="text-gray-400 mt-4 text-lg font-semibold">
                   🤖 Multi-Agent System Working...
@@ -760,7 +760,7 @@ function AppContent() {
 
               {/* Real-time Agent Activity Log */}
               {sessionId && (
-                <div className="mt-6">
+                <div className="mt-6 w-full flex justify-center">
                   <AgentActivityLogPolling
                     sessionId={sessionId}
                     onComplete={handleWorkflowComplete}
@@ -769,7 +769,11 @@ function AppContent() {
               )}
 
               {/* Fallback animated indicator if no session ID */}
-              {!sessionId && <ProgressIndicator />}
+              {!sessionId && (
+                <div className="flex justify-center w-full">
+                  <ProgressIndicator />
+                </div>
+              )}
             </div>
           </div>
         ) : showDeploymentMonitor ? (

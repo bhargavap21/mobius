@@ -25,13 +25,14 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
   return (
     <div className="w-full">
       {/* Navbar - always visible */}
-      <div className="sticky top-0 z-50 flex items-center justify-between px-6 py-6 bg-dark-surface/50 backdrop-blur-sm">
-        <button
-          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-          className="text-white hover:opacity-80 transition-opacity -ml-6 pl-6"
-        >
-          <span className="text-2xl font-serif italic">Mobius</span>
-        </button>
+      <div className="sticky top-0 z-50 bg-dark-surface/50 backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
+          <button
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="text-white hover:opacity-80 transition-opacity"
+          >
+            <span className="text-2xl font-serif italic">Mobius</span>
+          </button>
         
         <div className="flex items-center gap-3">
           {/* Dashboard & Community buttons - always visible */}
@@ -99,6 +100,7 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
             </>
           )}
         </div>
+        </div>
       </div>
 
       {/* Hero Section with 3D */}
@@ -119,7 +121,7 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
             <p className="text-xl md:text-2xl text-gray-400 leading-relaxed mb-8">
               Mobius delivers proven algorithms, automated backtesting, and production-ready code to traders, quants, and developers.
             </p>
-            <div>
+            <div className="flex gap-4">
               <button
                 onClick={handleBuildBot}
                 className="px-12 py-4 bg-white text-black text-lg font-medium rounded-xl hover:bg-accent hover:text-white transition-all inline-flex items-center gap-2"
@@ -127,11 +129,18 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
               >
                 Build Bot →
               </button>
+              <button
+                onClick={() => navigate('/community')}
+                className="px-8 py-4 bg-transparent border-2 border-white/20 text-white text-lg font-medium rounded-xl hover:border-accent hover:text-accent transition-all inline-flex items-center gap-2"
+                style={{ willChange: 'border-color, color', transform: 'translateZ(0)' }}
+              >
+                Explore Bots
+              </button>
             </div>
           </div>
 
           {/* Right side - 3D Logo */}
-          <div className="w-1/2 h-full absolute -right-30 top-16 flex items-center justify-center pointer-events-none" style={{ isolation: 'isolate' }}>
+          <div className="w-1/2 h-full absolute -right-40 -top-12 flex items-center justify-center pointer-events-none" style={{ isolation: 'isolate' }}>
             <div className="w-full h-full flex items-center justify-center">
               <iframe
                 src='https://my.spline.design/mobiusmiamisunsetcopy-SKOxlmvEV8x6vDuzNWCJ8AFf/'
@@ -142,16 +151,6 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
               />
             </div>
           </div>
-        </div>
-
-        {/* Scroll indicator */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 animate-bounce">
-          <button
-            onClick={() => scrollToSection('process')}
-            className="w-6 h-10 rounded-full flex items-start justify-center p-2 hover:opacity-70 transition-opacity"
-          >
-            <div className="w-1 h-3 bg-accent rounded-full" />
-          </button>
         </div>
       </section>
 

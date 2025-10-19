@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Share2, Users, Star, TrendingUp, Eye, Download, Heart, ArrowLeft, Plus, Save, Sparkles } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
 
-export default function CommunityPage({ userAgents = [], isAuthenticated = false }) {
+export default function CommunityPage({ userAgents = [] }) {
   const navigate = useNavigate()
+  const { user, isAuthenticated, signout } = useAuth()
   const [activeTab, setActiveTab] = useState('shared')
   const [sharedAgents, setSharedAgents] = useState([])
   const [loading, setLoading] = useState(false)
@@ -189,32 +191,83 @@ export default function CommunityPage({ userAgents = [], isAuthenticated = false
 
   return (
     <div className="min-h-screen bg-dark-bg">
-      {/* Header */}
-      <div className="bg-dark-surface border-b border-dark-border">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+      {/* Navbar */}
+      <div className="sticky top-0 z-50 bg-dark-surface/50 backdrop-blur-sm border-b border-dark-border">
+        <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
+          <button
+            onClick={() => navigate('/')}
+            className="text-white hover:opacity-80 transition-opacity"
+          >
+            <span className="text-2xl font-serif italic">Mobius</span>
+          </button>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate('/')}
+              className="px-4 py-2 text-sm font-light rounded-lg border border-white/20 text-white/80 hover:border-accent hover:text-accent transition-colors"
+            >
+              Dashboard
+            </button>
+            <button
+              onClick={() => navigate('/community')}
+              className="px-4 py-2 text-sm font-light rounded-lg border border-accent text-accent transition-colors"
+            >
+              Community
+            </button>
+
+            {isAuthenticated ? (
+              <div className="flex items-center gap-2 pl-3 border-l border-gray-700">
+                <span className="text-sm text-gray-400">
+                  {user?.full_name ? user.full_name.split(' ')[0] : user?.email}
+                </span>
+                <div className="relative group">
+                  <button className="text-sm text-gray-400 hover:text-white p-1">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </button>
+
+                  <div className="absolute right-0 top-full mt-1 w-32 bg-dark-surface rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                    <div className="py-1">
+                      <button
+                        onClick={signout}
+                        className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-dark-bg hover:text-red-300 transition-colors"
+                      >
+                        Sign Out
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
               <button
                 onClick={() => navigate('/')}
-                className="text-gray-400 hover:text-white transition-colors"
+                className="px-4 py-2 bg-white text-black text-sm font-medium rounded-lg hover:bg-gray-100 transition-colors"
               >
-                <ArrowLeft className="w-6 h-6" />
+                Sign In
               </button>
-              <div>
-                <h1 className="text-3xl md:text-4xl font-light tracking-tight text-white">Community</h1>
-                <p className="mt-1 text-sm text-gray-400">Share your trading agents and discover strategies from other traders</p>
-              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Header */}
+      <div className="bg-dark-bg border-b border-dark-border">
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-semibold text-white mb-2">Community</h1>
+              <p className="text-gray-400">Share your trading agents and discover strategies from other traders</p>
             </div>
-            
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleGoCreateAgents}
-                className="btn btn-primary text-sm flex items-center gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                Create Agents
-              </button>
-            </div>
+
+            <button
+              onClick={handleGoCreateAgents}
+              className="px-6 py-3 rounded-lg bg-accent text-white hover:bg-accent/90 transition-colors flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Create Agents
+            </button>
           </div>
         </div>
       </div>
