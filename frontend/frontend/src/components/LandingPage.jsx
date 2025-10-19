@@ -131,15 +131,14 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
           </div>
 
           {/* Right side - 3D Logo */}
-          <div className="w-1/2 h-full absolute -right-30 top-16 flex items-center justify-center" style={{ isolation: 'isolate' }}>
+          <div className="w-1/2 h-full absolute -right-30 top-16 flex items-center justify-center pointer-events-none" style={{ isolation: 'isolate' }}>
             <div className="w-full h-full flex items-center justify-center">
               <iframe
                 src='https://my.spline.design/mobiusmiamisunsetcopy-SKOxlmvEV8x6vDuzNWCJ8AFf/'
-                frameBorder='0'
                 width='100%'
                 height='100%'
                 title="Mobius 3D Logo"
-                style={{ border: 'none' }}
+                style={{ border: 'none', pointerEvents: 'auto' }}
               />
             </div>
           </div>
