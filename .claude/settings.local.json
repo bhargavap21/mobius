@@ -26,7 +26,11 @@
       "Bash(pip3 install pandas-ta --no-deps)",
       "Bash(pip3 install git+https://github.com/twopirllc/pandas-ta.git@0.3.14b)",
       "Bash(pip3 install pandas_ta)",
-      "Bash(pip3 install supabase)"
+      "Bash(pip3 install supabase)",
+      "Bash(git checkout:*)",
+      "Bash(git add -A)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []

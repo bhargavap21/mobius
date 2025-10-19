@@ -11,7 +11,7 @@ This module handles:
 import json
 import logging
 from typing import Dict, List, Any, Optional, Callable
-import google.generativeai as genai
+# import google.generativeai as genai  # Disabled - using Claude for code generation
 from config import settings
 
 # Set up logging
@@ -21,13 +21,14 @@ logger = logging.getLogger(__name__)
 
 class TradingBotOrchestrator:
     """
-    Main orchestrator that uses Gemini to understand requests and coordinate tools
+    Main orchestrator that coordinates tools (Gemini disabled - using Claude for strategy generation)
     """
 
     def __init__(self):
-        """Initialize the orchestrator with Gemini client and tool registry"""
-        genai.configure(api_key=settings.gemini_api_key)
-        self.client = genai.GenerativeModel('gemini-2.0-flash-exp')
+        """Initialize the orchestrator with tool registry (Gemini disabled)"""
+        # genai.configure(api_key=settings.gemini_api_key)  # Disabled
+        # self.client = genai.GenerativeModel('gemini-2.0-flash-exp')  # Disabled
+        self.client = None  # Gemini client disabled - Claude used for code generation
         self.tools: Dict[str, Callable] = {}
         self.tool_schemas: List[Dict[str, Any]] = []
 
@@ -217,7 +218,9 @@ When you have a complete answer, provide it clearly."""
         Returns:
             Response and updated conversation
         """
-        from llm_client import generate_text
+        from anthropic import Anthropic
+
+        client = Anthropic(api_key=settings.anthropic_api_key)
 
         if conversation_history is None:
             conversation_history = []
@@ -262,12 +265,7 @@ BACKTEST RESULTS:
                     code_preview = code[:500] + "..." if len(code) > 500 else code
                     context_str += f"\nSTRATEGY CODE (preview):\n```python\n{code_preview}\n```\n"
 
-            # Build conversation context for Gemini
-            conversation_text = context_str + "\n\n" + "\n\n".join([
-                f"{msg['role'].upper()}: {msg['content']}"
-                for msg in conversation_history
-            ])
-
+            # Build conversation context with system message prepended
             system_instruction = """You are an expert trading strategy assistant with deep knowledge of:
 - Technical analysis (RSI, MACD, moving averages, etc.)
 - Sentiment analysis from social media
@@ -284,11 +282,27 @@ Your role is to help users understand and improve their trading strategies by:
 Always be specific, data-driven, and reference the actual strategy context provided.
 If the strategy has 0 trades, explain the likely reasons (conditions too strict, market data issues, etc.)."""
 
-            response_text = generate_text(
-                prompt=conversation_text,
-                system_instruction=system_instruction,
-                max_tokens=2048
+            # Prepend context to first message if available
+            messages = []
+            if context_str and len(conversation_history) > 0:
+                first_msg = conversation_history[0]
+                messages.append({
+                    "role": first_msg["role"],
+                    "content": context_str + "\n\n" + first_msg["content"]
+                })
+                messages.extend(conversation_history[1:])
+            else:
+                messages = conversation_history
+
+            # Call Claude API
+            response = client.messages.create(
+                model="claude-sonnet-4-5-20250929",
+                max_tokens=2048,
+                system=system_instruction,
+                messages=messages
             )
+
+            response_text = response.content[0].text
 
             conversation_history.append({"role": "assistant", "content": response_text})
 

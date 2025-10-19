@@ -62,12 +62,12 @@ const AgentActivityLogPolling = ({ sessionId, onComplete }) => {
           throw new Error(`HTTP error! status: ${response.status}`)
         }
 
-        const data = await response.json()
-        console.log('[AgentActivityLogPolling] Poll response:', data)
-
         // Reset retry counter on successful request
         retryCountRef.current = 0
         setError(null)
+
+        const data = await response.json()
+        console.log('[AgentActivityLogPolling] Poll response:', data)
 
         if (data.events && data.events.length > 0) {
           console.log('[AgentActivityLogPolling] Received', data.events.length, 'new events')

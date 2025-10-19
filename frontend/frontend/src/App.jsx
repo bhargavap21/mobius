@@ -11,7 +11,7 @@ import Login from './components/Login'
 import Signup from './components/Signup'
 import BotLibrary from './components/BotLibrary'
 import LandingPage from './components/LandingPage'
-import StrategySidebar from './components/StrategySidebar'
+import RefineSidebar from './components/RefineSidebar'
 import './index.css'
 
 function AppContent() {
@@ -19,7 +19,7 @@ function AppContent() {
   if (!auth) {
     return <div className="min-h-screen bg-dark-bg flex items-center justify-center text-white">Loading...</div>
   }
-  const { user, isAuthenticated, signout, getAuthHeaders } = auth
+  const { user, isAuthenticated, signout, getAuthHeaders, tokenExpiredError, handleTokenExpired, clearExpiredError } = auth
   const navigate = useNavigate()
   const location = useLocation()
   const [strategy, setStrategy] = useState(null)
@@ -43,7 +43,6 @@ function AppContent() {
   const [showLogin, setShowLogin] = useState(false)
   const [showSignup, setShowSignup] = useState(false)
   const [showBotLibrary, setShowBotLibrary] = useState(false)
-  const [showSidebar, setShowSidebar] = useState(false)
 
   // Current bot ID for tracking saves/updates
   const [currentBotId, setCurrentBotId] = useState(null)
@@ -88,12 +87,12 @@ function AppContent() {
     setBacktestResults(null)
     setProgressSteps([])
     setCurrentIteration(0)
+    setSessionId(null) // Clear any old session ID
 
     // Generate session ID on frontend first
     const newSessionId = crypto.randomUUID()
     console.log('[App] Generated session ID:', newSessionId)
-    setSessionId(newSessionId)
-    console.log('[App] Session ID state updated')
+    // DON'T set sessionId state yet - wait for POST to succeed first!
 
     try {
       // Use multi-agent endpoint by default (includes auto-backtesting and refinement)
@@ -105,6 +104,9 @@ function AppContent() {
       if (useMultiAgent) {
         setProgressSteps(['🚀 Starting multi-agent workflow...'])
       }
+
+      console.log(`[App] Sending POST to ${endpoint}`)
+      console.log(`[App] Payload:`, { strategy_description: userInput, session_id: newSessionId })
 
       // Add fast mode parameter to URL
       const url = useFastMode ? `${endpoint}?fast_mode=true` : endpoint
@@ -120,11 +122,20 @@ function AppContent() {
         }),
       })
 
+      console.log(`[App] Response status: ${response.status} ${response.statusText}`)
+
       if (!response.ok) {
-        throw new Error('Failed to generate strategy')
+        const errorText = await response.text()
+        console.error(`[App] Request failed:`, errorText)
+        throw new Error(`Failed to generate strategy (${response.status}): ${errorText}`)
       }
 
       const data = await response.json()
+
+      // NOW set the session ID - POST succeeded, backend has the session
+      console.log('[App] POST succeeded, setting sessionId state')
+      setSessionId(newSessionId)
+
       setStrategy(data.strategy)
       setGeneratedCode(data.code)
 
@@ -157,6 +168,14 @@ function AppContent() {
       }
     } catch (err) {
       console.error('Error during job submission:', err)
+
+      // If error message indicates job FAILED (not just connection issue), don't poll
+      if (err.message && (err.message.includes('500') || err.message.includes('400'))) {
+        console.error('Job failed on backend, not polling')
+        setError(err.message)
+        setLoading(false)
+        return
+      }
 
       // If we have a session ID, try to retrieve the result
       // (job may have completed even if connection dropped)
@@ -193,7 +212,7 @@ function AppContent() {
         }
       }
 
-      // Start polling for result
+      // Start polling for result (only for connection issues, not backend failures)
       if (newSessionId && useMultiAgent) {
         console.log('⏱️  Starting polling for job completion...')
         pollForResult(newSessionId)
@@ -399,6 +418,11 @@ function AppContent() {
 
       if (!botName) return
 
+      console.log('📤 Attempting to save bot:')
+      console.log('  Name:', botName)
+      console.log('  Strategy:', strategy)
+      console.log('  Session ID:', sessionId)
+
       const response = await fetch('http://localhost:8000/bots', {
         method: 'POST',
         headers: {
@@ -417,15 +441,25 @@ function AppContent() {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to save bot')
+        // Log detailed error information
+        const errorText = await response.text()
+        console.error('❌ Bot save failed:')
+        console.error('  Status:', response.status, response.statusText)
+        console.error('  Response:', errorText)
+
+        // Check for 401 Unauthorized (expired token)
+        if (response.status === 401) {
+          handleTokenExpired()
+          return
+        }
+        throw new Error(`Failed to save bot (${response.status}): ${errorText}`)
       }
 
       const data = await response.json()
       setCurrentBotId(data.id)
 
-      if (!autoSave) {
-        alert('Bot saved successfully!')
-      }
+      // Always show success confirmation
+      alert('✅ Bot saved successfully!')
       console.log('✅ Bot saved with ID:', data.id)
     } catch (err) {
       console.error('Error saving bot:', err)
@@ -571,6 +605,37 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-dark-bg">
+      {/* Token Expired Notification */}
+      {tokenExpiredError && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 max-w-md w-full mx-4">
+          <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 backdrop-blur-md">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 text-red-400 text-xl">⚠️</div>
+              <div className="flex-1">
+                <h3 className="text-red-400 font-semibold mb-1">Session Expired</h3>
+                <p className="text-red-200 text-sm mb-3">
+                  Your authentication token has expired. Please sign in again to continue.
+                </p>
+                <button
+                  onClick={() => {
+                    clearExpiredError()
+                    setShowLogin(true)
+                  }}
+                  className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm rounded-lg transition-colors"
+                >
+                  Sign In Again
+                </button>
+              </div>
+              <button
+                onClick={clearExpiredError}
+                className="flex-shrink-0 text-red-400 hover:text-red-300 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-8">
@@ -609,17 +674,9 @@ function AppContent() {
                 {generatedCode && backtestResults && (
                   <button
                     onClick={handleSaveBot}
-                    className="btn btn-primary text-sm"
+                    className="px-4 py-2 text-sm font-light rounded-lg border border-white/20 bg-transparent transition-colors text-white/80 hover:border-accent hover:text-accent hover:bg-white/5"
                   >
-                    💾 Save Bot
-                  </button>
-                )}
-                {generatedCode && (
-                  <button
-                    onClick={handleReset}
-                    className="btn btn-secondary text-sm"
-                  >
-                    New Strategy
+                    Save Bot
                   </button>
                 )}
                 <div className="flex items-center gap-2 pl-3 border-l border-gray-700">
@@ -656,14 +713,6 @@ function AppContent() {
               </>
             ) : (
               <>
-                {generatedCode && (
-                  <button
-                    onClick={handleReset}
-                    className="btn btn-secondary text-sm"
-                  >
-                    New Strategy
-                  </button>
-                )}
                 <button
                   onClick={() => setShowLogin(true)}
                   className="btn btn-secondary text-sm"
@@ -726,52 +775,35 @@ function AppContent() {
             <div className="space-y-6">
             {/* Strategy Summary */}
             {strategy && (
-              <div className="card">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-white">📋 Strategy Overview</h2>
-                  <button
-                    onClick={handleRunBacktest}
-                    disabled={backtesting}
-                    className="btn btn-primary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {backtesting ? (
-                      <>
-                        <svg className="animate-spin h-4 w-4 inline mr-2" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
-                        Running...
-                      </>
-                    ) : (
-                      <>📊 Run Backtest</>
-                    )}
-                  </button>
+              <div className="rounded-2xl border border-white/10 bg-[#0e1117] p-5">
+                <div className="mb-4">
+                  <h2 className="text-sm font-light text-white">Strategy Overview</h2>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <p className="text-sm text-gray-400">Asset</p>
-                    <p className="text-lg font-semibold text-accent-primary">{strategy.asset}</p>
+                    <p className="text-xs text-white/50">Asset</p>
+                    <p className="mt-1 text-base font-semibold text-white">{strategy.asset}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-400">Take Profit</p>
-                    <p className="text-lg font-semibold text-accent-success">
+                    <p className="text-xs text-white/50">Take Profit</p>
+                    <p className="mt-1 text-base font-semibold text-green-400">
                       +{(strategy.exit_conditions?.take_profit * 100).toFixed(1)}%
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-400">Stop Loss</p>
-                    <p className="text-lg font-semibold text-accent-danger">
+                    <p className="text-xs text-white/50">Stop Loss</p>
+                    <p className="mt-1 text-base font-semibold text-red-400">
                       -{(strategy.exit_conditions?.stop_loss * 100).toFixed(1)}%
                     </p>
                   </div>
                 </div>
-                <div className="mt-4 pt-4 border-t border-dark-border">
-                  <p className="text-sm text-gray-400 mb-2">Data Sources</p>
+                <div className="mt-3 pt-3 border-t border-white/10">
+                  <p className="text-xs text-white/50 mb-2">Data Sources</p>
                   <div className="flex flex-wrap gap-2">
                     {strategy.data_sources?.map((source) => (
                       <span
                         key={source}
-                        className="px-3 py-1 bg-dark-bg rounded-full text-sm text-gray-300 border border-dark-border"
+                        className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-white/50"
                       >
                         {source}
                       </span>
@@ -783,15 +815,9 @@ function AppContent() {
 
             {/* Backtest Results */}
             {backtestResults && (
-              <div className="relative">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-white">📊 Backtest Results</h2>
-                  <button
-                    onClick={() => setShowSidebar(true)}
-                    className="btn btn-secondary text-sm"
-                  >
-                    🔧 Refine Strategy
-                  </button>
+              <div className="rounded-2xl border border-white/10 bg-[#0e1117] p-5">
+                <div className="mb-4">
+                  <h2 className="text-sm font-light text-white">Backtest Results</h2>
                 </div>
                 <BacktestResults results={backtestResults} insightsConfig={insightsConfig} />
               </div>
@@ -802,14 +828,14 @@ function AppContent() {
             </div>
             </div>
 
-            {/* Strategy Sidebar - part of page layout */}
-            <StrategySidebar
-              isOpen={showSidebar}
-              onClose={() => setShowSidebar(false)}
-              currentStrategy={strategy}
-              onRefineStrategy={handleRefineStrategy}
-              onRunBacktest={handleRunBacktest}
-            />
+            {/* Refine Sidebar - fixed right-side panel with vertical handle */}
+            {strategy && (
+              <RefineSidebar
+                currentStrategy={strategy}
+                onRefineStrategy={handleRefineStrategy}
+                onRunBacktest={handleRunBacktest}
+              />
+            )}
           </div>
         )}
       </main>

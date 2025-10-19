@@ -1,13 +1,10 @@
 """Configuration management using environment variables"""
 import os
-from pathlib import Path
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
 
-# Load environment variables from root .env file
-root_dir = Path(__file__).parent.parent
-env_path = root_dir / '.env'
-load_dotenv(dotenv_path=env_path)
+# Load environment variables
+load_dotenv()
 
 
 class Settings(BaseSettings):
@@ -44,23 +41,14 @@ class Settings(BaseSettings):
     polygon_api_key: str = os.getenv("POLYGON_API_KEY", "")
     iex_api_key: str = os.getenv("IEX_API_KEY", "")
 
-    # Supabase Configuration
-    supabase_url: str = os.getenv("SUPABASE_URL", "")
-    supabase_anon_key: str = os.getenv("SUPABASE_ANON_KEY", "")
-    supabase_service_role_key: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
-
     # Application Settings
     environment: str = os.getenv("ENVIRONMENT", "development")
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
 
-    # Supabase Settings
-    supabase_url: str = os.getenv("SUPABASE_URL", "")
-    supabase_anon_key: str = os.getenv("SUPABASE_ANON_KEY", "")
-    supabase_service_role_key: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
-
     class Config:
         env_file = ".env"
         case_sensitive = False
+        extra = "ignore"  # Ignore extra fields from environment
 
 
 # Global settings instance

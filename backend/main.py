@@ -402,6 +402,18 @@ async def create_strategy_multi_agent(request: StrategyRequest, fast_mode: bool 
         logger.error(f"❌ Error in multi-agent workflow: {e}")
         import traceback
         traceback.print_exc()
+        
+        # Store error result so frontend can retrieve it
+        if session_id:
+            from job_storage import job_storage
+            error_data = {
+                "success": False,
+                "error": str(e),
+                "message": "Bot generation failed. Please try again."
+            }
+            job_storage.store_result(session_id, error_data)
+            logger.info(f"📦 Stored error result for session {session_id[:8]}")
+        
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -1040,6 +1052,38 @@ async def create_bot(bot_data: dict, user_id: str = "current_user"):
         
     except Exception as e:
         logger.error(f"❌ Error saving bot: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/dev/create-default-user")
+async def create_default_user():
+    """
+    Development endpoint to create the default user for testing
+    """
+    try:
+        from db.supabase_client import get_supabase_admin
+        from uuid import UUID
+
+        admin_client = get_supabase_admin()
+        default_user_id = "00000000-0000-0000-0000-000000000001"
+
+        # Try to create the default user
+        user_data = {
+            'id': default_user_id,
+            'email': 'dev@mobius.local',
+            'full_name': 'Development User',
+        }
+
+        response = admin_client.table('users').upsert(user_data, on_conflict='id').execute()
+
+        logger.info(f"✅ Default dev user created/updated: {default_user_id}")
+        return {
+            "success": True,
+            "message": "Default dev user created successfully",
+            "user_id": default_user_id
+        }
+    except Exception as e:
+        logger.error(f"❌ Error creating default user: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

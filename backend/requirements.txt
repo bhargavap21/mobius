@@ -1,5 +1,5 @@
 # Core AI & Orchestration
-google-generativeai>=0.8.0
+anthropic>=0.39.0
 openai>=1.54.0
 
 # Web Framework

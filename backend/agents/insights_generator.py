@@ -4,7 +4,8 @@ Analyzes user query and backtest results to generate helpful visualizations and 
 """
 import logging
 from typing import Dict, Any, List
-from llm_client import generate_json, generate_text
+from anthropic import Anthropic
+from config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +14,8 @@ class InsightsGeneratorAgent:
     """Generates additional insights and visualizations based on strategy context"""
 
     def __init__(self):
-        pass
+        self.client = Anthropic(api_key=settings.anthropic_api_key)
+        self.model = "claude-sonnet-4-20250514"
 
     async def analyze_query_for_insights(self, user_query: str, strategy: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -103,9 +105,33 @@ Query: "Buy TSLA after Elon tweets"
 Now analyze the user's query:"""
 
         try:
-            logger.info(f"Calling Gemini to generate insights config...")
-            insights_config = generate_json(prompt, max_tokens=2000)
-            logger.info(f"✅ Generated {len(insights_config.get('visualizations', []))} visualization configs")
+            logger.info(f"Calling Claude to generate insights config...")
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=2000,
+                messages=[{"role": "user", "content": prompt}]
+            )
+
+            content = response.content[0].text
+            logger.info(f"Received response from Claude (length: {len(content)})")
+
+            # Extract JSON from response
+            import json
+            import re
+
+            # Try to find JSON in response
+            json_match = re.search(r'\{.*\}', content, re.DOTALL)
+            if json_match:
+                insights_config = json.loads(json_match.group())
+                logger.info(f"✅ Generated {len(insights_config.get('visualizations', []))} visualization configs")
+            else:
+                # Fallback if no JSON found
+                logger.warning("No JSON found in Claude response, using empty config")
+                insights_config = {
+                    "visualizations": [],
+                    "insights": ["Unable to generate specific insights"]
+                }
+
             return insights_config
 
         except Exception as e:
@@ -155,8 +181,14 @@ Provide a 2-3 sentence interpretation that:
 Be specific with numbers and trends. Focus on actionable insights."""
 
         try:
-            interpretation = generate_text(prompt, max_tokens=300)
-            return interpretation.strip()
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=300,
+                messages=[{"role": "user", "content": prompt}]
+            )
+
+            interpretation = response.content[0].text.strip()
+            return interpretation
 
         except Exception as e:
             logger.error(f"Error generating interpretation: {str(e)}")

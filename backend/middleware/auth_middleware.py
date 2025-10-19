@@ -104,7 +104,7 @@ class AuthMiddleware:
 
     async def get_optional_user_id(
         self,
-        credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
+        credentials: Optional[HTTPAuthorizationCredentials] = Depends(optional_security)
     ) -> Optional[UUID]:
         """
         Extract user ID from token if present, return None if not
@@ -116,16 +116,29 @@ class AuthMiddleware:
             User UUID if authenticated, None otherwise
         """
         try:
+            logger.info(f"🔐 get_optional_user_id called - credentials present: {credentials is not None}")
+
             if not credentials:
+                logger.info(f"⚠️  No credentials provided - returning None")
                 return None
 
             token = credentials.credentials
+            token_preview = token[:20] if len(token) > 20 else token
+            logger.info(f"🔐 Extracted token from credentials: {token_preview}... (length: {len(token)})")
+
             user_id = await self.auth_service.verify_token(token)
+
+            if user_id:
+                logger.info(f"✅ get_optional_user_id returning user_id: {user_id}")
+            else:
+                logger.warning(f"⚠️  verify_token returned None - no valid user_id")
 
             return user_id
 
         except Exception as e:
-            logger.warning(f"⚠️  Optional auth failed: {e}")
+            logger.error(f"❌ Optional auth failed - Exception type: {type(e).__name__}")
+            logger.error(f"❌ Optional auth failed - Exception message: {str(e)}")
+            logger.error(f"❌ Optional auth failed - Full traceback:", exc_info=True)
             return None
 
 

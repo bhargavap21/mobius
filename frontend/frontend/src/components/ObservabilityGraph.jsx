@@ -7,15 +7,22 @@ import { useMemo } from "react";
 
 // mock demo data (replace via props later if needed)
 function useDemoData() {
-  return useMemo(
-    () =>
-      Array.from({ length: 30 }).map((_, i) => ({
-        name: `T${i + 1}`,
-        homepage: 200 + Math.round(60 * Math.sin(i / 3) + Math.random() * 40),
-        checkout: 110 + Math.round(40 * Math.cos(i / 4) + Math.random() * 30),
-      })),
-    []
-  );
+  return useMemo(() => {
+    const now = new Date();
+    const sixMonthsAgo = new Date(now);
+    sixMonthsAgo.setMonth(now.getMonth() - 6);
+    
+    return Array.from({ length: 30 }).map((_, i) => {
+      const date = new Date(sixMonthsAgo);
+      date.setDate(sixMonthsAgo.getDate() + (i * 6)); // ~6 days apart
+      
+      return {
+        name: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        mobius: 10000 + Math.round(6000 * Math.sin(i / 3) + Math.random() * 2000),
+        manual: 5000 + Math.round(3000 * Math.cos(i / 4) + Math.random() * 1500),
+      };
+    });
+  }, []);
 }
 
 export default function ObservabilityGraph({
@@ -30,9 +37,8 @@ export default function ObservabilityGraph({
       className="mx-auto mt-0 w-full max-w-6xl rounded-2xl bg-transparent p-6 md:p-8"
     >
       <header className="mb-6">
-        <p className="text-sm text-fg-muted">📈 Observability</p>
-        <h3 className="mt-2 text-2xl font-light tracking-tight text-fg">{title}</h3>
-        <p className="mt-1 text-sm text-fg-muted">{subtitle}</p>
+        <h3 className="text-3xl md:text-4xl font-light tracking-tight text-white">{title}</h3>
+        <p className="mt-2 text-base text-gray-400">See how Mobius AI-powered trading bots outperform manual trading strategies</p>
       </header>
 
       <div className="h-[320px] w-full">
@@ -43,7 +49,9 @@ export default function ObservabilityGraph({
             <YAxis
               stroke="rgba(255,255,255,0.35)"
               width={44}
-              tickFormatter={(v) => `${v}k`}
+              domain={[0, 20000]}
+              ticks={[0, 5000, 10000, 15000, 20000]}
+              tickFormatter={(v) => `${v / 1000}k`}
               tickMargin={8}
             />
             <Tooltip
@@ -59,11 +67,11 @@ export default function ObservabilityGraph({
               wrapperStyle={{ color: "rgba(255,255,255,0.7)" }}
               iconType="circle"
             />
-            {/* Series colors: purple + amber to mirror the reference */}
+            {/* Series colors: purple for Mobius, white for Manual Trading */}
             <Line
               type="monotone"
-              dataKey="homepage"
-              name="Homepage"
+              dataKey="mobius"
+              name="Mobius"
               stroke="#7c3aed"
               strokeWidth={2}
               dot={false}
@@ -71,8 +79,8 @@ export default function ObservabilityGraph({
             />
             <Line
               type="monotone"
-              dataKey="checkout"
-              name="Checkout"
+              dataKey="manual"
+              name="Manual Trading"
               stroke="#ffffff"
               strokeWidth={2}
               dot={false}
