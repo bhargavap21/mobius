@@ -8,12 +8,14 @@ const AgentActivityLogPolling = ({ sessionId, onComplete }) => {
   const [autoScroll, setAutoScroll] = useState(true)
   const scrollRef = useRef(null)
   const eventIndexRef = useRef(0) // Use ref to persist across renders
+  const consecutive404sRef = useRef(0) // Track consecutive 404s
 
   useEffect(() => {
     if (!sessionId) return
 
     let intervalId
     eventIndexRef.current = 0 // Reset for new session
+    consecutive404sRef.current = 0 // Reset 404 counter
 
     const pollForEvents = async () => {
       try {
@@ -23,12 +25,26 @@ const AgentActivityLogPolling = ({ sessionId, onComplete }) => {
 
         if (!response.ok) {
           if (response.status === 404) {
-            console.log('[AgentActivityLogPolling] Session not found yet (404), will retry...')
+            consecutive404sRef.current++
+            console.log(`[AgentActivityLogPolling] Session not found (404), attempt ${consecutive404sRef.current}/5`)
+
+            // If too many consecutive 404s, the session likely doesn't exist (POST failed)
+            if (consecutive404sRef.current >= 5) {
+              console.error('[AgentActivityLogPolling] Too many 404s - session likely never created. Stopping poll.')
+              setError('Strategy generation failed to start. Please try again.')
+              if (intervalId) {
+                clearInterval(intervalId)
+              }
+              return
+            }
             // Session not found yet, keep polling
             return
           }
           throw new Error(`HTTP error! status: ${response.status}`)
         }
+
+        // Reset 404 counter on successful response
+        consecutive404sRef.current = 0
 
         const data = await response.json()
         console.log('[AgentActivityLogPolling] Poll response:', data)

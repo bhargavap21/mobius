@@ -105,6 +105,9 @@ function AppContent() {
         setProgressSteps(['🚀 Starting multi-agent workflow...'])
       }
 
+      console.log(`[App] Sending POST to ${endpoint}`)
+      console.log(`[App] Payload:`, { strategy_description: userInput, session_id: newSessionId })
+
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
@@ -116,8 +119,12 @@ function AppContent() {
         }),
       })
 
+      console.log(`[App] Response status: ${response.status} ${response.statusText}`)
+
       if (!response.ok) {
-        throw new Error('Failed to generate strategy')
+        const errorText = await response.text()
+        console.error(`[App] Request failed:`, errorText)
+        throw new Error(`Failed to generate strategy (${response.status}): ${errorText}`)
       }
 
       const data = await response.json()
@@ -435,9 +442,8 @@ function AppContent() {
       const data = await response.json()
       setCurrentBotId(data.id)
 
-      if (!autoSave) {
-        alert('Bot saved successfully!')
-      }
+      // Always show success confirmation
+      alert('✅ Bot saved successfully!')
       console.log('✅ Bot saved with ID:', data.id)
     } catch (err) {
       console.error('Error saving bot:', err)
