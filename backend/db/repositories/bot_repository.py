@@ -44,6 +44,11 @@ class BotRepository:
             Created TradingBot object
         """
         try:
+            logger.info(f"💾 BotRepository.create() called")
+            logger.info(f"💾 user_id: {user_id} (type: {type(user_id)})")
+            logger.info(f"💾 bot_data.name: {bot_data.name}")
+            logger.info(f"💾 bot_data.session_id: {bot_data.session_id}")
+
             bot_dict = {
                 'user_id': str(user_id),
                 'name': bot_data.name,
@@ -55,15 +60,28 @@ class BotRepository:
                 'session_id': bot_data.session_id,
             }
 
+            logger.info(f"💾 Prepared bot_dict with user_id: {bot_dict['user_id']}")
+            logger.info(f"💾 Using admin_client to insert into trading_bots table...")
+
             # Use admin client to bypass RLS (for development/expired tokens)
             response = self.admin_client.table('trading_bots').insert(bot_dict).execute()
 
+            logger.info(f"💾 Database response received")
+            logger.info(f"💾 response.data: {response.data}")
+            logger.info(f"💾 response.data length: {len(response.data) if response.data else 0}")
+
             if response.data and len(response.data) > 0:
-                return TradingBot(**response.data[0])
+                created_bot = TradingBot(**response.data[0])
+                logger.info(f"✅ Bot created in database with ID: {created_bot.id}")
+                return created_bot
             else:
-                raise Exception("Failed to create trading bot")
+                logger.error(f"❌ Database returned empty response!")
+                raise Exception("Failed to create trading bot - empty response from database")
         except Exception as e:
-            logger.error(f"Error creating bot: {e}")
+            logger.error(f"❌ BotRepository.create() failed!")
+            logger.error(f"❌ Exception type: {type(e).__name__}")
+            logger.error(f"❌ Exception message: {str(e)}")
+            logger.error(f"❌ Full traceback:", exc_info=True)
             raise
 
     async def get_by_id(self, bot_id: UUID, user_id: UUID) -> Optional[TradingBot]:

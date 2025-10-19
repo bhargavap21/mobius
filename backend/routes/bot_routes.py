@@ -41,20 +41,35 @@ async def create_bot(
         HTTPException: If creation fails
     """
     try:
-        logger.info(f"📝 Creating bot - Received user_id: {user_id}")
+        logger.info("="*80)
+        logger.info("🚀 BOT SAVE REQUEST RECEIVED")
+        logger.info(f"📝 Bot data: name='{bot_data.name}', asset='{bot_data.asset}'")
+        logger.info(f"🔐 Auth user_id from middleware: {user_id}")
+        logger.info(f"🔐 user_id type: {type(user_id)}")
 
-        # Use a default user ID if not authenticated (for development)
         if user_id is None:
-            logger.warning("⚠️ No user_id from token, using default dev user")
-            user_id = UUID("00000000-0000-0000-0000-000000000001")  # Default dev user
-        else:
-            logger.info(f"✅ Authenticated user_id: {user_id}")
+            logger.error("❌ CRITICAL: user_id is None after auth middleware!")
+            logger.error("This means token verification failed or no token was sent")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required. Please sign in again."
+            )
+
+        logger.info(f"✅ Authenticated user_id: {user_id}")
+        logger.info(f"📤 Calling bot_repo.create(user_id={user_id}, bot_data=...)")
 
         bot = await bot_repo.create(user_id, bot_data)
-        logger.info(f"✅ Bot created: {bot.name} (ID: {bot.id})")
+
+        logger.info(f"✅ Bot created successfully: {bot.name} (ID: {bot.id})")
+        logger.info("="*80)
         return bot
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"❌ Bot creation failed: {e}")
+        logger.error(f"❌ Bot creation failed with exception: {type(e).__name__}")
+        logger.error(f"❌ Exception message: {str(e)}")
+        logger.error(f"❌ Full traceback:", exc_info=True)
+        logger.info("="*80)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Failed to create bot: {str(e)}"
