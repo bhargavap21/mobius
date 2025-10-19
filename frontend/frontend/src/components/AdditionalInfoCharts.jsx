@@ -43,7 +43,7 @@ export default function AdditionalInfoCharts({ additionalInfo }) {
       {hasRSI && (
         <div className="bg-white/5 rounded-lg p-3 border border-white/10">
           <h3 className="text-sm font-light text-white mb-3">RSI (Relative Strength Index)</h3>
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={400}>
             <ComposedChart data={additionalInfo}>
               <CartesianGrid strokeDasharray="3 3" stroke="#333" />
               <XAxis
@@ -121,7 +121,7 @@ export default function AdditionalInfoCharts({ additionalInfo }) {
       {hasMACD && (
         <div className="bg-white/5 rounded-lg p-3 border border-white/10">
           <h3 className="text-sm font-light text-white mb-3">MACD (Moving Average Convergence Divergence)</h3>
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={400}>
             <LineChart data={additionalInfo}>
               <CartesianGrid strokeDasharray="3 3" stroke="#333" />
               <XAxis
@@ -171,7 +171,7 @@ export default function AdditionalInfoCharts({ additionalInfo }) {
       {hasSMA && (
         <div className="bg-white/5 rounded-lg p-3 border border-white/10">
           <h3 className="text-sm font-light text-white mb-3">Simple Moving Averages</h3>
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={400}>
             <LineChart data={additionalInfo}>
               <CartesianGrid strokeDasharray="3 3" stroke="#333" />
               <XAxis
@@ -228,7 +228,7 @@ export default function AdditionalInfoCharts({ additionalInfo }) {
       {hasTwitterSentiment && (
         <div className="bg-white/5 rounded-lg p-3 border border-white/10">
           <h3 className="text-sm font-light text-white mb-3">Twitter Sentiment Score</h3>
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={400}>
             <ComposedChart data={additionalInfo}>
               <CartesianGrid strokeDasharray="3 3" stroke="#333" />
               <XAxis
@@ -297,7 +297,7 @@ export default function AdditionalInfoCharts({ additionalInfo }) {
       {hasRedditSentiment && (
         <div className="bg-white/5 rounded-lg p-3 border border-white/10">
           <h3 className="text-sm font-light text-white mb-3">Reddit Sentiment Score</h3>
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={400}>
             <ComposedChart data={additionalInfo}>
               <CartesianGrid strokeDasharray="3 3" stroke="#333" />
               <XAxis

@@ -116,7 +116,7 @@ export default function BacktestResults({ results, insightsConfig }) {
       {/* Portfolio Performance Chart */}
       <div className="mt-4 pt-4 border-t border-white/10">
         <h3 className="text-sm font-light text-white mb-3">Portfolio Value Over Time</h3>
-        <ResponsiveContainer width="100%" height={300}>
+        <ResponsiveContainer width="100%" height={500}>
           <LineChart data={portfolio_history}>
             <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
             <XAxis

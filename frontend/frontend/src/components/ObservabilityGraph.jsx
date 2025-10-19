@@ -41,7 +41,7 @@ export default function ObservabilityGraph({
         <p className="mt-2 text-base text-gray-400">See how Mobius AI-powered trading bots outperform manual trading strategies</p>
       </header>
 
-      <div className="h-[320px] w-full">
+      <div className="h-[400px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 12, right: 12, left: 0, bottom: 8 }}>
             <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />

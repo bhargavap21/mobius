@@ -180,7 +180,7 @@ function RenderVisualization({ visualization, data }) {
       <p className="text-xs text-white/50 mb-3">{description}</p>
 
       <div className="relative">
-        <ResponsiveContainer width="100%" height={300}>
+        <ResponsiveContainer width="100%" height={400}>
           <ComposedChart data={data}>
             <CartesianGrid strokeDasharray="3 3" stroke="#333" />
             <XAxis
