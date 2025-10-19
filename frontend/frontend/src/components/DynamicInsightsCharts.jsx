@@ -84,15 +84,14 @@ function RenderVisualization({ visualization, data }) {
   const additionalMetrics = data_to_collect?.additional_metrics || []
   const thresholds = data_to_collect?.thresholds || {}
 
-  // Debug logging (development only)
-  if (process.env.NODE_ENV !== 'production' && data && data.length > 0) {
-    console.log(`[Insights] ${title}:`, {
-      primaryMetric,
-      dataLength: data.length,
-      firstDataPoint: data[0],
-      availableFields: Object.keys(data[0] || {})
-    })
-  }
+  // ALWAYS log to debug chart issues
+  console.log(`[CHART DEBUG] ${title}:`, {
+    hasData: !!data,
+    dataLength: data?.length || 0,
+    primaryMetric,
+    firstDataPoint: data?.[0],
+    availableFields: data?.[0] ? Object.keys(data[0]) : []
+  })
 
   // Check if data has the required metrics - more tolerant checking
   const hasData = data && data.length > 0 && data.some(point => {

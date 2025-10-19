@@ -38,6 +38,14 @@ export default function BacktestResults({ results, insightsConfig }) {
 
   const { summary, trades, portfolio_history, additional_info } = results
 
+  // ALWAYS log to debug chart issues
+  console.log('[BACKTEST DEBUG] Results received:', {
+    hasAdditionalInfo: !!additional_info,
+    additionalInfoLength: additional_info?.length || 0,
+    hasInsightsConfig: !!insightsConfig,
+    insightsVisualizationsCount: insightsConfig?.visualizations?.length || 0
+  })
+
   const getReturnColor = (value) => {
     if (value > 0) return 'text-accent-success'
     if (value < 0) return 'text-accent-danger'
