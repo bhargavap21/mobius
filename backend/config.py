@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     # Application Settings
     environment: str = os.getenv("ENVIRONMENT", "development")
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
+    max_iterations: int = int(os.getenv("MAX_ITERATIONS", "2"))  # Strategy refinement iterations
 
     class Config:
         env_file = ".env"

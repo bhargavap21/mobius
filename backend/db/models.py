@@ -276,3 +276,116 @@ class PaginatedResponse(BaseModel):
         if 'has_more' not in data:
             data['has_more'] = data.get('page', 1) < data.get('total_pages', 1)
         super().__init__(**data)
+# ============================================================================
+# DEPLOYMENT MODELS
+# ============================================================================
+
+class DeploymentCreate(BaseModel):
+    """Model for creating a new deployment"""
+    bot_id: UUID
+    initial_capital: float = 10000.00
+    execution_frequency: str = "5min"
+    max_position_size: Optional[float] = None
+    daily_loss_limit: Optional[float] = None
+
+
+class DeploymentUpdate(BaseModel):
+    """Model for updating a deployment"""
+    status: Optional[str] = Field(None, pattern="^(running|paused|stopped|error)$")
+    current_capital: Optional[float] = None
+    total_pnl: Optional[float] = None
+    total_return_pct: Optional[float] = None
+    last_execution_at: Optional[datetime] = None
+    stopped_at: Optional[datetime] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class Deployment(BaseModel):
+    """Complete deployment model"""
+    id: UUID
+    user_id: UUID
+    bot_id: UUID
+    status: str
+    alpaca_account_id: Optional[str] = None
+    initial_capital: float
+    current_capital: Optional[float] = None
+    total_pnl: float = 0.0
+    total_return_pct: float = 0.0
+    execution_frequency: str
+    max_position_size: Optional[float] = None
+    daily_loss_limit: Optional[float] = None
+    deployed_at: datetime
+    stopped_at: Optional[datetime] = None
+    last_execution_at: Optional[datetime] = None
+    metadata: Dict[str, Any] = {}
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DeploymentTrade(BaseModel):
+    """Deployment trade record"""
+    id: UUID
+    deployment_id: UUID
+    alpaca_order_id: Optional[str] = None
+    alpaca_order_status: Optional[str] = None
+    symbol: str
+    side: str
+    order_type: str = "market"
+    quantity: float
+    filled_qty: Optional[float] = None
+    filled_avg_price: Optional[float] = None
+    limit_price: Optional[float] = None
+    stop_price: Optional[float] = None
+    total_value: Optional[float] = None
+    commission: float = 0.0
+    realized_pnl: Optional[float] = None
+    submitted_at: datetime
+    filled_at: Optional[datetime] = None
+    signal_metadata: Dict[str, Any] = {}
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DeploymentMetrics(BaseModel):
+    """Deployment performance metrics snapshot"""
+    id: UUID
+    deployment_id: UUID
+    timestamp: datetime
+    portfolio_value: float
+    cash: float
+    positions_value: float
+    total_return_pct: Optional[float] = None
+    daily_pnl: Optional[float] = None
+    unrealized_pnl: Optional[float] = None
+    realized_pnl: Optional[float] = None
+    max_drawdown_pct: Optional[float] = None
+    sharpe_ratio: Optional[float] = None
+    open_positions_count: int = 0
+    total_trades_count: int = 0
+    winning_trades_count: int = 0
+    losing_trades_count: int = 0
+    metadata: Dict[str, Any] = {}
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DeploymentPosition(BaseModel):
+    """Current open position in a deployment"""
+    id: UUID
+    deployment_id: UUID
+    symbol: str
+    quantity: float
+    average_entry_price: float
+    current_price: Optional[float] = None
+    market_value: Optional[float] = None
+    cost_basis: Optional[float] = None
+    unrealized_pnl: Optional[float] = None
+    unrealized_pnl_pct: Optional[float] = None
+    opened_at: datetime
+    updated_at: datetime
+    metadata: Dict[str, Any] = {}
+
+    model_config = ConfigDict(from_attributes=True)

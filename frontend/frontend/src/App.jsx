@@ -12,6 +12,8 @@ import Signup from './components/Signup'
 import BotLibrary from './components/BotLibrary'
 import LandingPage from './components/LandingPage'
 import RefineSidebar from './components/RefineSidebar'
+import DeploymentPage from './components/DeploymentPage'
+import DeploymentMonitor from './components/DeploymentMonitor'
 import './index.css'
 
 function AppContent() {
@@ -46,6 +48,13 @@ function AppContent() {
 
   // Current bot ID for tracking saves/updates
   const [currentBotId, setCurrentBotId] = useState(null)
+
+  // Sidebar open state
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  // Deployment page state
+  const [showDeploymentPage, setShowDeploymentPage] = useState(false)
+  const [showDeploymentMonitor, setShowDeploymentMonitor] = useState(false)
 
   // Load last viewed bot on mount (if authenticated)
   useEffect(() => {
@@ -668,6 +677,16 @@ function AppContent() {
             >
               Community
             </button>
+            <button
+              onClick={() => setShowDeploymentMonitor(true)}
+              className={`px-4 py-2 text-sm font-light rounded-lg border border-white/20 transition-colors ${
+                showDeploymentMonitor
+                  ? 'border-accent text-accent'
+                  : 'text-white/80 hover:border-accent hover:text-accent'
+              }`}
+            >
+              Deployments
+            </button>
 
             {isAuthenticated ? (
               <>
@@ -757,14 +776,32 @@ function AppContent() {
               {!sessionId && <ProgressIndicator />}
             </div>
           </div>
+        ) : showDeploymentMonitor ? (
+          <DeploymentMonitor
+            onBack={() => setShowDeploymentMonitor(false)}
+          />
+        ) : showDeploymentPage ? (
+          <DeploymentPage
+            strategy={strategy}
+            generatedCode={generatedCode}
+            backtestResults={backtestResults}
+            currentBotId={currentBotId}
+            onBackToDashboard={() => setShowDeploymentPage(false)}
+            onViewDeployments={() => {
+              setShowDeploymentPage(false)
+              setShowDeploymentMonitor(true)
+            }}
+          />
         ) : !generatedCode ? (
           <div className="max-w-7xl mx-auto px-6 py-8 w-full">
             <StrategyInput onGenerate={handleGenerateStrategy} fastMode={fastMode} onFastModeChange={setFastMode} />
           </div>
         ) : (
-          <div className="flex flex-1 gap-0 overflow-hidden">
+          <div className="flex flex-1 gap-0 overflow-hidden w-full">
             {/* Main Content */}
-            <div className="flex-1 overflow-y-auto px-12 py-8 max-w-[1600px]">
+            <div className={`flex-1 overflow-y-auto px-12 py-8 transition-all duration-300 ${
+              sidebarOpen ? 'mr-[380px] md:mr-[420px]' : 'mr-0'
+            }`}>
             {error && (
               <div className="mb-6 p-4 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400">
                 <p className="font-medium">Error</p>
@@ -825,6 +862,19 @@ function AppContent() {
 
             {/* Generated Code */}
             <CodeDisplay code={generatedCode} strategyName={strategy?.name} />
+
+            {/* Deploy Button */}
+            {backtestResults && (
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={() => setShowDeploymentPage(true)}
+                  className="px-8 py-3 rounded-lg bg-accent text-white font-medium hover:bg-accent/90 transition-colors flex items-center gap-2"
+                >
+                  Proceed to Deployment
+                  <span>→</span>
+                </button>
+              </div>
+            )}
             </div>
             </div>
 
@@ -834,6 +884,7 @@ function AppContent() {
                 currentStrategy={strategy}
                 onRefineStrategy={handleRefineStrategy}
                 onRunBacktest={handleRunBacktest}
+                onOpenChange={setSidebarOpen}
               />
             )}
           </div>

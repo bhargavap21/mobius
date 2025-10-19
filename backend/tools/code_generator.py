@@ -154,6 +154,13 @@ Requirements:
 8. Add docstrings and comments
 9. Make it executable
 
+**CRITICAL - Data Validation:**
+10. ALWAYS check for None/null values before comparisons or mathematical operations
+11. Skip iterations if RSI, sentiment, or any indicator returns None
+12. Use patterns like: `if rsi is not None and rsi < 30:` instead of `if rsi < 30:`
+13. Handle missing data gracefully with continue statements
+14. Never compare None with numbers - this will crash the backtest
+
 Structure:
 ```python
 import logging

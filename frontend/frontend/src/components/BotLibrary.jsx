@@ -111,6 +111,8 @@ const BotLibrary = ({ onClose, onLoadBot, user, onSignOut, onShowBotLibrary }) =
       // Pass bot data to parent component
       if (onLoadBot) {
         onLoadBot({
+          id: bot.id,
+          name: bot.name,
           strategy: bot.strategy_config,
           code: bot.generated_code,
           backtest_results: bot.backtest_results,
