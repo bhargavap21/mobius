@@ -262,6 +262,20 @@ class MessageResponse(BaseModel):
     success: bool = True
 
 
+class PaginatedResponse(BaseModel):
+    """Paginated response model"""
+    items: List[Any]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+    has_more: bool = False
+    
+    def __init__(self, **data):
+        # Calculate has_more based on page and total_pages
+        if 'has_more' not in data:
+            data['has_more'] = data.get('page', 1) < data.get('total_pages', 1)
+        super().__init__(**data)
 # ============================================================================
 # DEPLOYMENT MODELS
 # ============================================================================

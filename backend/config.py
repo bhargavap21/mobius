@@ -12,6 +12,11 @@ class Settings(BaseSettings):
 
     # AI API Keys
     anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
+    anthropic_model: str = os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-20241022")  # Development default
+    
+    # Legacy Gemini support (deprecated)
+    gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
+    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")  # Development default
 
     # Trading API Keys (Alpaca)
     alpaca_api_key: str = os.getenv("ALPACA_API_KEY", "")
