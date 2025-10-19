@@ -5,7 +5,7 @@ FastAPI Backend for AI Trading Bot Generator
 import logging
 import asyncio
 import json
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -250,13 +250,13 @@ async def backtest(request: BacktestRequest):
 
 
 @app.get("/api/strategy/events/{session_id}")
-async def get_events(session_id: str, from_index: int = 0):
+async def get_events(session_id: str, from_: int = Query(0, alias="from")):
     """
     Get events for a session (polling endpoint)
     """
     from progress_manager import progress_manager
 
-    logger.info(f"📡 Polling request: session={session_id[:8]}, from_index={from_index}")
+    logger.info(f"📡 Polling request: session={session_id[:8]}, from={from_}")
     logger.info(f"📡 Available sessions: {list(progress_manager.event_history.keys())}")
 
     # Initialize session if it doesn't exist
@@ -273,13 +273,13 @@ async def get_events(session_id: str, from_index: int = 0):
     logger.info(f"📡 Total events for session {session_id[:8]}: {len(all_events)}")
 
     # Return events from the requested index
-    events = all_events[from_index:] if from_index < len(all_events) else []
-    logger.info(f"📡 Returning {len(events)} events (from index {from_index})")
+    events = all_events[from_:] if from_ < len(all_events) else []
+    logger.info(f"📡 Returning {len(events)} events (from index {from_})")
 
     return {
         "events": events,
         "total": len(all_events),
-        "from": from_index,
+        "from": from_,
         "session_active": session_id in progress_manager.sessions
     }
 

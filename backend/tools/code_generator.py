@@ -271,6 +271,7 @@ Requirements:
 7. Implement stop loss and take profit
 8. Add docstrings and comments
 9. Make it executable
+10. CRITICAL: Always check if indicator values (RSI, MACD, etc.) are None or NaN before using them in comparisons or calculations. Use checks like: if rsi is not None and rsi < 30:
 
 {structure_section}
 

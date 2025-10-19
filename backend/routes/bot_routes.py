@@ -13,7 +13,7 @@ from db.models import (
     MessageResponse
 )
 from db.repositories.bot_repository import BotRepository
-from middleware.auth_middleware import get_current_user_id
+from middleware.auth_middleware import get_current_user_id, get_optional_user_id
 import logging
 
 logger = logging.getLogger(__name__)
@@ -25,14 +25,14 @@ bot_repo = BotRepository()
 @router.post("", response_model=TradingBot, status_code=status.HTTP_201_CREATED)
 async def create_bot(
     bot_data: TradingBotCreate,
-    user_id: UUID = Depends(get_current_user_id)
+    user_id: Optional[UUID] = Depends(get_optional_user_id)
 ):
     """
     Create a new trading bot
 
     Args:
         bot_data: Bot creation data
-        user_id: Current user ID (from auth token)
+        user_id: Current user ID (from auth token, optional for development)
 
     Returns:
         Created TradingBot object
@@ -41,6 +41,10 @@ async def create_bot(
         HTTPException: If creation fails
     """
     try:
+        # Use a default user ID if not authenticated (for development)
+        if user_id is None:
+            user_id = UUID("00000000-0000-0000-0000-000000000001")  # Default dev user
+
         bot = await bot_repo.create(user_id, bot_data)
         logger.info(f"✅ Bot created: {bot.name} (ID: {bot.id})")
         return bot
@@ -57,7 +61,7 @@ async def list_bots(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
     favorites_only: bool = Query(False, description="Show only favorite bots"),
-    user_id: UUID = Depends(get_current_user_id)
+    user_id: Optional[UUID] = Depends(get_optional_user_id)
 ):
     """
     List all trading bots for current user
@@ -66,12 +70,16 @@ async def list_bots(
         page: Page number (1-indexed)
         page_size: Number of items per page
         favorites_only: If true, only show favorite bots
-        user_id: Current user ID (from auth token)
+        user_id: Current user ID (from auth token, optional for development)
 
     Returns:
         PaginatedResponse with list of TradingBotListItem objects
     """
     try:
+        # Use default user ID if not authenticated
+        if user_id is None:
+            user_id = UUID("00000000-0000-0000-0000-000000000001")
+
         result = await bot_repo.list_by_user(
             user_id=user_id,
             page=page,

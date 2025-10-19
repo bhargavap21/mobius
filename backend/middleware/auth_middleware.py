@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 # HTTP Bearer scheme for extracting tokens from Authorization header
 security = HTTPBearer()
+optional_security = HTTPBearer(auto_error=False)  # Optional auth - doesn't throw 401
 
 
 class AuthMiddleware:
@@ -148,7 +149,7 @@ async def get_current_user(
 
 
 async def get_optional_user_id(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(optional_security)
 ) -> Optional[UUID]:
-    """Dependency to get optional user ID"""
+    """Dependency to get optional user ID (doesn't require auth)"""
     return await auth_middleware.get_optional_user_id(credentials)

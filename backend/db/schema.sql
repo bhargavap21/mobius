@@ -154,6 +154,9 @@ CREATE INDEX IF NOT EXISTS idx_bot_executions_status ON public.bot_executions(st
 -- Enable RLS on all tables
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.trading_bots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.shared_agents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.agent_likes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.agent_downloads ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bot_executions ENABLE ROW LEVEL SECURITY;
 
 -- Users table policies
@@ -215,6 +218,66 @@ CREATE POLICY "Users can create executions for own bots"
             AND trading_bots.user_id = auth.uid()
         )
     );
+
+-- Shared agents policies
+CREATE POLICY "Anyone can view public shared agents"
+    ON public.shared_agents
+    FOR SELECT
+    USING (is_public = TRUE);
+
+CREATE POLICY "Users can view own shared agents"
+    ON public.shared_agents
+    FOR SELECT
+    USING (auth.uid() = author_id);
+
+CREATE POLICY "Users can share own bots"
+    ON public.shared_agents
+    FOR INSERT
+    WITH CHECK (
+        auth.uid() = author_id AND
+        EXISTS (
+            SELECT 1 FROM public.trading_bots
+            WHERE trading_bots.id = shared_agents.original_bot_id
+            AND trading_bots.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Users can update own shared agents"
+    ON public.shared_agents
+    FOR UPDATE
+    USING (auth.uid() = author_id);
+
+CREATE POLICY "Users can delete own shared agents"
+    ON public.shared_agents
+    FOR DELETE
+    USING (auth.uid() = author_id);
+
+-- Agent likes policies
+CREATE POLICY "Anyone can view likes"
+    ON public.agent_likes
+    FOR SELECT
+    USING (true);
+
+CREATE POLICY "Authenticated users can like agents"
+    ON public.agent_likes
+    FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can unlike agents"
+    ON public.agent_likes
+    FOR DELETE
+    USING (auth.uid() = user_id);
+
+-- Agent downloads policies
+CREATE POLICY "Anyone can view download counts"
+    ON public.agent_downloads
+    FOR SELECT
+    USING (true);
+
+CREATE POLICY "Anyone can download agents"
+    ON public.agent_downloads
+    FOR INSERT
+    WITH CHECK (true); -- Allows anonymous downloads
 
 -- ============================================================================
 -- FUNCTIONS

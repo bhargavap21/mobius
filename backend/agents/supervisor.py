@@ -37,7 +37,7 @@ class SupervisorAgent(BaseAgent):
         self.backtest_runner = BacktestRunnerAgent()
         self.strategy_analyst = StrategyAnalystAgent()
         self.insights_generator = InsightsGeneratorAgent()
-        self.max_iterations = 5
+        self.max_iterations = 3  # Reduced from 5 to 3 for faster performance
 
         # Initialize intelligent orchestrator for data-driven learning
         self.orchestrator = IntelligentOrchestrator()
@@ -179,6 +179,9 @@ class SupervisorAgent(BaseAgent):
 
             if not code_result.get('success'):
                 logger.error(f"❌ Code generation failed: {code_result.get('error')}")
+                if progress:
+                    await progress.emit_error(session_id, 'CodeGenerator', code_result.get('error'))
+                    progress.close_session(session_id)
                 return {
                     'success': False,
                     'error': f"Code generation failed at iteration {iteration}: {code_result.get('error')}"
@@ -237,11 +240,39 @@ class SupervisorAgent(BaseAgent):
             })
 
             if not backtest_result.get('success'):
-                logger.error(f"❌ Backtest failed: {backtest_result.get('error')}")
-                return {
-                    'success': False,
-                    'error': f"Backtest failed at iteration {iteration}: {backtest_result.get('error')}"
-                }
+                error_msg = backtest_result.get('error', '')
+                logger.error(f"❌ Backtest failed: {error_msg}")
+
+                # INTELLIGENT ERROR RECOVERY: Instead of failing, ask code generator to fix the bug
+                if iteration < self.max_iterations:
+                    logger.info(f"🔧 Attempting to fix backtest error in next iteration...")
+
+                    # Create error feedback for next iteration
+                    feedback = {
+                        'success': True,
+                        'needs_refinement': True,
+                        'should_continue': True,
+                        'issues': [f"CRITICAL BUG: Backtest execution failed with error: {error_msg}"],
+                        'suggestions': [
+                            f"Fix this bug in the generated code. Add proper None/null checks and error handling.",
+                            "Ensure all indicator values are checked for None before mathematical operations.",
+                            "Consider using default values or skipping early periods where indicators haven't calculated yet."
+                        ],
+                        'analysis': f"Backtest failed with error: {error_msg}. Need to add proper error handling."
+                    }
+
+                    # Continue to next iteration to fix the bug
+                    iteration_history.append(iteration_data)
+                    continue
+                else:
+                    # Out of iterations, return the error
+                    if progress:
+                        await progress.emit_error(session_id, 'BacktestRunner', error_msg)
+                        progress.close_session(session_id)
+                    return {
+                        'success': False,
+                        'error': f"Backtest failed at iteration {iteration}: {error_msg}"
+                    }
 
             backtest_results = backtest_result.get('results')
             days_used = backtest_result.get('days_used', days)
@@ -303,6 +334,9 @@ class SupervisorAgent(BaseAgent):
 
             if not analysis_result.get('success'):
                 logger.error(f"❌ Analysis failed: {analysis_result.get('error')}")
+                if progress:
+                    await progress.emit_error(session_id, 'StrategyAnalyst', analysis_result.get('error'))
+                    progress.close_session(session_id)
                 return {
                     'success': False,
                     'error': f"Analysis failed at iteration {iteration}: {analysis_result.get('error')}"
@@ -362,6 +396,8 @@ class SupervisorAgent(BaseAgent):
 
         if progress:
             await progress.emit_complete(session_id, iteration)
+            # Close session to mark it as inactive
+            progress.close_session(session_id)
 
         final_summary = backtest_results.get('summary', {})
         logger.info(f"📊 Final Results:")
