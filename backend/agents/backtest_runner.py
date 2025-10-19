@@ -49,8 +49,8 @@ class BacktestRunnerAgent(BaseAgent):
         strategy = input_data.get('strategy', {})
         feedback = input_data.get('feedback')
         iteration = input_data.get('iteration', 1)
-        days = input_data.get('days', self.default_days)
-        initial_capital = input_data.get('initial_capital', self.default_capital)
+        days = input_data.get('days') or self.default_days  # Use 'or' to handle None
+        initial_capital = input_data.get('initial_capital') or self.default_capital  # Use 'or' to handle None
 
         warnings = []
 
