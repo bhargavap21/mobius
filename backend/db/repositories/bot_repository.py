@@ -227,10 +227,8 @@ class BotRepository:
                 .execute()
             )
 
-            if response.data and len(response.data) > 0:
-                return TradingBot(**response.data[0])
-            else:
-                raise Exception("Bot not found or unauthorized")
+            # Supabase update returns empty data due to RLS, so fetch the updated bot
+            return await self.get_by_id(bot_id, user_id)
         except Exception as e:
             logger.error(f"Error updating bot {bot_id}: {e}")
             raise

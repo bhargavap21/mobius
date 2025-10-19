@@ -118,46 +118,91 @@ def generate_trading_bot_code(
 
         # Add politician data context to prompt if available
         politician_context = ""
+        politician_template = ""
         if politician_data:
             trades_count = len(politician_data.get('trades', []))
             tickers = politician_data.get('tickers', [])
             logger.info(f"🏛️ Including {trades_count} real politician trades in code generation")
+
+            # Determine politician name from strategy
+            politician_name = None
+            if 'pelosi' in strategy.get('name', '').lower():
+                politician_name = 'Pelosi'
+
             politician_context = f"""
 
-IMPORTANT: Real Politician Trading Data Available:
-- {trades_count} recent trades from QuiverQuant API
-- Portfolio tickers: {tickers[:10] if tickers else 'N/A'}
-- Summary: {json.dumps(politician_data.get('summary', {}), indent=2)}
+🏛️ CRITICAL REQUIREMENT - POLITICIAN TRADING DATA:
+This strategy requires real-time politician trading data from QuiverQuant API.
+- Available: {trades_count} recent congressional trades
+- DO NOT use web scraping, news APIs, or mock data
+- MUST import and use: from tools.politician_trades import get_politician_trades
 
-Recent trades sample:
-{json.dumps(politician_data.get('trades', [])[:5], indent=2)}
-
-You MUST use this REAL data in your trading bot. Do NOT scrape Google News or use mock data.
-Import the politician trading tools:
-from tools.politician_trades import get_politician_trades, get_pelosi_portfolio_tickers
-
-Use these functions to get real-time politician trading data in your bot.
+The politician_trades module is already available in your environment.
 """
 
-        # Build prompt for code generation
-        prompt = f"""You are an expert Python developer specializing in algorithmic trading.
+            politician_template = f"""
+# REQUIRED IMPORTS for politician trading
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from tools.politician_trades import get_politician_trades
 
-Generate a complete, production-ready Python trading bot based on this strategy:
+class TradingBot:
+    def __init__(self, api_key: str, secret_key: str, paper: bool = True):
+        self.client = TradingClient(api_key, secret_key, paper=paper)
+        self.symbol = "{strategy.get('asset', 'SPY')}"
+        self.politician_name = {repr(politician_name)}  # e.g., "Pelosi" or None for all
 
-{json.dumps(strategy, indent=2)}{politician_context}
+    def get_recent_politician_trades(self):
+        \"\"\"Fetch real-time politician trading data from QuiverQuant API\"\"\"
+        try:
+            trades_data = get_politician_trades(
+                politician_name=self.politician_name,
+                days_back=30  # Last 30 days of trades
+            )
+            return trades_data.get('trades', [])
+        except Exception as e:
+            logger.error(f"Error fetching politician trades: {{e}}")
+            return []
 
-Requirements:
-1. Use the Alpaca API for trading (alpaca-py library)
-2. Include all necessary imports
-3. Implement entry and exit logic based on strategy
-4. Add proper error handling
-5. Include logging
-6. Calculate position sizes correctly
-7. Implement stop loss and take profit
-8. Add docstrings and comments
-9. Make it executable
+    def check_entry_conditions(self) -> bool:
+        \"\"\"Check if politicians recently bought this stock\"\"\"
+        recent_trades = self.get_recent_politician_trades()
 
-Structure:
+        # Filter for BUY transactions of our target symbol
+        buy_trades = [
+            t for t in recent_trades
+            if t.get('Ticker') == self.symbol and t.get('Transaction') in ['Purchase', 'Buy']
+        ]
+
+        # Enter if politician bought within last 7 days
+        if buy_trades:
+            logger.info(f"🏛️ Found {{len(buy_trades)}} politician BUY trades for {{self.symbol}}")
+            return True
+        return False
+
+    def check_exit_conditions(self, position) -> bool:
+        \"\"\"Check if politicians recently sold this stock\"\"\"
+        recent_trades = self.get_recent_politician_trades()
+
+        # Filter for SELL transactions of our target symbol
+        sell_trades = [
+            t for t in recent_trades
+            if t.get('Ticker') == self.symbol and t.get('Transaction') in ['Sale', 'Sell']
+        ]
+
+        # Exit if politician sold recently
+        if sell_trades:
+            logger.info(f"🏛️ Found {{len(sell_trades)}} politician SELL trades for {{self.symbol}}")
+            return True
+        return False
+"""
+
+        # Build structure template based on whether we have politician data
+        if politician_template:
+            structure_section = f"REQUIRED Structure (follow this EXACTLY):\n```python\n{politician_template}\n```"
+        else:
+            structure_section = f"""Structure:
 ```python
 import logging
 from alpaca.trading.client import TradingClient
@@ -206,6 +251,28 @@ class TradingBot:
 
             time.sleep(60)  # Check every minute
 
+
+if __name__ == "__main__":"""
+
+        # Build prompt for code generation
+        prompt = f"""You are an expert Python developer specializing in algorithmic trading.
+
+Generate a complete, production-ready Python trading bot based on this strategy:
+
+{json.dumps(strategy, indent=2)}{politician_context}
+
+Requirements:
+1. Use the Alpaca API for trading (alpaca-py library)
+2. Include all necessary imports
+3. Implement entry and exit logic based on strategy
+4. Add proper error handling
+5. Include logging
+6. Calculate position sizes correctly
+7. Implement stop loss and take profit
+8. Add docstrings and comments
+9. Make it executable
+
+{structure_section}
 
 if __name__ == "__main__":
     # Initialize with your API keys
