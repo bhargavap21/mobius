@@ -47,6 +47,9 @@ function AppContent() {
   // Current bot ID for tracking saves/updates
   const [currentBotId, setCurrentBotId] = useState(null)
 
+  // Sidebar open state
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+
   // Load last viewed bot on mount (if authenticated)
   useEffect(() => {
     const loadLastBot = async () => {
@@ -758,9 +761,11 @@ function AppContent() {
             <StrategyInput onGenerate={handleGenerateStrategy} />
           </div>
         ) : (
-          <div className="flex flex-1 gap-0 overflow-hidden">
+          <div className="flex flex-1 gap-0 overflow-hidden w-full">
             {/* Main Content */}
-            <div className="flex-1 overflow-y-auto px-12 py-8 max-w-[1600px]">
+            <div className={`flex-1 overflow-y-auto px-12 py-8 transition-all duration-300 ${
+              sidebarOpen ? 'mr-[380px] md:mr-[420px]' : 'mr-0'
+            }`}>
             {error && (
               <div className="mb-6 p-4 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400">
                 <p className="font-medium">Error</p>
@@ -830,6 +835,7 @@ function AppContent() {
                 currentStrategy={strategy}
                 onRefineStrategy={handleRefineStrategy}
                 onRunBacktest={handleRunBacktest}
+                onOpenChange={setSidebarOpen}
               />
             )}
           </div>
