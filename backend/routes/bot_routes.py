@@ -43,7 +43,8 @@ async def create_bot(
     try:
         logger.info("="*80)
         logger.info("🚀 BOT SAVE REQUEST RECEIVED")
-        logger.info(f"📝 Bot data: name='{bot_data.name}', asset='{bot_data.asset}'")
+        asset = bot_data.strategy_config.get('asset', 'N/A') if bot_data.strategy_config else 'N/A'
+        logger.info(f"📝 Bot data: name='{bot_data.name}', asset='{asset}'")
         logger.info(f"🔐 Auth user_id from middleware: {user_id}")
         logger.info(f"🔐 user_id type: {type(user_id)}")
 

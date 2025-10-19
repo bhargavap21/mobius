@@ -395,6 +395,11 @@ function AppContent() {
 
       if (!botName) return
 
+      console.log('📤 Attempting to save bot:')
+      console.log('  Name:', botName)
+      console.log('  Strategy:', strategy)
+      console.log('  Session ID:', sessionId)
+
       const response = await fetch('http://localhost:8000/bots', {
         method: 'POST',
         headers: {
@@ -413,12 +418,18 @@ function AppContent() {
       })
 
       if (!response.ok) {
+        // Log detailed error information
+        const errorText = await response.text()
+        console.error('❌ Bot save failed:')
+        console.error('  Status:', response.status, response.statusText)
+        console.error('  Response:', errorText)
+
         // Check for 401 Unauthorized (expired token)
         if (response.status === 401) {
           handleTokenExpired()
           return
         }
-        throw new Error('Failed to save bot')
+        throw new Error(`Failed to save bot (${response.status}): ${errorText}`)
       }
 
       const data = await response.json()
