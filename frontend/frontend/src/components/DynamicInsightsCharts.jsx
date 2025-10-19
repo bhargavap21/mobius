@@ -278,10 +278,19 @@ function RenderVisualization({ visualization, data }) {
                   <Line
                     type="monotone"
                     dataKey={(point) => {
-                      // Try primary metric first
-                      if (point[primaryMetric] !== undefined) return point[primaryMetric]
-                      
-                      // Fallback to common field name variations
+                      // Debug logging to find the issue
+                      const value = point[primaryMetric]
+                      if (value === undefined || value === null) {
+                        console.log(`[MISSING FIELD] primaryMetric="${primaryMetric}" not found in point. Available fields:`, Object.keys(point))
+                      }
+
+                      // IMPORTANT: Try exact field name FIRST before pattern matching
+                      if (value !== undefined && value !== null) {
+                        return value
+                      }
+
+                      // Only use fallback pattern matching if exact field doesn't exist
+                      // This prevents "gme_price" from incorrectly matching "price" pattern
                       if (primaryMetric.includes('sentiment') || primaryMetric.includes('tweet')) {
                         return point.tweet_sentiment_score ?? point.sentimentScore ?? point.sentiment ?? point.twitter_sentiment ?? point.reddit_sentiment ?? 0
                       }
