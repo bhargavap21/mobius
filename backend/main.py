@@ -570,7 +570,7 @@ async def refine_strategy(request: RefineStrategyRequest):
 @app.post("/api/chat")
 async def chat(message: dict):
     """
-    Chat with the AI about the current trading strategy
+    Chat with the AI about the current trading strategy using Gemini
 
     Provides context-aware assistance including:
     - Strategy code and parameters
@@ -579,24 +579,24 @@ async def chat(message: dict):
     - Answers to specific questions
     """
     try:
+        from llm_client import generate_gemini_chat
+
         user_message = message.get("message", "")
         bot_context = message.get("bot_context", {})
 
         if not user_message:
             raise HTTPException(status_code=400, detail="Message is required")
 
-        result = orchestrator.chat(user_message, bot_context=bot_context)
-
-        if not result["success"]:
-            raise HTTPException(status_code=500, detail=result.get("error"))
+        # Use Gemini with full backtest context
+        response_text = generate_gemini_chat(user_message, context=bot_context)
 
         return {
             "success": True,
-            "response": result["response"],
+            "response": response_text,
         }
 
     except Exception as e:
-        logger.error(f"❌ Error in chat: {e}")
+        logger.error(f"Error in chat: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
