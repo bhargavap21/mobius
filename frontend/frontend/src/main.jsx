@@ -27,7 +27,7 @@ function CommunityPageWrapper() {
 
         if (response.ok) {
           const data = await response.json()
-          const botList = data.data || []
+          const botList = data.items || []
           
           // Transform bot data to match what ShareAgentForm expects
           const transformedBots = botList.map(bot => ({

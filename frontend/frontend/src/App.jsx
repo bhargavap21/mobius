@@ -68,8 +68,8 @@ function AppContent() {
 
         if (response.ok) {
           const data = await response.json()
-          if (data.data && data.data.length > 0) {
-            const lastBot = data.data[0]
+          if (data.items && data.items.length > 0) {
+            const lastBot = data.items[0]
             setStrategy(lastBot.strategy_config)
             setGeneratedCode(lastBot.generated_code)
             setBacktestResults(lastBot.backtest_results)

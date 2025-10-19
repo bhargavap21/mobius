@@ -40,7 +40,7 @@ const BotLibrary = ({ onClose, onLoadBot, user, onSignOut, onShowBotLibrary }) =
       }
 
       const data = await response.json();
-      const botList = data.data || [];
+      const botList = data.items || [];
       setBots(botList);
     } catch (err) {
       setError(err.message);

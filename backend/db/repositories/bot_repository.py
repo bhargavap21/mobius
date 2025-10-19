@@ -195,11 +195,13 @@ class BotRepository:
                 )
                 list_items.append(list_item)
 
+            total_pages = (total + page_size - 1) // page_size if page_size > 0 else 0
             return PaginatedResponse(
-                data=list_items,
+                items=list_items,
                 total=total,
                 page=page,
                 page_size=page_size,
+                total_pages=total_pages,
                 has_more=(offset + page_size) < total
             )
         except Exception as e:
@@ -331,7 +333,7 @@ class BotRepository:
                 page_size=1000,  # Get all favorites
                 favorites_only=True
             )
-            return response.data
+            return response.items
         except Exception as e:
             logger.error(f"Error getting favorites for user {user_id}: {e}")
             raise
