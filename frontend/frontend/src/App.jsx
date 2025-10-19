@@ -75,7 +75,7 @@ function AppContent() {
             setBacktestResults(lastBot.backtest_results)
             setInsightsConfig(lastBot.insights_config)
             setCurrentBotId(lastBot.id)
-            console.log('✅ Loaded last bot:', lastBot.name)
+            console.log('Loaded last bot:', lastBot.name)
           }
         }
       } catch (err) {
@@ -111,7 +111,7 @@ function AppContent() {
 
       // Show initial progress
       if (useMultiAgent) {
-        setProgressSteps(['🚀 Starting multi-agent workflow...'])
+        setProgressSteps(['Starting multi-agent workflow...'])
       }
 
       console.log(`[App] Sending POST to ${endpoint}`)
@@ -160,16 +160,16 @@ function AppContent() {
             const iterNum = idx + 1
             const results = iter.steps.find(s => s.agent === 'BacktestRunner')?.results
             if (results) {
-              return `✅ Iteration ${iterNum}: ${results.total_trades} trades, ${results.total_return?.toFixed(1)}% return`
+              return `Iteration ${iterNum}: ${results.total_trades} trades, ${results.total_return?.toFixed(1)}% return`
             }
-            return `⏳ Iteration ${iterNum}: Processing...`
+            return `Iteration ${iterNum}: Processing...`
           })
           setProgressSteps(steps)
         }
 
-        console.log(`✅ Multi-agent workflow completed in ${data.iterations} iterations`)
+        console.log(`Multi-agent workflow completed in ${data.iterations} iterations`)
         if (data.insights_config) {
-          console.log(`📊 Generated ${data.insights_config.visualizations?.length || 0} custom visualizations`)
+          console.log(`Generated ${data.insights_config.visualizations?.length || 0} custom visualizations`)
         }
 
         // Auto-save new bot after generation completes
@@ -194,7 +194,7 @@ function AppContent() {
           const resultResponse = await fetch(`http://localhost:8000/api/strategy/result/${newSessionId}`)
           if (resultResponse.ok) {
             const data = await resultResponse.json()
-            console.log('✅ Retrieved completed job result after connection drop')
+            console.log('Retrieved completed job result after connection drop')
             setStrategy(data.strategy)
             setGeneratedCode(data.code)
             setBacktestResults(data.backtest_results)
@@ -206,9 +206,9 @@ function AppContent() {
                 const iterNum = idx + 1
                 const results = iter.steps.find(s => s.agent === 'BacktestRunner')?.results
                 if (results) {
-                  return `✅ Iteration ${iterNum}: ${results.total_trades} trades, ${results.total_return?.toFixed(1)}% return`
+                  return `Iteration ${iterNum}: ${results.total_trades} trades, ${results.total_return?.toFixed(1)}% return`
                 }
-                return `⏳ Iteration ${iterNum}: Processing...`
+                return `Iteration ${iterNum}: Processing...`
               })
               setProgressSteps(steps)
             }
@@ -223,7 +223,7 @@ function AppContent() {
 
       // Start polling for result (only for connection issues, not backend failures)
       if (newSessionId && useMultiAgent) {
-        console.log('⏱️  Starting polling for job completion...')
+        console.log('Starting polling for job completion...')
         pollForResult(newSessionId)
       } else {
         setError(err.message)
@@ -244,7 +244,7 @@ function AppContent() {
         const response = await fetch(`http://localhost:8000/api/strategy/result/${sessionId}`)
         if (response.ok) {
           const data = await response.json()
-          console.log('✅ Job completed! Retrieved result.')
+          console.log('Job completed! Retrieved result.')
 
           setStrategy(data.strategy)
           setGeneratedCode(data.code)
@@ -257,9 +257,9 @@ function AppContent() {
               const iterNum = idx + 1
               const results = iter.steps.find(s => s.agent === 'BacktestRunner')?.results
               if (results) {
-                return `✅ Iteration ${iterNum}: ${results.total_trades} trades, ${results.total_return?.toFixed(1)}% return`
+                return `Iteration ${iterNum}: ${results.total_trades} trades, ${results.total_return?.toFixed(1)}% return`
               }
-              return `⏳ Iteration ${iterNum}: Processing...`
+              return `Iteration ${iterNum}: Processing...`
             })
             setProgressSteps(steps)
           }
@@ -333,7 +333,7 @@ function AppContent() {
 
       if (response.ok) {
         const data = await response.json()
-        console.log('[App] ✅ Retrieved completed job result')
+        console.log('[App] Retrieved completed job result')
 
         // Set all the state from the completed job
         setStrategy(data.strategy)
@@ -347,9 +347,9 @@ function AppContent() {
             const iterNum = idx + 1
             const results = iter.steps.find(s => s.agent === 'BacktestRunner')?.results
             if (results) {
-              return `✅ Iteration ${iterNum}: ${results.total_trades} trades, ${results.total_return?.toFixed(1)}% return`
+              return `Iteration ${iterNum}: ${results.total_trades} trades, ${results.total_return?.toFixed(1)}% return`
             }
-            return `⏳ Iteration ${iterNum}: Processing...`
+            return `Iteration ${iterNum}: Processing...`
           })
           setProgressSteps(steps)
         }
@@ -416,7 +416,7 @@ function AppContent() {
         if (!autoSave) {
           alert('Bot updated successfully!')
         }
-        console.log('✅ Bot auto-saved')
+        console.log('Bot auto-saved')
         return
       }
 
@@ -427,7 +427,7 @@ function AppContent() {
 
       if (!botName) return
 
-      console.log('📤 Attempting to save bot:')
+      console.log('Attempting to save bot:')
       console.log('  Name:', botName)
       console.log('  Strategy:', strategy)
       console.log('  Session ID:', sessionId)
@@ -452,7 +452,7 @@ function AppContent() {
       if (!response.ok) {
         // Log detailed error information
         const errorText = await response.text()
-        console.error('❌ Bot save failed:')
+        console.error('Bot save failed:')
         console.error('  Status:', response.status, response.statusText)
         console.error('  Response:', errorText)
 
@@ -468,8 +468,8 @@ function AppContent() {
       setCurrentBotId(data.id)
 
       // Always show success confirmation
-      alert('✅ Bot saved successfully!')
-      console.log('✅ Bot saved with ID:', data.id)
+      alert('Bot saved successfully!')
+      console.log('Bot saved with ID:', data.id)
     } catch (err) {
       console.error('Error saving bot:', err)
       if (!autoSave) {
@@ -485,7 +485,7 @@ function AppContent() {
     setInsightsConfig(botData.insights_config)
     setCurrentBotId(botData.id)
     setShowBotLibrary(false)
-    console.log('✅ Loaded bot:', botData.name)
+    console.log('Loaded bot:', botData.name)
   }
 
   const handleRefineStrategy = async (refinementPrompt) => {
@@ -525,7 +525,7 @@ function AppContent() {
       setBacktestResults(data.backtest_results)
       setInsightsConfig(data.insights_config)
 
-      console.log('✅ Strategy refined successfully:', data.changes_made)
+      console.log('Strategy refined successfully:', data.changes_made)
       setLoading(false)
 
       // Auto-save after refinement
@@ -619,7 +619,7 @@ function AppContent() {
         <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 max-w-md w-full mx-4">
           <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 backdrop-blur-md">
             <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 text-red-400 text-xl">⚠️</div>
+              <div className="flex-shrink-0 text-red-400 text-xl">!</div>
               <div className="flex-1">
                 <h3 className="text-red-400 font-semibold mb-1">Session Expired</h3>
                 <p className="text-red-200 text-sm mb-3">
@@ -639,7 +639,7 @@ function AppContent() {
                 onClick={clearExpiredError}
                 className="flex-shrink-0 text-red-400 hover:text-red-300 transition-colors"
               >
-                ✕
+                X
               </button>
             </div>
           </div>
@@ -717,7 +717,7 @@ function AppContent() {
                           onClick={() => setShowBotLibrary(true)}
                           className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-dark-bg hover:text-white transition-colors"
                         >
-                          📚 My Bots
+                          My Bots
                         </button>
                         <button
                           onClick={handleSignOut}
@@ -755,7 +755,7 @@ function AppContent() {
               <div className="mb-6 flex flex-col items-center">
                 <LoadingSpinner />
                 <p className="text-gray-400 mt-4 text-lg font-semibold">
-                  🤖 Multi-Agent System Working...
+                  Multi-Agent System Working...
                 </p>
                 <p className="text-gray-500 text-sm mt-2">
                   Iterating through code generation, backtesting, and analysis

@@ -163,7 +163,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const handleTokenExpired = () => {
-    console.error('🔐 Token expired - signing out user');
+    console.error('Token expired - signing out user');
     signout(true);
   };
 

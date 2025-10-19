@@ -180,19 +180,19 @@ const AgentActivityLogPolling = ({ sessionId, onComplete }) => {
   const getEventIcon = (type) => {
     switch (type) {
       case 'agent_start':
-        return '🤖'
+        return 'START'
       case 'agent_complete':
-        return '✅'
+        return 'DONE'
       case 'iteration_start':
-        return '🔄'
+        return 'ITER'
       case 'refinement':
-        return '🔧'
+        return 'REFINE'
       case 'complete':
-        return '🎉'
+        return 'SUCCESS'
       case 'error':
-        return '❌'
+        return 'ERROR'
       default:
-        return '📝'
+        return 'LOG'
     }
   }
 
@@ -237,7 +237,7 @@ const AgentActivityLogPolling = ({ sessionId, onComplete }) => {
       {isComplete && (
         <div className="pt-2 mt-2 border-t border-gray-700">
           <span className="text-green-400 font-semibold">
-            ✨ Workflow complete!
+            Workflow complete!
           </span>
         </div>
       )}

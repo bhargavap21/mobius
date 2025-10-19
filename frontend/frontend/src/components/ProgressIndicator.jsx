@@ -4,11 +4,11 @@ export default function ProgressIndicator() {
   const [currentStep, setCurrentStep] = useState(0)
 
   const steps = [
-    { icon: '📝', label: 'Parsing Strategy', desc: 'Understanding your trading rules...' },
-    { icon: '🤖', label: 'Generating Code', desc: 'Creating strategy implementation...' },
-    { icon: '📊', label: 'Running Backtest', desc: 'Testing strategy on historical data...' },
-    { icon: '🔍', label: 'Analyzing Results', desc: 'Evaluating performance metrics...' },
-    { icon: '✨', label: 'Refining Strategy', desc: 'Optimizing parameters...' },
+    { icon: 'PARSE', label: 'Parsing Strategy', desc: 'Understanding your trading rules...' },
+    { icon: 'CODE', label: 'Generating Code', desc: 'Creating strategy implementation...' },
+    { icon: 'TEST', label: 'Running Backtest', desc: 'Testing strategy on historical data...' },
+    { icon: 'ANALYZE', label: 'Analyzing Results', desc: 'Evaluating performance metrics...' },
+    { icon: 'REFINE', label: 'Refining Strategy', desc: 'Optimizing parameters...' },
   ]
 
   useEffect(() => {
@@ -40,11 +40,11 @@ export default function ProgressIndicator() {
               }`}
             >
               <div
-                className={`text-2xl transition-transform duration-500 ${
+                className={`text-sm font-mono transition-transform duration-500 ${
                   isActive ? 'scale-125' : 'scale-100'
-                }`}
+                } ${isPast ? 'text-green-400' : 'text-gray-400'}`}
               >
-                {isPast ? '✅' : step.icon}
+                {isPast ? 'DONE' : step.icon}
               </div>
               <div className="flex-1">
                 <p

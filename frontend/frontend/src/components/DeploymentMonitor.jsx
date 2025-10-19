@@ -74,10 +74,10 @@ const DeploymentMonitor = ({ onBack }) => {
 
       // Refresh deployments
       fetchDeployments()
-      alert(`✅ Deployment ${action}d successfully`)
+      alert(`Deployment ${action}d successfully`)
     } catch (err) {
       console.error(`Error ${action}ing deployment:`, err)
-      alert(`❌ Failed to ${action} deployment: ${err.message}`)
+      alert(`Failed to ${action} deployment: ${err.message}`)
     }
   }
 
@@ -146,7 +146,6 @@ const DeploymentMonitor = ({ onBack }) => {
 
         {deployments.length === 0 ? (
           <div className="text-center py-16">
-            <div className="text-6xl mb-4">📊</div>
             <h2 className="text-xl text-white mb-2">No Active Deployments</h2>
             <p className="text-gray-400 mb-6">Deploy a strategy to start live paper trading</p>
             <button
@@ -243,7 +242,7 @@ const DeploymentMonitor = ({ onBack }) => {
                           onClick={() => handleStatusChange(selectedDeployment.id, 'pause')}
                           className="px-4 py-2 rounded-lg bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 hover:bg-yellow-500/30 transition-colors"
                         >
-                          ⏸ Pause
+                          Pause
                         </button>
                       )}
                       {selectedDeployment.status === 'paused' && (
@@ -251,7 +250,7 @@ const DeploymentMonitor = ({ onBack }) => {
                           onClick={() => handleStatusChange(selectedDeployment.id, 'resume')}
                           className="px-4 py-2 rounded-lg bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30 transition-colors"
                         >
-                          ▶ Resume
+                          Resume
                         </button>
                       )}
                       {selectedDeployment.status !== 'stopped' && (
@@ -263,7 +262,7 @@ const DeploymentMonitor = ({ onBack }) => {
                           }}
                           className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30 transition-colors"
                         >
-                          ⏹ Stop
+                          Stop
                         </button>
                       )}
                     </div>

@@ -35,16 +35,16 @@ export default function CommunityPage({ userAgents = [], loadingBots = false }) 
 
   const handleShareAgent = async (agentData) => {
     try {
-      console.log('📤 Sharing agent:', agentData)
-      console.log('👤 Current user:', user)
-      console.log('👤 User ID:', user?.id)
-      console.log('👤 Auth headers:', getAuthHeaders())
-      
+      console.log('Sharing agent:', agentData)
+      console.log('Current user:', user)
+      console.log('User ID:', user?.id)
+      console.log('Auth headers:', getAuthHeaders())
+
       const requestData = {
         ...agentData,
         user_id: user?.id || "demo_user"
       }
-      console.log('📤 Request data:', requestData)
+      console.log('Request data:', requestData)
       
       const response = await fetch('http://localhost:8000/api/community/share', {
         method: 'POST',
@@ -57,25 +57,25 @@ export default function CommunityPage({ userAgents = [], loadingBots = false }) 
 
       if (response.ok) {
         const result = await response.json()
-        console.log('✅ Agent shared successfully:', result)
-        
+        console.log('Agent shared successfully:', result)
+
         // Show success message
-        alert('✅ Agent shared successfully!')
-        
+        alert('Agent shared successfully!')
+
         // Switch back to shared agents tab and refresh
         setActiveTab('shared')
         fetchSharedAgents()
-        
+
         // Reset the form
         setShowShareForm(false)
       } else {
         const errorText = await response.text()
-        console.error('❌ Failed to share agent:', response.status, errorText)
-        alert(`❌ Failed to share agent: ${response.status} ${errorText}`)
+        console.error('Failed to share agent:', response.status, errorText)
+        alert(`Failed to share agent: ${response.status} ${errorText}`)
       }
     } catch (error) {
-      console.error('❌ Error sharing agent:', error)
-      alert('❌ Error sharing agent. Please try again.')
+      console.error('Error sharing agent:', error)
+      alert('Error sharing agent. Please try again.')
     }
   }
 
@@ -141,9 +141,9 @@ export default function CommunityPage({ userAgents = [], loadingBots = false }) 
         a.click()
         window.URL.revokeObjectURL(url)
         document.body.removeChild(a)
-        
+
         // Show success message
-        console.log(`✅ Downloaded agent configuration: ${agentId}`)
+        console.log(`Downloaded agent configuration: ${agentId}`)
         
         // Refresh the agents list to update download counts
         fetchSharedAgents()
@@ -188,7 +188,7 @@ export default function CommunityPage({ userAgents = [], loadingBots = false }) 
           })
 
         if (saveResponse.ok) {
-          console.log(`✅ Agent saved to My Bots: ${agentId}`)
+          console.log(`Agent saved to My Bots: ${agentId}`)
           alert('Agent saved to your My Bots collection!')
         } else {
           console.error('Failed to save agent')
@@ -464,17 +464,17 @@ function AgentPlacard({ agent, onLike, onDownload, onSaveToMyBots, onRemix, isAu
   const getPlaceholderImage = (agent) => {
     const tags = agent.tags || []
     if (tags.some(tag => tag.toLowerCase().includes('elon') || tag.toLowerCase().includes('tweet'))) {
-      return '🚀' // Rocket for Elon/Twitter strategies
+      return 'Rocket' // Rocket for Elon/Twitter strategies
     } else if (tags.some(tag => tag.toLowerCase().includes('reddit') || tag.toLowerCase().includes('wsb'))) {
-      return '📈' // Chart for Reddit strategies
+      return 'Chart' // Chart for Reddit strategies
     } else if (tags.some(tag => tag.toLowerCase().includes('rsi') || tag.toLowerCase().includes('technical'))) {
-      return '📊' // Bar chart for technical strategies
+      return 'Analytics' // Bar chart for technical strategies
     } else if (tags.some(tag => tag.toLowerCase().includes('crypto'))) {
-      return '₿' // Bitcoin for crypto strategies
+      return 'Bitcoin' // Bitcoin for crypto strategies
     } else if (tags.some(tag => tag.toLowerCase().includes('momentum'))) {
-      return '⚡' // Lightning for momentum strategies
+      return 'Lightning' // Lightning for momentum strategies
     } else {
-      return '🤖' // Default robot icon
+      return 'Bot' // Default robot icon
     }
   }
 

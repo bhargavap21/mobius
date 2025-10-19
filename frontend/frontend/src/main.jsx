@@ -41,9 +41,10 @@ function CommunityPageWrapper() {
             totalTrades: bot.backtest_results?.summary?.total_trades || 0,
             symbol: bot.strategy_config?.asset || 'Unknown'
           }))
-          
+
+
           setUserAgents(transformedBots)
-          console.log('✅ Loaded user bots for community sharing:', transformedBots.length)
+          console.log('Loaded user bots for community sharing:', transformedBots.length)
         } else {
           console.error('Failed to load user bots:', response.status)
           setUserAgents([])

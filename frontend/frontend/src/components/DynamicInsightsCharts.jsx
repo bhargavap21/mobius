@@ -414,7 +414,7 @@ function RenderVisualization({ visualization, data }) {
         {!hasData && (
           <div className="absolute inset-0 flex items-center justify-center bg-dark-surface/80 backdrop-blur-sm">
             <div className="text-center p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg max-w-md">
-              <p className="text-sm text-yellow-400 font-medium mb-2">⚠️ Data not yet available</p>
+              <p className="text-sm text-yellow-400 font-medium mb-2">Data not yet available</p>
               <p className="text-xs text-yellow-300 mb-2">
                 This visualization requires <span className="font-mono text-yellow-200">{primaryMetric}</span> data that hasn't been generated yet.
               </p>

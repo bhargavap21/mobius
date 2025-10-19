@@ -74,7 +74,6 @@ const EmailConfirmation = () => {
 
         {status === 'success' && (
           <>
-            <div className="text-6xl mb-4">✅</div>
             <h2 className="text-xl font-bold text-white mb-2">Email Confirmed!</h2>
             <p className="text-gray-400">{message}</p>
           </>
@@ -82,7 +81,6 @@ const EmailConfirmation = () => {
 
         {status === 'error' && (
           <>
-            <div className="text-6xl mb-4">❌</div>
             <h2 className="text-xl font-bold text-white mb-2">Confirmation Failed</h2>
             <p className="text-gray-400 mb-4">{message}</p>
             <a

@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 const EXAMPLE_STRATEGIES = [
   {
-    title: "Elon Tweet Strategy 🚀",
+    title: "Elon Tweet Strategy",
     description: "Buy TSLA when Elon Musk tweets something positive about Tesla. Sell at +2% profit or -1% stop loss."
   },
   {

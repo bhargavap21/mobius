@@ -57,10 +57,10 @@ const DeploymentPage = ({
 
       const deployment = await response.json()
       setDeploymentId(deployment.id)
-      console.log('✅ Deployment created:', deployment)
+      console.log('Deployment created:', deployment)
 
     } catch (err) {
-      console.error('❌ Deployment error:', err)
+      console.error('Deployment error:', err)
       setError(err.message)
     } finally {
       setDeploying(false)
@@ -79,7 +79,6 @@ const DeploymentPage = ({
           </button>
           {/* Success Message */}
           <div className="rounded-2xl border border-green-500/20 bg-green-500/10 p-8 text-center">
-            <div className="text-6xl mb-4">🚀</div>
             <h2 className="text-2xl font-semibold text-white mb-2">
               Strategy Deployed Successfully!
             </h2>
@@ -272,7 +271,7 @@ const DeploymentPage = ({
         {/* Warning Box */}
         <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/10 p-4 mb-6">
           <div className="flex gap-3">
-            <div className="text-yellow-500 text-xl">⚠️</div>
+            <div className="text-yellow-500 text-xl">!</div>
             <div>
               <p className="text-sm text-yellow-500 font-medium mb-1">Paper Trading Mode</p>
               <p className="text-xs text-yellow-500/80">
@@ -289,7 +288,7 @@ const DeploymentPage = ({
           disabled={deploying || !isAuthenticated}
           className="w-full py-4 rounded-lg bg-accent text-white font-medium hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          {deploying ? 'Deploying...' : '🚀 Deploy Strategy'}
+          {deploying ? 'Deploying...' : 'Deploy Strategy'}
         </button>
 
         {!isAuthenticated && (

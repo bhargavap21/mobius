@@ -122,7 +122,7 @@ export default function AgentActivityLog({ sessionId }) {
   if (error && events.length === 0) {
     return (
       <div className="bg-dark-card rounded-xl border border-red-500/30 p-6">
-        <p className="text-red-400 text-sm">⚠️ Unable to connect to activity stream</p>
+        <p className="text-red-400 text-sm">Unable to connect to activity stream</p>
       </div>
     )
   }
@@ -135,7 +135,7 @@ export default function AgentActivityLog({ sessionId }) {
   return (
     <div className="bg-dark-card rounded-xl border border-dark-border p-6 space-y-3">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-bold text-white">🤖 Agent Activity</h3>
+        <h3 className="text-lg font-bold text-white">Agent Activity</h3>
         {isComplete && (
           <span className="text-xs text-green-400 bg-green-500/10 px-2 py-1 rounded">
             Complete

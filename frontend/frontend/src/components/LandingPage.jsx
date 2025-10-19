@@ -70,7 +70,7 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
                       onClick={onShowBotLibrary}
                       className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-dark-bg hover:text-white transition-colors"
                     >
-                      📚 My Bots
+                      My Bots
                     </button>
                     <button
                       onClick={onSignOut}
