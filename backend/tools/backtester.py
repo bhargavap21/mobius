@@ -311,7 +311,9 @@ class Backtester:
                 # Extract RSI threshold from entry conditions if available
                 rsi_exit_threshold = 70  # default
                 if 'parameters' in entry_conditions_raw:
-                    rsi_exit_threshold = entry_conditions_raw['parameters'].get('rsi_exit_threshold', 70)
+                    threshold_value = entry_conditions_raw['parameters'].get('rsi_exit_threshold', 70)
+                    # Ensure we have a valid number, not None
+                    rsi_exit_threshold = threshold_value if threshold_value is not None else 70
 
                 exit_conditions_list.append({
                     'type': 'rsi',
@@ -516,19 +518,25 @@ class Backtester:
 
                 if exit_signal_met:
                     capital += shares * price
+                    
+                    # Ensure we have valid values for calculations
+                    entry_price = position.get('entry_price', price)
+                    if entry_price is None:
+                        entry_price = price
+                        logger.warning(f"Missing entry_price for position, using current price {price}")
 
                     trade = {
-                        'trade_number': position['trade_number'],
-                        'entry_date': position['entry_date'],
+                        'trade_number': position.get('trade_number', 0),
+                        'entry_date': position.get('entry_date', idx),
                         'exit_date': idx,
-                        'entry_price': position['entry_price'],
+                        'entry_price': entry_price,
                         'exit_price': price,
                         'shares': shares,
-                        'pnl': shares * (price - position['entry_price']),
+                        'pnl': shares * (price - entry_price),
                         'pnl_pct': pnl_pct * 100,
                         'exit_reason': exit_reason,
-                        'entry_reason': position['entry_reason'],
-                        'days_held': (idx - position['entry_date']).days,
+                        'entry_reason': position.get('entry_reason', 'unknown'),
+                        'days_held': (idx - position['entry_date']).days if position.get('entry_date') else 0,
                         'capital_before': round(capital - shares * price, 2),
                         'capital_after': round(capital, 2)
                     }
@@ -543,20 +551,28 @@ class Backtester:
         if position is not None:
             final_price = df.iloc[-1]['close']
             capital += shares * final_price
-            pnl_pct = ((shares * final_price) - (position['shares'] * position['entry_price'])) / (position['shares'] * position['entry_price'])
+            
+            # Ensure we have valid values for calculations
+            entry_price = position.get('entry_price', final_price)
+            if entry_price is None or entry_price == 0:
+                entry_price = final_price
+                logger.warning(f"Missing or invalid entry_price for end-of-period position, using final price {final_price}")
+                pnl_pct = 0
+            else:
+                pnl_pct = ((shares * final_price) - (position.get('shares', shares) * entry_price)) / (position.get('shares', shares) * entry_price)
 
             trade = {
-                'trade_number': position['trade_number'],
-                'entry_date': position['entry_date'],
+                'trade_number': position.get('trade_number', 0),
+                'entry_date': position.get('entry_date', df.index[0]),
                 'exit_date': df.index[-1],
-                'entry_price': position['entry_price'],
+                'entry_price': entry_price,
                 'exit_price': final_price,
                 'shares': shares,
-                'pnl': shares * (final_price - position['entry_price']),
+                'pnl': shares * (final_price - entry_price),
                 'pnl_pct': pnl_pct * 100,
                 'exit_reason': 'end_of_period',
-                'entry_reason': position['entry_reason'],
-                'days_held': (df.index[-1] - position['entry_date']).days,
+                'entry_reason': position.get('entry_reason', 'unknown'),
+                'days_held': (df.index[-1] - position['entry_date']).days if position.get('entry_date') else 0,
                 'capital_before': round(capital - shares * final_price, 2),
                 'capital_after': round(capital, 2)
             }
@@ -722,6 +738,14 @@ def backtest_strategy(
     Returns:
         Backtest results with metrics and trade history
     """
+    # Ensure we have valid values (handle None cases)
+    if days is None or days <= 0:
+        days = 180
+        logger.warning(f"Invalid days parameter, using default: {days}")
+    if initial_capital is None or initial_capital <= 0:
+        initial_capital = 10000.0
+        logger.warning(f"Invalid initial_capital parameter, using default: ${initial_capital}")
+    
     # Override strategy exit conditions if provided
     if take_profit is not None or stop_loss is not None:
         if 'exit_conditions' not in strategy:

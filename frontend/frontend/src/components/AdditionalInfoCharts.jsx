@@ -33,16 +33,16 @@ export default function AdditionalInfoCharts({ additionalInfo }) {
   const hasRedditSentiment = 'reddit_sentiment' in samplePoint
 
   return (
-    <div className="bg-dark-card rounded-xl border border-dark-border p-6 space-y-6">
+    <div className="rounded-2xl border border-white/10 bg-[#0e1117] p-5 space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">📊 Strategy Insights</h2>
-        <p className="text-sm text-gray-400">Visual analysis of key indicators</p>
+        <h2 className="text-sm font-light text-white">Strategy Insights</h2>
+        <p className="text-xs text-white/50">Visual analysis of key indicators</p>
       </div>
 
       {/* RSI Chart */}
       {hasRSI && (
-        <div className="bg-dark-surface rounded-lg p-4 border border-dark-border">
-          <h3 className="text-lg font-semibold text-white mb-4">RSI (Relative Strength Index)</h3>
+        <div className="bg-white/5 rounded-lg p-3 border border-white/10">
+          <h3 className="text-sm font-light text-white mb-3">RSI (Relative Strength Index)</h3>
           <ResponsiveContainer width="100%" height={300}>
             <ComposedChart data={additionalInfo}>
               <CartesianGrid strokeDasharray="3 3" stroke="#333" />
@@ -119,8 +119,8 @@ export default function AdditionalInfoCharts({ additionalInfo }) {
 
       {/* MACD Chart */}
       {hasMACD && (
-        <div className="bg-dark-surface rounded-lg p-4 border border-dark-border">
-          <h3 className="text-lg font-semibold text-white mb-4">MACD (Moving Average Convergence Divergence)</h3>
+        <div className="bg-white/5 rounded-lg p-3 border border-white/10">
+          <h3 className="text-sm font-light text-white mb-3">MACD (Moving Average Convergence Divergence)</h3>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={additionalInfo}>
               <CartesianGrid strokeDasharray="3 3" stroke="#333" />
@@ -169,8 +169,8 @@ export default function AdditionalInfoCharts({ additionalInfo }) {
 
       {/* SMA Chart */}
       {hasSMA && (
-        <div className="bg-dark-surface rounded-lg p-4 border border-dark-border">
-          <h3 className="text-lg font-semibold text-white mb-4">Simple Moving Averages</h3>
+        <div className="bg-white/5 rounded-lg p-3 border border-white/10">
+          <h3 className="text-sm font-light text-white mb-3">Simple Moving Averages</h3>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={additionalInfo}>
               <CartesianGrid strokeDasharray="3 3" stroke="#333" />
@@ -226,8 +226,8 @@ export default function AdditionalInfoCharts({ additionalInfo }) {
 
       {/* Twitter Sentiment Chart */}
       {hasTwitterSentiment && (
-        <div className="bg-dark-surface rounded-lg p-4 border border-dark-border">
-          <h3 className="text-lg font-semibold text-white mb-4">🐦 Twitter Sentiment Score</h3>
+        <div className="bg-white/5 rounded-lg p-3 border border-white/10">
+          <h3 className="text-sm font-light text-white mb-3">Twitter Sentiment Score</h3>
           <ResponsiveContainer width="100%" height={300}>
             <ComposedChart data={additionalInfo}>
               <CartesianGrid strokeDasharray="3 3" stroke="#333" />
@@ -295,8 +295,8 @@ export default function AdditionalInfoCharts({ additionalInfo }) {
 
       {/* Reddit Sentiment Chart */}
       {hasRedditSentiment && (
-        <div className="bg-dark-surface rounded-lg p-4 border border-dark-border">
-          <h3 className="text-lg font-semibold text-white mb-4">📱 Reddit Sentiment Score</h3>
+        <div className="bg-white/5 rounded-lg p-3 border border-white/10">
+          <h3 className="text-sm font-light text-white mb-3">Reddit Sentiment Score</h3>
           <ResponsiveContainer width="100%" height={300}>
             <ComposedChart data={additionalInfo}>
               <CartesianGrid strokeDasharray="3 3" stroke="#333" />

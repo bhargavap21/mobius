@@ -13,7 +13,7 @@ const CustomTooltip = ({ active, payload }) => {
           Strategy: ${payload[0].value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </p>
         {payload[1] && (
-          <p className="text-accent-success text-sm font-semibold">
+          <p className="text-white text-sm font-semibold">
             Buy & Hold: ${payload[1].value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
         )}
@@ -53,65 +53,59 @@ export default function BacktestResults({ results, insightsConfig }) {
   const displayedTrades = showAllTrades ? trades : trades.slice(0, 5)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="card">
-        <div className="flex items-center gap-3 mb-6">
-          <span className="text-3xl">📊</span>
-          <div>
-            <h2 className="text-3xl font-light text-fg">Backtest Results</h2>
-            <p className="text-sm text-gray-400">
-              {summary.symbol} • {summary.start_date} to {summary.end_date}
-            </p>
-          </div>
-        </div>
+      <div>
+        <p className="text-xs text-white/50 mb-2">
+          {summary.symbol} • {summary.start_date} to {summary.end_date}
+        </p>
 
         {/* Key Metrics Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="p-4 bg-dark-bg rounded-lg border border-dark-border">
-            <p className="text-xs text-gray-400 mb-1">Total Return</p>
-            <p className={`text-3xl font-bold ${getReturnColor(summary.total_return)}`}>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          <div className="p-3 bg-white/5 rounded-lg border border-white/10">
+            <p className="text-xs text-white/50 mb-1">Total Return</p>
+            <p className={`text-2xl font-semibold ${getReturnColor(summary.total_return)}`}>
               {summary.total_return > 0 ? '+' : ''}{summary.total_return}%
             </p>
           </div>
 
-          <div className="p-4 bg-dark-bg rounded-lg border border-dark-border">
-            <p className="text-xs text-gray-400 mb-1">Buy & Hold</p>
-            <p className={`text-3xl font-bold ${getReturnColor(summary.buy_hold_return)}`}>
+          <div className="p-3 bg-white/5 rounded-lg border border-white/10">
+            <p className="text-xs text-white/50 mb-1">Buy & Hold</p>
+            <p className={`text-2xl font-semibold ${getReturnColor(summary.buy_hold_return)}`}>
               {summary.buy_hold_return > 0 ? '+' : ''}{summary.buy_hold_return}%
             </p>
           </div>
 
-          <div className="p-4 bg-dark-bg rounded-lg border border-dark-border">
-            <p className="text-xs text-gray-400 mb-1">Win Rate</p>
-            <p className="text-3xl font-bold text-white">
+          <div className="p-3 bg-white/5 rounded-lg border border-white/10">
+            <p className="text-xs text-white/50 mb-1">Win Rate</p>
+            <p className="text-2xl font-semibold text-white">
               {summary.win_rate}%
             </p>
           </div>
 
-          <div className="p-4 bg-dark-bg rounded-lg border border-dark-border">
-            <p className="text-xs text-gray-400 mb-1">Total Trades</p>
-            <p className="text-3xl font-bold text-white">
+          <div className="p-3 bg-white/5 rounded-lg border border-white/10">
+            <p className="text-xs text-white/50 mb-1">Total Trades</p>
+            <p className="text-2xl font-semibold text-white">
               {summary.total_trades}
             </p>
           </div>
         </div>
 
         {/* Performance Comparison Banner */}
-        <div className={`p-4 rounded-lg border ${getReturnBgColor(summary.total_return - summary.buy_hold_return)}`}>
+        <div className={`p-3 rounded-lg border ${getReturnBgColor(summary.total_return - summary.buy_hold_return)}`}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-400">Strategy vs Buy & Hold {summary.symbol}</p>
-              <p className={`text-xl font-bold ${getReturnColor(summary.total_return - summary.buy_hold_return)}`}>
-                {summary.total_return > summary.buy_hold_return ? '📈 Outperformed' : '📉 Underperformed'} {summary.symbol} by {Math.abs(summary.total_return - summary.buy_hold_return).toFixed(2)}%
+              <p className="text-xs text-white/50">Strategy vs Buy & Hold {summary.symbol}</p>
+              <p className={`text-base font-semibold ${getReturnColor(summary.total_return - summary.buy_hold_return)}`}>
+                {summary.total_return > summary.buy_hold_return ? 'Outperformed' : 'Underperformed'} by {Math.abs(summary.total_return - summary.buy_hold_return).toFixed(2)}%
               </p>
             </div>
             <div className="text-right">
-              <p className="text-sm text-gray-400">Final Capital</p>
-              <p className="text-xl font-bold text-white">
+              <p className="text-xs text-white/50">Final Capital</p>
+              <p className="text-base font-semibold text-white">
                 ${summary.final_capital.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
-              <p className={`text-sm ${getReturnColor(summary.final_capital - summary.initial_capital)}`}>
+              <p className={`text-xs ${getReturnColor(summary.final_capital - summary.initial_capital)}`}>
                 {summary.final_capital > summary.initial_capital ? '+' : ''}${(summary.final_capital - summary.initial_capital).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
@@ -120,8 +114,8 @@ export default function BacktestResults({ results, insightsConfig }) {
       </div>
 
       {/* Portfolio Performance Chart */}
-      <div className="card">
-        <h3 className="text-2xl font-light text-fg mb-4">📈 Portfolio Value Over Time</h3>
+      <div className="mt-4 pt-4 border-t border-white/10">
+        <h3 className="text-sm font-light text-white mb-3">Portfolio Value Over Time</h3>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={portfolio_history}>
             <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
@@ -144,7 +138,7 @@ export default function BacktestResults({ results, insightsConfig }) {
             <Line
               type="monotone"
               dataKey="portfolio_value"
-              stroke="#3b82f6"
+              stroke="#7c3aed"
               strokeWidth={2}
               dot={false}
               name="Strategy"
@@ -152,7 +146,7 @@ export default function BacktestResults({ results, insightsConfig }) {
             <Line
               type="monotone"
               dataKey="buy_hold_value"
-              stroke="#10b981"
+              stroke="#ffffff"
               strokeWidth={2}
               dot={false}
               strokeDasharray="5 5"
@@ -172,76 +166,76 @@ export default function BacktestResults({ results, insightsConfig }) {
       )}
 
       {/* Detailed Metrics */}
-      <div className="card">
-        <h3 className="text-2xl font-light text-fg mb-4">📋 Detailed Metrics</h3>
+      <div className="mt-4 pt-4 border-t border-white/10">
+        <h3 className="text-sm font-light text-white mb-3">Detailed Metrics</h3>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="p-3 bg-dark-bg rounded-lg border border-dark-border">
-            <p className="text-xs text-gray-400 mb-1">Winning Trades</p>
-            <p className="text-lg font-semibold text-accent-success">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="p-3 bg-white/5 rounded-lg border border-white/10">
+            <p className="text-xs text-white/50 mb-1">Winning Trades</p>
+            <p className="text-base font-semibold text-green-400">
               {summary.winning_trades} ({((summary.winning_trades / summary.total_trades) * 100).toFixed(0)}%)
             </p>
           </div>
 
-          <div className="p-3 bg-dark-bg rounded-lg border border-dark-border">
-            <p className="text-xs text-gray-400 mb-1">Losing Trades</p>
-            <p className="text-lg font-semibold text-accent-danger">
+          <div className="p-3 bg-white/5 rounded-lg border border-white/10">
+            <p className="text-xs text-white/50 mb-1">Losing Trades</p>
+            <p className="text-base font-semibold text-red-400">
               {summary.losing_trades} ({((summary.losing_trades / summary.total_trades) * 100).toFixed(0)}%)
             </p>
           </div>
 
-          <div className="p-3 bg-dark-bg rounded-lg border border-dark-border">
-            <p className="text-xs text-gray-400 mb-1">Avg Win</p>
-            <p className="text-lg font-semibold text-accent-success">
+          <div className="p-3 bg-white/5 rounded-lg border border-white/10">
+            <p className="text-xs text-white/50 mb-1">Avg Win</p>
+            <p className="text-base font-semibold text-green-400">
               ${summary.avg_win.toFixed(2)}
             </p>
           </div>
 
-          <div className="p-3 bg-dark-bg rounded-lg border border-dark-border">
-            <p className="text-xs text-gray-400 mb-1">Avg Loss</p>
-            <p className="text-lg font-semibold text-accent-danger">
+          <div className="p-3 bg-white/5 rounded-lg border border-white/10">
+            <p className="text-xs text-white/50 mb-1">Avg Loss</p>
+            <p className="text-base font-semibold text-red-400">
               ${summary.avg_loss.toFixed(2)}
             </p>
           </div>
 
-          <div className="p-3 bg-dark-bg rounded-lg border border-dark-border">
-            <p className="text-xs text-gray-400 mb-1">Max Win</p>
-            <p className="text-lg font-semibold text-accent-success">
+          <div className="p-3 bg-white/5 rounded-lg border border-white/10">
+            <p className="text-xs text-white/50 mb-1">Max Win</p>
+            <p className="text-base font-semibold text-green-400">
               ${summary.max_win.toFixed(2)}
             </p>
           </div>
 
-          <div className="p-3 bg-dark-bg rounded-lg border border-dark-border">
-            <p className="text-xs text-gray-400 mb-1">Max Loss</p>
-            <p className="text-lg font-semibold text-accent-danger">
+          <div className="p-3 bg-white/5 rounded-lg border border-white/10">
+            <p className="text-xs text-white/50 mb-1">Max Loss</p>
+            <p className="text-base font-semibold text-red-400">
               ${summary.max_loss.toFixed(2)}
             </p>
           </div>
 
-          <div className="p-3 bg-dark-bg rounded-lg border border-dark-border">
-            <p className="text-xs text-gray-400 mb-1">Avg Days Held</p>
-            <p className="text-lg font-semibold text-white">
+          <div className="p-3 bg-white/5 rounded-lg border border-white/10">
+            <p className="text-xs text-white/50 mb-1">Avg Days Held</p>
+            <p className="text-base font-semibold text-white">
               {summary.avg_days_held} days
             </p>
           </div>
 
-          <div className="p-3 bg-dark-bg rounded-lg border border-dark-border">
-            <p className="text-xs text-gray-400 mb-1">Max Drawdown</p>
-            <p className="text-lg font-semibold text-accent-danger">
+          <div className="p-3 bg-white/5 rounded-lg border border-white/10">
+            <p className="text-xs text-white/50 mb-1">Max Drawdown</p>
+            <p className="text-base font-semibold text-red-400">
               -{summary.max_drawdown.toFixed(2)}%
             </p>
           </div>
 
-          <div className="p-3 bg-dark-bg rounded-lg border border-dark-border">
-            <p className="text-xs text-gray-400 mb-1">Sharpe Ratio</p>
-            <p className="text-lg font-semibold text-white">
+          <div className="p-3 bg-white/5 rounded-lg border border-white/10">
+            <p className="text-xs text-white/50 mb-1">Sharpe Ratio</p>
+            <p className="text-base font-semibold text-white">
               {summary.sharpe_ratio.toFixed(2)}
             </p>
           </div>
 
-          <div className="p-3 bg-dark-bg rounded-lg border border-dark-border">
-            <p className="text-xs text-gray-400 mb-1">Profit Factor</p>
-            <p className={`text-lg font-semibold ${summary.profit_factor >= 1 ? 'text-accent-success' : 'text-accent-danger'}`}>
+          <div className="p-3 bg-white/5 rounded-lg border border-white/10">
+            <p className="text-xs text-white/50 mb-1">Profit Factor</p>
+            <p className={`text-base font-semibold ${summary.profit_factor >= 1 ? 'text-green-400' : 'text-red-400'}`}>
               {summary.profit_factor.toFixed(2)}
             </p>
           </div>
@@ -249,75 +243,72 @@ export default function BacktestResults({ results, insightsConfig }) {
       </div>
 
       {/* Trade History */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-2xl font-light text-fg">📝 Trade History</h3>
+      <div className="mt-4 pt-4 border-t border-white/10">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-light text-white">Trade History</h3>
           {trades.length > 5 && (
             <button
               onClick={() => setShowAllTrades(!showAllTrades)}
-              className="text-sm text-accent-primary hover:text-blue-400 transition-colors"
+              className="text-xs text-accent hover:text-accent/80 transition-colors"
             >
               {showAllTrades ? 'Show Less' : `Show All ${trades.length} Trades`}
             </button>
           )}
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-2">
           {displayedTrades.map((trade) => (
             <div
               key={trade.trade_number}
-              className={`p-4 rounded-lg border ${
+              className={`p-3 rounded-lg border ${
                 trade.pnl > 0
-                  ? 'bg-accent-success/5 border-accent-success/20'
-                  : 'bg-accent-danger/5 border-accent-danger/20'
+                  ? 'bg-green-400/5 border-green-400/20'
+                  : 'bg-red-400/5 border-red-400/20'
               }`}
             >
               {/* Trade Header */}
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">
-                    {trade.pnl > 0 ? '✅' : '❌'}
-                  </span>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
                   <div>
-                    <p className="text-white font-semibold">
+                    <p className="text-sm font-semibold text-white">
                       Trade #{trade.trade_number} • {trade.symbol}
                     </p>
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs text-white/50">
                       {trade.days_held} day{trade.days_held !== 1 ? 's' : ''} held
                     </p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className={`text-xl font-bold ${getReturnColor(trade.pnl)}`}>
+                  <p className={`text-base font-semibold ${getReturnColor(trade.pnl)}`}>
                     {trade.pnl > 0 ? '+' : ''}${trade.pnl.toFixed(2)}
                   </p>
-                  <p className={`text-sm ${getReturnColor(trade.pnl_pct)}`}>
+                  <p className={`text-xs ${getReturnColor(trade.pnl_pct)}`}>
                     {trade.pnl_pct > 0 ? '+' : ''}{trade.pnl_pct.toFixed(2)}%
                   </p>
                 </div>
               </div>
 
               {/* Trade Details Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">
                 {/* Entry */}
-                <div className="bg-dark-bg p-3 rounded-lg">
-                  <p className="text-xs text-gray-400 mb-2">📥 ENTRY</p>
-                  <div className="space-y-1">
+                <div className="bg-white/5 p-2 rounded-lg">
+                  <p className="text-xs text-white/50 mb-1">ENTRY</p>
+                  <div className="space-y-0.5">
                     <div className="flex justify-between">
-                      <span className="text-sm text-gray-400">Date:</span>
-                      <span className="text-sm text-white">{trade.entry_date}</span>
+                      <span className="text-xs text-white/50">Date:</span>
+                      <span className="text-xs text-white">{trade.entry_date}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-sm text-gray-400">Price:</span>
-                      <span className="text-sm text-white">${trade.entry_price}</span>
+                      <span className="text-xs text-white/50">Price:</span>
+                      <span className="text-xs text-white">${trade.entry_price}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-sm text-gray-400">Shares:</span>
-                      <span className="text-sm text-white">{trade.shares}</span>
+                      <span className="text-xs text-white/50">Shares:</span>
+                      <span className="text-xs text-white">{trade.shares}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-sm text-gray-400">Value:</span>
-                      <span className="text-sm text-white">
+                      <span className="text-xs text-white/50">Value:</span>
+                      <span className="text-xs text-white">
                         ${(trade.entry_price * trade.shares).toFixed(2)}
                       </span>
                     </div>
@@ -325,24 +316,24 @@ export default function BacktestResults({ results, insightsConfig }) {
                 </div>
 
                 {/* Exit */}
-                <div className="bg-dark-bg p-3 rounded-lg">
-                  <p className="text-xs text-gray-400 mb-2">📤 EXIT</p>
-                  <div className="space-y-1">
+                <div className="bg-white/5 p-2 rounded-lg">
+                  <p className="text-xs text-white/50 mb-1">EXIT</p>
+                  <div className="space-y-0.5">
                     <div className="flex justify-between">
-                      <span className="text-sm text-gray-400">Date:</span>
-                      <span className="text-sm text-white">{trade.exit_date}</span>
+                      <span className="text-xs text-white/50">Date:</span>
+                      <span className="text-xs text-white">{trade.exit_date}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-sm text-gray-400">Price:</span>
-                      <span className="text-sm text-white">${trade.exit_price}</span>
+                      <span className="text-xs text-white/50">Price:</span>
+                      <span className="text-xs text-white">${trade.exit_price}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-sm text-gray-400">Shares:</span>
-                      <span className="text-sm text-white">{trade.shares}</span>
+                      <span className="text-xs text-white/50">Shares:</span>
+                      <span className="text-xs text-white">{trade.shares}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-sm text-gray-400">Value:</span>
-                      <span className="text-sm text-white">
+                      <span className="text-xs text-white/50">Value:</span>
+                      <span className="text-xs text-white">
                         ${(trade.exit_price * trade.shares).toFixed(2)}
                       </span>
                     </div>
@@ -351,28 +342,25 @@ export default function BacktestResults({ results, insightsConfig }) {
               </div>
 
               {/* Trade Reasoning */}
-              <div className="border-t border-dark-border pt-3 space-y-2">
+              <div className="border-t border-white/10 pt-2 space-y-1">
                 <div className="flex items-start gap-2">
-                  <span className="text-gray-400 text-sm">📍</span>
                   <div className="flex-1">
-                    <p className="text-xs text-gray-400">Entry Reason:</p>
-                    <p className="text-sm text-white">{trade.entry_reason}</p>
+                    <p className="text-xs text-white/50">Entry Reason:</p>
+                    <p className="text-xs text-white">{trade.entry_reason}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-2">
-                  <span className="text-gray-400 text-sm">🎯</span>
                   <div className="flex-1">
-                    <p className="text-xs text-gray-400">Exit Reason:</p>
-                    <p className="text-sm text-white capitalize">
+                    <p className="text-xs text-white/50">Exit Reason:</p>
+                    <p className="text-xs text-white capitalize">
                       {trade.exit_reason.replace('_', ' ')}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-2">
-                  <span className="text-gray-400 text-sm">💰</span>
                   <div className="flex-1">
-                    <p className="text-xs text-gray-400">Capital Impact:</p>
-                    <p className="text-sm text-white">
+                    <p className="text-xs text-white/50">Capital Impact:</p>
+                    <p className="text-xs text-white">
                       ${trade.capital_before.toLocaleString()} → ${trade.capital_after.toLocaleString()}
                     </p>
                   </div>
@@ -383,10 +371,10 @@ export default function BacktestResults({ results, insightsConfig }) {
         </div>
 
         {!showAllTrades && trades.length > 5 && (
-          <div className="mt-4 text-center">
+          <div className="mt-3 text-center">
             <button
               onClick={() => setShowAllTrades(true)}
-              className="btn btn-secondary text-sm"
+              className="px-4 py-2 text-sm font-medium rounded-lg bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
             >
               View {trades.length - 5} More Trades
             </button>

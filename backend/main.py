@@ -397,6 +397,18 @@ async def create_strategy_multi_agent(request: StrategyRequest):
         logger.error(f"❌ Error in multi-agent workflow: {e}")
         import traceback
         traceback.print_exc()
+        
+        # Store error result so frontend can retrieve it
+        if session_id:
+            from job_storage import job_storage
+            error_data = {
+                "success": False,
+                "error": str(e),
+                "message": "Bot generation failed. Please try again."
+            }
+            job_storage.store_result(session_id, error_data)
+            logger.info(f"📦 Stored error result for session {session_id[:8]}")
+        
         raise HTTPException(status_code=500, detail=str(e))
 
 

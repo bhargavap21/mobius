@@ -230,14 +230,14 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
         </div>
       </section>
 
-      {/* Observability Graph */}
+      {/* Performance Comparison Graph */}
       <section className="bg-black pt-0 pb-12 px-6">
         <Suspense fallback={
           <div className="flex items-center justify-center w-full h-[400px]">
             <div className="animate-pulse text-white/50">Loading chart...</div>
           </div>
         }>
-          <ObservabilityGraph />
+          <ObservabilityGraph title="Mobius vs Manual Trading" subtitle="" />
         </Suspense>
       </section>
 

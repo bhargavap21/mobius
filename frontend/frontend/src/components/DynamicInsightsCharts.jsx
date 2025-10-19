@@ -24,14 +24,14 @@ const CustomTooltip = ({ active, payload }) => {
 export default function DynamicInsightsCharts({ additionalInfo, insightsConfig }) {
   if (!additionalInfo || additionalInfo.length === 0) {
     return (
-      <div className="bg-dark-card rounded-xl border border-dark-border p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold text-white">📊 Strategy Insights</h2>
-          <p className="text-sm text-gray-400">AI-generated visualizations</p>
+      <div className="rounded-2xl border border-white/10 bg-[#0e1117] p-5">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-light text-white">Strategy Insights</h2>
+          <p className="text-xs text-white/50">AI-generated visualizations</p>
         </div>
-        <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
-          <p className="text-sm text-blue-400 font-medium">🔄 Strategy processing in progress</p>
-          <p className="text-xs text-blue-300 mt-1">
+        <div className="bg-accent/10 border border-accent/30 rounded-lg p-3">
+          <p className="text-sm text-accent font-medium">Strategy processing in progress</p>
+          <p className="text-xs text-accent/80 mt-1">
             Additional insights and visualizations will appear here once the strategy analysis is complete.
             This may take a few moments while we analyze market data and generate trade signals.
           </p>
@@ -46,19 +46,19 @@ export default function DynamicInsightsCharts({ additionalInfo, insightsConfig }
   }
 
   return (
-    <div className="bg-dark-card rounded-xl border border-dark-border p-6 space-y-6">
+    <div className="rounded-2xl border border-white/10 bg-[#0e1117] p-5 space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-white">📊 Strategy Insights</h2>
-        <p className="text-sm text-gray-400">AI-generated visualizations</p>
+        <h2 className="text-sm font-light text-white">Strategy Insights</h2>
+        <p className="text-xs text-white/50">AI-generated visualizations</p>
       </div>
 
       {/* General insights from LLM */}
       {insightsConfig.insights && insightsConfig.insights.length > 0 && (
-        <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
-          <h3 className="text-sm font-semibold text-blue-400 mb-2">💡 Key Insights</h3>
+        <div className="bg-accent/10 border border-accent/30 rounded-lg p-3">
+          <h3 className="text-xs font-light text-accent mb-2">Key Insights</h3>
           <ul className="space-y-1">
             {insightsConfig.insights.map((insight, idx) => (
-              <li key={idx} className="text-sm text-gray-300">• {insight}</li>
+              <li key={idx} className="text-xs text-gray-300">• {insight}</li>
             ))}
           </ul>
         </div>
@@ -84,22 +84,85 @@ function RenderVisualization({ visualization, data }) {
   const additionalMetrics = data_to_collect?.additional_metrics || []
   const thresholds = data_to_collect?.thresholds || {}
 
-  // Check if data has the required metrics
-  const hasData = data.some(point => {
-    // Check for direct metric
+  // Debug logging (development only)
+  if (process.env.NODE_ENV !== 'production' && data && data.length > 0) {
+    console.log(`[Insights] ${title}:`, {
+      primaryMetric,
+      dataLength: data.length,
+      firstDataPoint: data[0],
+      availableFields: Object.keys(data[0] || {})
+    })
+  }
+
+  // Check if data has the required metrics - more tolerant checking
+  const hasData = data && data.length > 0 && data.some(point => {
+    // If no primary metric specified, assume data is available if we have any datapoints with more than just date/price
+    if (!primaryMetric) {
+      // Check if we have any interesting data beyond the basics
+      const keys = Object.keys(point)
+      return keys.length > 2 || keys.some(k => k !== 'date' && k !== 'price')
+    }
+    
+    // Check for direct metric match
     if (primaryMetric in point && point[primaryMetric] !== undefined && point[primaryMetric] !== null) return true
+    
+    // Check for common field name variations (normalize field names)
+    // Handle sentiment-related fields
+    if (primaryMetric.includes('sentiment') || primaryMetric.includes('tweet')) {
+      if (point.tweet_sentiment_score !== undefined && point.tweet_sentiment_score !== null) return true
+      if (point.sentimentScore !== undefined && point.sentimentScore !== null) return true
+      if (point.sentiment !== undefined && point.sentiment !== null) return true
+      if (point.twitter_sentiment !== undefined && point.twitter_sentiment !== null) return true
+      if (point.reddit_sentiment !== undefined && point.reddit_sentiment !== null) return true
+      if (point.wsb_sentiment_score !== undefined && point.wsb_sentiment_score !== null) return true
+      if (point.elon_tweet_sentiment !== undefined && point.elon_tweet_sentiment !== null) return true
+    }
+    
+    // Handle price-related fields
+    if (primaryMetric.includes('price')) {
+      if (point.price !== undefined && point.price !== null) return true
+      if (point.close !== undefined && point.close !== null) return true
+      if (point.gme_price !== undefined && point.gme_price !== null) return true
+    }
+    
+    // Handle RSI
+    if (primaryMetric.includes('rsi') || primaryMetric.includes('RSI')) {
+      if (point.rsi !== undefined && point.rsi !== null) return true
+      if (point.RSI !== undefined && point.RSI !== null) return true
+    }
+    
+    // Handle MACD
+    if (primaryMetric.includes('macd') || primaryMetric.includes('MACD')) {
+      if (point.macd !== undefined && point.macd !== null) return true
+      if (point.MACD !== undefined && point.MACD !== null) return true
+    }
+    
+    // Handle PnL/profit/loss related fields
+    if (primaryMetric.includes('pnl') || primaryMetric.includes('profit') || primaryMetric.includes('loss') || primaryMetric.includes('return')) {
+      if (point.pnl !== undefined && point.pnl !== null) return true
+      if (point.pnl_pct !== undefined && point.pnl_pct !== null) return true
+      if (point.profit !== undefined && point.profit !== null) return true
+      if (point.return !== undefined && point.return !== null) return true
+      if (point.trade_pnl !== undefined && point.trade_pnl !== null) return true
+      if (point.trade_pnl_percentage !== undefined && point.trade_pnl_percentage !== null) return true
+      if (point.trade_return !== undefined && point.trade_return !== null) return true
+      // Check if we have trade markers with PnL info
+      if (point.trade_entry !== undefined && point.trade_entry !== null) return true
+      if (point.trade_exit !== undefined && point.trade_exit !== null) return true
+    }
     
     // Check for trade-related metrics
     if (primaryMetric === 'trade_positions' && point.has_position !== undefined) return true
     if (primaryMetric === 'stop_loss_level' && point.stop_loss_level !== undefined) return true
     if (primaryMetric === 'exit_condition_analysis' && (point.trade_entry !== null || point.trade_exit !== null)) return true
-    
-    // Check for mock data fields
-    if (primaryMetric === 'wsb_sentiment_score' && point.wsb_sentiment_score !== undefined) return true
-    if (primaryMetric === 'gme_price' && point.gme_price !== undefined) return true
-    if (primaryMetric === 'elon_tweet_sentiment' && point.elon_tweet_sentiment !== undefined) return true
     if (primaryMetric === 'exit_type_percentage' && point.exit_type_percentage !== undefined) return true
     if (primaryMetric === 'tweet_timing' && point.tweet_timing !== undefined) return true
+    
+    // Handle volume
+    if (primaryMetric.includes('volume')) {
+      if (point.volume !== undefined && point.volume !== null) return true
+      if (point.Volume !== undefined && point.Volume !== null) return true
+    }
     
     return false
   })
@@ -112,9 +175,9 @@ function RenderVisualization({ visualization, data }) {
     : undefined
 
   return (
-    <div className="bg-dark-surface rounded-lg p-4 border border-dark-border">
-      <h3 className="text-lg font-semibold text-white mb-2">{title}</h3>
-      <p className="text-sm text-gray-400 mb-4">{description}</p>
+    <div className="bg-white/5 rounded-lg p-3 border border-white/10">
+      <h3 className="text-sm font-light text-white mb-1">{title}</h3>
+      <p className="text-xs text-white/50 mb-3">{description}</p>
 
       <div className="relative">
         <ResponsiveContainer width="100%" height={300}>
@@ -215,10 +278,65 @@ function RenderVisualization({ visualization, data }) {
                 ) : (
                   <Line
                     type="monotone"
-                    dataKey={primaryMetric}
-                    stroke="#3b82f6"
+                    dataKey={(point) => {
+                      // Try primary metric first
+                      if (point[primaryMetric] !== undefined) return point[primaryMetric]
+                      
+                      // Fallback to common field name variations
+                      if (primaryMetric.includes('sentiment') || primaryMetric.includes('tweet')) {
+                        return point.tweet_sentiment_score ?? point.sentimentScore ?? point.sentiment ?? point.twitter_sentiment ?? point.reddit_sentiment ?? 0
+                      }
+                      if (primaryMetric.includes('price')) {
+                        return point.price ?? point.close ?? 0
+                      }
+                      if (primaryMetric.includes('rsi')) {
+                        return point.rsi ?? point.RSI ?? 0
+                      }
+                      if (primaryMetric.includes('macd')) {
+                        return point.macd ?? point.MACD ?? 0
+                      }
+                      if (primaryMetric.includes('pnl') || primaryMetric.includes('profit') || primaryMetric.includes('loss') || primaryMetric.includes('return')) {
+                        // Try direct fields first
+                        if (point.pnl !== undefined) return point.pnl
+                        if (point.pnl_pct !== undefined) return point.pnl_pct
+                        if (point.profit !== undefined) return point.profit
+                        if (point.return !== undefined) return point.return
+                        if (point.trade_pnl !== undefined) return point.trade_pnl
+                        if (point.trade_pnl_percentage !== undefined) return point.trade_pnl_percentage
+                        if (point.trade_return !== undefined) return point.trade_return
+                        // Extract from trade_exit marker if available
+                        if (point.trade_exit && point.trade_exit.pnl_pct !== undefined) return point.trade_exit.pnl_pct
+                        // Only show value on exit points, otherwise null to create gaps
+                        return null
+                      }
+                      if (primaryMetric.includes('volume')) {
+                        return point.volume ?? point.Volume ?? 0
+                      }
+                      
+                      return 0
+                    }}
+                    stroke="#7c3aed"
                     strokeWidth={2}
-                    dot={false}
+                    dot={(props) => {
+                      // Show dots on trade exit points
+                      const { cx, cy, payload } = props
+                      if (payload && payload.trade_exit) {
+                        const pnl = payload.trade_exit.pnl_pct || 0
+                        const color = pnl >= 0 ? '#22c55e' : '#ef4444'
+                        return (
+                          <circle
+                            cx={cx}
+                            cy={cy}
+                            r={5}
+                            fill={color}
+                            stroke="#fff"
+                            strokeWidth={2}
+                          />
+                        )
+                      }
+                      return null
+                    }}
+                    connectNulls={false}
                     name={primaryMetric.replace(/_/g, ' ').toUpperCase()}
                   />
                 )}
@@ -264,8 +382,24 @@ function RenderVisualization({ visualization, data }) {
                   <Line
                     key={`metric-${metricIdx}`}
                     type="monotone"
-                    dataKey={metric}
-                    stroke={metricIdx === 0 ? '#ef4444' : '#22c55e'}
+                    dataKey={(point) => {
+                      // Try direct metric first
+                      if (point[metric] !== undefined) return point[metric]
+                      
+                      // Handle common variations for additional metrics
+                      if (metric.includes('price')) {
+                        return point.price ?? point.close ?? 0
+                      }
+                      if (metric.includes('rsi')) {
+                        return point.rsi ?? point.RSI ?? 0
+                      }
+                      if (metric.includes('macd')) {
+                        return point.macd ?? point.MACD ?? 0
+                      }
+                      
+                      return 0
+                    }}
+                    stroke={metricIdx === 0 ? '#ffffff' : metricIdx === 1 ? '#22c55e' : '#3b82f6'}
                     strokeWidth={2}
                     dot={false}
                     name={metric.replace(/_/g, ' ').toUpperCase()}
