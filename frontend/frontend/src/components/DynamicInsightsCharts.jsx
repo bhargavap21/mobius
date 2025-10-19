@@ -84,14 +84,15 @@ function RenderVisualization({ visualization, data }) {
   const additionalMetrics = data_to_collect?.additional_metrics || []
   const thresholds = data_to_collect?.thresholds || {}
 
-  // ALWAYS log to debug chart issues
-  console.log(`[CHART DEBUG] ${title}:`, {
-    hasData: !!data,
-    dataLength: data?.length || 0,
-    primaryMetric,
-    firstDataPoint: data?.[0],
-    availableFields: data?.[0] ? Object.keys(data[0]) : []
-  })
+  // Debug logging (development only)
+  if (process.env.NODE_ENV !== 'production' && data && data.length > 0) {
+    console.log(`[Insights] ${title}:`, {
+      primaryMetric,
+      dataLength: data.length,
+      firstDataPoint: data[0],
+      availableFields: Object.keys(data[0] || {})
+    })
+  }
 
   // Check if data has the required metrics - more tolerant checking
   const hasData = data && data.length > 0 && data.some(point => {
@@ -278,19 +279,12 @@ function RenderVisualization({ visualization, data }) {
                   <Line
                     type="monotone"
                     dataKey={(point) => {
-                      // Debug logging to find the issue
-                      const value = point[primaryMetric]
-                      if (value === undefined || value === null) {
-                        console.log(`[MISSING FIELD] primaryMetric="${primaryMetric}" not found in point. Available fields:`, Object.keys(point))
+                      // Try exact field name first
+                      if (point[primaryMetric] !== undefined && point[primaryMetric] !== null) {
+                        return point[primaryMetric]
                       }
 
-                      // IMPORTANT: Try exact field name FIRST before pattern matching
-                      if (value !== undefined && value !== null) {
-                        return value
-                      }
-
-                      // Only use fallback pattern matching if exact field doesn't exist
-                      // This prevents "gme_price" from incorrectly matching "price" pattern
+                      // Fallback to common field name variations
                       if (primaryMetric.includes('sentiment') || primaryMetric.includes('tweet')) {
                         return point.tweet_sentiment_score ?? point.sentimentScore ?? point.sentiment ?? point.twitter_sentiment ?? point.reddit_sentiment ?? 0
                       }
