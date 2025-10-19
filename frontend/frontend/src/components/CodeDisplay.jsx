@@ -27,8 +27,8 @@ export default function CodeDisplay({ code, strategyName }) {
     <div className="card">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-lg font-semibold text-white">🐍 Generated Python Code</h2>
-          <p className="text-sm text-gray-400 mt-1">
+          <h2 className="text-2xl font-light text-fg">🐍 Generated Python Code</h2>
+          <p className="text-sm text-fg-muted mt-1">
             {lineCount} lines • Ready to use
           </p>
         </div>
@@ -80,13 +80,13 @@ export default function CodeDisplay({ code, strategyName }) {
       </div>
 
       {/* Usage Instructions */}
-      <div className="mt-6 p-4 bg-dark-bg/50 rounded-lg border border-dark-border">
-        <h3 className="text-sm font-semibold text-white mb-2">🚀 How to use this code:</h3>
-        <ol className="text-sm text-gray-400 space-y-2 list-decimal list-inside">
+      <div className="mt-6 p-4 bg-dark-bg/50 rounded-lg">
+        <h3 className="text-base font-light text-fg mb-2">🚀 How to use this code:</h3>
+        <ol className="text-sm text-fg-muted space-y-2 list-decimal list-inside">
           <li>Download the generated Python file</li>
-          <li>Install required packages: <code className="px-2 py-1 bg-dark-bg rounded text-accent-primary">pip install alpaca-py tweepy textblob python-dotenv</code></li>
-          <li>Add your API keys to <code className="px-2 py-1 bg-dark-bg rounded text-accent-primary">.env</code> file</li>
-          <li>Run: <code className="px-2 py-1 bg-dark-bg rounded text-accent-primary">python {strategyName?.replace(/\s+/g, '_').toLowerCase() || 'trading_bot'}.py</code></li>
+          <li>Install required packages: <code className="px-2 py-1 bg-dark-bg rounded text-accent">pip install alpaca-py tweepy textblob python-dotenv</code></li>
+          <li>Add your API keys to <code className="px-2 py-1 bg-dark-bg rounded text-accent">.env</code> file</li>
+          <li>Run: <code className="px-2 py-1 bg-dark-bg rounded text-accent">python {strategyName?.replace(/\s+/g, '_').toLowerCase() || 'trading_bot'}.py</code></li>
         </ol>
       </div>
     </div>

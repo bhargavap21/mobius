@@ -96,14 +96,107 @@ class TradingBotListItem(BaseModel):
     id: UUID
     name: str
     description: Optional[str] = None
-    is_favorite: bool
+    is_favorite: bool = False
     created_at: datetime
-    updated_at: datetime
 
-    # Summary from backtest results
-    total_trades: Optional[int] = None
-    total_return: Optional[float] = None
-    win_rate: Optional[float] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ============================================================================
+# COMMUNITY MODELS
+# ============================================================================
+
+class SharedAgentBase(BaseModel):
+    """Base shared agent model"""
+    name: str = Field(..., min_length=1, max_length=255)
+    description: str = Field(..., min_length=1, max_length=2000)
+    tags: List[str] = Field(default_factory=list)
+    is_public: bool = True
+
+
+class SharedAgentCreate(SharedAgentBase):
+    """Model for creating a shared agent"""
+    original_bot_id: UUID
+
+
+class SharedAgentUpdate(BaseModel):
+    """Model for updating a shared agent"""
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    description: Optional[str] = Field(None, min_length=1, max_length=2000)
+    tags: Optional[List[str]] = None
+    is_public: Optional[bool] = None
+
+
+class SharedAgent(SharedAgentBase):
+    """Complete shared agent model"""
+    id: UUID
+    original_bot_id: UUID
+    author_id: UUID
+    views: int = 0
+    likes: int = 0
+    downloads: int = 0
+    shared_at: datetime
+    updated_at: datetime
+    liked: bool = False  # Whether current user has liked this agent
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SharedAgentListItem(BaseModel):
+    """Simplified shared agent model for list views"""
+    id: UUID
+    name: str
+    description: str
+    author_id: UUID
+    tags: List[str]
+    views: int
+    likes: int
+    downloads: int
+    shared_at: datetime
+    liked: bool = False
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AgentLike(BaseModel):
+    """Model for agent likes"""
+    id: UUID
+    shared_agent_id: UUID
+    user_id: UUID
+    liked_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AgentDownload(BaseModel):
+    """Model for agent downloads"""
+    id: UUID
+    shared_agent_id: UUID
+    user_id: Optional[UUID] = None
+    downloaded_at: datetime
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ============================================================================
+# RESPONSE MODELS
+# ============================================================================
+
+class PaginatedResponse(BaseModel):
+    """Paginated response model"""
+    items: List[Any]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+class MessageResponse(BaseModel):
+    """Simple message response model"""
+    message: str
+    success: bool = True
 
 
 # ============================================================================

@@ -1,52 +1,157 @@
-import { Brain, Zap, Code, BarChart3, TrendingUp, Check, ArrowRight } from 'lucide-react'
+import { Brain, Zap, Code, BarChart3, TrendingUp, Check } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
+import { useNavigate } from 'react-router-dom'
+import { useState, lazy, Suspense } from 'react'
+import Login from './Login'
+import Signup from './Signup'
 
-export default function LandingPage({ onGetStarted }) {
+const ObservabilityGraph = lazy(() => import('./ObservabilityGraph'))
+
+export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOut, onShowBotLibrary }) {
+  const { isAuthenticated } = useAuth()
+  const navigate = useNavigate()
+  const [showLogin, setShowLogin] = useState(false)
+  const [showSignup, setShowSignup] = useState(false)
+
   const scrollToSection = (id) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  const goToDashboard = () => {
-    if (onGetStarted) {
-      onGetStarted()
-    }
+  const handleBuildBot = () => {
+    // Always navigate to dashboard
+    onGetStarted?.()
   }
 
   return (
     <div className="w-full">
-      {/* Hero Section with 3D */}
-      <section className="w-full h-screen overflow-hidden relative">
-        <iframe
-          src="https://my.spline.design/untitled-d60805fcfc4322f8deb736b6722c1f49/"
-          width="100%"
-          height="100%"
-          className="w-full h-full border-0"
-          title="3D Trading Bot Visualization"
-        />
-
-        {/* CTA Button Overlay */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 text-center">
-          <h1 className="text-5xl md:text-7xl font-light text-white mb-6 drop-shadow-2xl">
-            Trading bots, <span className="italic font-serif">effortlessly.</span>
-          </h1>
-          <p className="text-xl md:text-2xl text-gray-300 mb-8 drop-shadow-lg">
-            Build production-ready algorithms in minutes, not months
-          </p>
+      {/* Navbar - always visible */}
+      <div className="sticky top-0 z-50 flex items-center justify-between px-6 py-6 bg-dark-surface/50 backdrop-blur-sm">
+        <button
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className="text-white hover:opacity-80 transition-opacity -ml-6 pl-6"
+        >
+          <span className="text-2xl font-serif italic">Mobius</span>
+        </button>
+        
+        <div className="flex items-center gap-3">
+          {/* Dashboard & Community buttons - always visible */}
           <button
-            onClick={goToDashboard}
-            className="group px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white text-lg font-medium rounded-full transition-all duration-300 flex items-center gap-2 mx-auto shadow-2xl hover:shadow-blue-500/50 hover:scale-105"
+            onClick={onGetStarted}
+            className="px-4 py-2 text-sm font-light rounded-lg border border-white/20 text-white/80 hover:border-accent hover:text-accent transition-colors"
           >
-            Get Started
-            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            Dashboard
           </button>
+          <button
+            onClick={() => navigate('/community')}
+            className="px-4 py-2 text-sm font-light rounded-lg border border-white/20 text-white/80 hover:border-accent hover:text-accent transition-colors"
+          >
+            Community
+          </button>
+          
+          {isAuthenticated ? (
+            // Authenticated user - show name and settings
+            <div className="flex items-center gap-2 pl-3 border-l border-gray-700">
+              <span className="text-sm text-gray-400">
+                {user?.full_name ? user.full_name.split(' ')[0] : user?.email}
+              </span>
+              <div className="relative group">
+                <button className="text-sm text-gray-400 hover:text-white p-1">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </button>
+                
+                {/* Dropdown Menu */}
+                <div className="absolute right-0 top-full mt-1 w-32 bg-dark-surface rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                  <div className="py-1">
+                    <button
+                      onClick={onShowBotLibrary}
+                      className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-dark-bg hover:text-white transition-colors"
+                    >
+                      📚 My Bots
+                    </button>
+                    <button
+                      onClick={onSignOut}
+                      className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-dark-bg hover:text-red-300 transition-colors"
+                    >
+                      Sign Out
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            // Unauthenticated user - show sign in and sign up buttons
+            <>
+              <button
+                onClick={() => setShowLogin(true)}
+                className="btn btn-secondary text-sm"
+              >
+                Sign In
+              </button>
+              <button
+                onClick={onShowSignup}
+                className="px-4 py-2 bg-white text-black text-sm font-medium rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                Sign Up
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Hero Section with 3D */}
+      <section className="w-full h-screen overflow-hidden relative bg-black">
+        {/* Subtle purple glow background */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 -z-10"
+        >
+          <div className="absolute top-1/4 left-1/4 h-[500px] w-[500px] rounded-full bg-gradient-to-tr from-purple-500/15 to-fuchsia-400/10 blur-3xl" />
+        </div>
+        <div className="max-w-7xl mx-auto h-full px-6 flex items-center">
+          {/* Left side - Text */}
+          <div className="w-1/2 z-10" style={{ isolation: 'isolate', willChange: 'transform', transform: 'translateZ(0)' }}>
+            <h1 className="text-4xl md:text-5xl font-light text-white mb-6 leading-tight">
+              AI-Powered Trading from <em className="italic font-serif text-accent">Strategy</em> to <em className="italic font-serif text-accent">Deployment</em>
+            </h1>
+            <p className="text-xl md:text-2xl text-gray-400 leading-relaxed mb-8">
+              Mobius delivers proven algorithms, automated backtesting, and production-ready code to traders, quants, and developers.
+            </p>
+            <div>
+              <button
+                onClick={handleBuildBot}
+                className="px-12 py-4 bg-white text-black text-lg font-medium rounded-xl hover:bg-accent hover:text-white transition-all inline-flex items-center gap-2"
+                style={{ willChange: 'background-color, color', transform: 'translateZ(0)' }}
+              >
+                Build Bot →
+              </button>
+            </div>
+          </div>
+
+          {/* Right side - 3D Logo */}
+          <div className="w-1/2 h-full absolute -right-30 top-16 flex items-center justify-center" style={{ isolation: 'isolate' }}>
+            <div className="w-full h-full flex items-center justify-center">
+              <iframe
+                src='https://my.spline.design/mobiusmiamisunsetcopy-SKOxlmvEV8x6vDuzNWCJ8AFf/'
+                frameBorder='0'
+                width='100%'
+                height='100%'
+                title="Mobius 3D Logo"
+                style={{ border: 'none' }}
+              />
+            </div>
+          </div>
         </div>
 
         {/* Scroll indicator */}
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 animate-bounce">
           <button
             onClick={() => scrollToSection('process')}
-            className="w-6 h-10 border-2 border-white/30 rounded-full flex items-start justify-center p-2 hover:border-white/50 transition-colors"
+            className="w-6 h-10 rounded-full flex items-start justify-center p-2 hover:opacity-70 transition-opacity"
           >
-            <div className="w-1 h-3 bg-white/50 rounded-full" />
+            <div className="w-1 h-3 bg-accent rounded-full" />
           </button>
         </div>
       </section>
@@ -54,14 +159,19 @@ export default function LandingPage({ onGetStarted }) {
       {/* Process Section */}
       <section id="process" className="bg-black py-24 px-6">
         <div className="max-w-6xl mx-auto">
-          <div className="border border-blue-500/30 rounded-3xl p-12 relative">
+          <div className="rounded-3xl p-12 relative">
+            {/* Subtle purple glow background */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -z-10 h-[400px] w-[400px] rounded-full bg-gradient-to-tr from-purple-500/20 to-fuchsia-400/10 blur-3xl top-0 left-1/3"
+            />
             {/* Header */}
             <div className="text-center mb-16">
               <div className="inline-block px-4 py-2 bg-gray-800/50 rounded-full text-sm text-gray-400 mb-6">
                 Process
               </div>
               <h2 className="text-5xl md:text-6xl font-light text-white mb-4">
-                Trading bots, <span className="italic font-serif">effortlessly.</span>
+                Trading bots, <em className="italic font-serif text-accent">effortlessly.</em>
               </h2>
               <p className="text-xl text-gray-400">
                 Build production-ready algorithms in three effortless steps.
@@ -121,16 +231,27 @@ export default function LandingPage({ onGetStarted }) {
         </div>
       </section>
 
+      {/* Observability Graph */}
+      <section className="bg-black pt-0 pb-12 px-6">
+        <Suspense fallback={
+          <div className="flex items-center justify-center w-full h-[400px]">
+            <div className="animate-pulse text-white/50">Loading chart...</div>
+          </div>
+        }>
+          <ObservabilityGraph />
+        </Suspense>
+      </section>
+
       {/* Features Section */}
       <section className="bg-black py-24 px-6">
         <div className="max-w-6xl mx-auto">
-          <div className="border border-blue-500/30 rounded-3xl p-12 relative">
+          <div className="rounded-3xl p-12 relative">
             <div className="text-center mb-16">
               <div className="inline-block px-4 py-2 bg-gray-800/50 rounded-full text-sm text-gray-400 mb-6">
                 Features
               </div>
               <h2 className="text-5xl md:text-6xl font-light text-white mb-4">
-                Powerful <span className="italic font-serif">Features.</span>
+                Powerful <em className="italic font-serif text-accent">Features.</em>
               </h2>
               <p className="text-xl text-gray-400">
                 Everything you need to build profitable trading algorithms.
@@ -209,8 +330,8 @@ export default function LandingPage({ onGetStarted }) {
                   "Free to get started"
                 ].map((benefit) => (
                   <div key={benefit} className="flex items-start gap-3">
-                    <div className="w-6 h-6 bg-accent-primary/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <Check className="w-4 h-4 text-accent-primary" />
+                    <div className="w-6 h-6 bg-accent/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Check className="w-4 h-4 text-accent" />
                     </div>
                     <span className="text-gray-300">{benefit}</span>
                   </div>
@@ -219,8 +340,8 @@ export default function LandingPage({ onGetStarted }) {
             </div>
 
             <div className="relative">
-              <div className="relative bg-gradient-to-br from-dark-surface to-dark-bg border border-dark-border rounded-2xl p-8 shadow-2xl">
-                <div className="absolute inset-0 bg-gradient-to-br from-accent-primary/10 to-blue-600/10 rounded-2xl" />
+              <div className="relative bg-gradient-to-br from-dark-surface to-dark-bg rounded-2xl p-8">
+                <div className="absolute inset-0 bg-gradient-to-br from-accent/10 to-purple-600/10 rounded-2xl" />
                 <div className="relative">
                   <div className="flex items-center gap-2 mb-4">
                     <div className="w-3 h-3 bg-red-500 rounded-full" />
@@ -258,24 +379,34 @@ class TradingBot:
         </div>
       </section>
 
-      {/* Final CTA Section */}
-      <section className="bg-gradient-to-b from-black to-dark-bg py-24 px-6">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-5xl md:text-6xl font-light text-white mb-6">
-            Ready to build your trading bot?
-          </h2>
-          <p className="text-xl text-gray-400 mb-10">
-            Start creating profitable trading algorithms in minutes
-          </p>
-          <button
-            onClick={goToDashboard}
-            className="group px-10 py-5 bg-blue-600 hover:bg-blue-700 text-white text-xl font-medium rounded-full transition-all duration-300 inline-flex items-center gap-3 shadow-2xl hover:shadow-blue-500/50 hover:scale-105"
-          >
-            Launch Dashboard
-            <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
-          </button>
-        </div>
-      </section>
+      {/* Auth Modals */}
+      {showLogin && (
+        <Login
+          onClose={() => setShowLogin(false)}
+          onSwitchToSignup={() => {
+            setShowLogin(false)
+            setShowSignup(true)
+          }}
+          onSuccess={() => {
+            setShowLogin(false)
+            onGetStarted?.()
+          }}
+        />
+      )}
+
+      {showSignup && (
+        <Signup
+          onClose={() => setShowSignup(false)}
+          onSwitchToLogin={() => {
+            setShowSignup(false)
+            setShowLogin(true)
+          }}
+          onSuccess={() => {
+            setShowSignup(false)
+            onGetStarted?.()
+          }}
+        />
+      )}
     </div>
   )
 }

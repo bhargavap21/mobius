@@ -59,7 +59,7 @@ export default function BacktestResults({ results, insightsConfig }) {
         <div className="flex items-center gap-3 mb-6">
           <span className="text-3xl">📊</span>
           <div>
-            <h2 className="text-2xl font-bold text-white">Backtest Results</h2>
+            <h2 className="text-3xl font-light text-fg">Backtest Results</h2>
             <p className="text-sm text-gray-400">
               {summary.symbol} • {summary.start_date} to {summary.end_date}
             </p>
@@ -121,7 +121,7 @@ export default function BacktestResults({ results, insightsConfig }) {
 
       {/* Portfolio Performance Chart */}
       <div className="card">
-        <h3 className="text-lg font-bold text-white mb-4">📈 Portfolio Value Over Time</h3>
+        <h3 className="text-2xl font-light text-fg mb-4">📈 Portfolio Value Over Time</h3>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={portfolio_history}>
             <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
@@ -173,7 +173,7 @@ export default function BacktestResults({ results, insightsConfig }) {
 
       {/* Detailed Metrics */}
       <div className="card">
-        <h3 className="text-lg font-bold text-white mb-4">📋 Detailed Metrics</h3>
+        <h3 className="text-2xl font-light text-fg mb-4">📋 Detailed Metrics</h3>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="p-3 bg-dark-bg rounded-lg border border-dark-border">
@@ -251,7 +251,7 @@ export default function BacktestResults({ results, insightsConfig }) {
       {/* Trade History */}
       <div className="card">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-white">📝 Trade History</h3>
+          <h3 className="text-2xl font-light text-fg">📝 Trade History</h3>
           {trades.length > 5 && (
             <button
               onClick={() => setShowAllTrades(!showAllTrades)}

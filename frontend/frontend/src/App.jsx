@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { AuthProvider, useAuth } from './context/AuthContext'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { useAuth } from './context/AuthContext'
 import StrategyInput from './components/StrategyInput'
 import CodeDisplay from './components/CodeDisplay'
 import LoadingSpinner from './components/LoadingSpinner'
@@ -19,6 +20,8 @@ function AppContent() {
     return <div className="min-h-screen bg-dark-bg flex items-center justify-center text-white">Loading...</div>
   }
   const { user, isAuthenticated, signout, getAuthHeaders } = auth
+  const navigate = useNavigate()
+  const location = useLocation()
   const [strategy, setStrategy] = useState(null)
   const [generatedCode, setGeneratedCode] = useState(null)
   const [backtestResults, setBacktestResults] = useState(null)
@@ -341,6 +344,11 @@ function AppContent() {
     setCurrentBotId(null)
   }
 
+  const handleSignOut = () => {
+    signout()
+    setShowLanding(true)
+  }
+
   const handleSaveBot = async (autoSave = false) => {
     if (!isAuthenticated) {
       if (!autoSave) setShowLogin(true)
@@ -496,61 +504,13 @@ function AppContent() {
   if (showLanding && !generatedCode && !loading) {
     return (
       <div className="min-h-screen bg-dark-bg">
-        {/* Header */}
-        <header className="border-b border-dark-border bg-dark-surface/50 backdrop-blur-sm sticky top-0 z-50">
-          <div className="max-w-7xl mx-auto px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-accent-primary to-blue-600 rounded-lg flex items-center justify-center">
-                  <span className="text-2xl">🤖</span>
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold text-white">AI Trading Bot Generator</h1>
-                  <p className="text-xs text-gray-400">Transform strategies into code with AI</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                {isAuthenticated ? (
-                  <>
-                    <button
-                      onClick={() => setShowBotLibrary(true)}
-                      className="btn btn-secondary text-sm"
-                    >
-                      📚 My Bots
-                    </button>
-                    <div className="flex items-center gap-2 pl-3 border-l border-gray-700">
-                      <span className="text-sm text-gray-400">{user?.email}</span>
-                      <button
-                        onClick={signout}
-                        className="text-sm text-gray-400 hover:text-white"
-                      >
-                        Sign Out
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => setShowLogin(true)}
-                      className="btn btn-secondary text-sm"
-                    >
-                      Sign In
-                    </button>
-                    <button
-                      onClick={() => setShowSignup(true)}
-                      className="btn btn-primary text-sm"
-                    >
-                      Sign Up
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <LandingPage onGetStarted={handleGetStarted} />
+        <LandingPage
+          onGetStarted={handleGetStarted}
+          onShowSignup={() => setShowSignup(true)}
+          user={user}
+          onSignOut={handleSignOut}
+          onShowBotLibrary={() => setShowBotLibrary(true)}
+        />
 
         {/* Footer */}
         <footer className="border-t border-dark-border py-6">
@@ -567,6 +527,10 @@ function AppContent() {
               setShowLogin(false)
               setShowSignup(true)
             }}
+            onSuccess={() => {
+              setShowLogin(false)
+              setShowLanding(false)
+            }}
           />
         )}
 
@@ -576,6 +540,10 @@ function AppContent() {
             onSwitchToLogin={() => {
               setShowSignup(false)
               setShowLogin(true)
+            }}
+            onSuccess={() => {
+              setShowSignup(false)
+              setShowLanding(false)
             }}
           />
         )}
@@ -588,6 +556,9 @@ function AppContent() {
               handleLoadBot(botData)
               setShowLanding(false)
             }}
+            user={user}
+            onSignOut={handleSignOut}
+            onShowBotLibrary={() => setShowBotLibrary(true)}
           />
         )}
       </div>
@@ -595,90 +566,117 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen bg-dark-bg flex flex-col">
-      {/* Header */}
-      <header className="border-b border-dark-border bg-dark-surface/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="px-12 py-4">
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => setShowLanding(true)}
-              className="flex items-center gap-3 hover:opacity-80 transition-opacity"
-            >
-              <div className="w-10 h-10 bg-gradient-to-br from-accent-primary to-blue-600 rounded-lg flex items-center justify-center">
-                <span className="text-2xl">🤖</span>
-              </div>
-              <div className="text-left">
-                <h1 className="text-xl font-bold text-white">AI Trading Bot Generator</h1>
-                <p className="text-xs text-gray-400">Transform strategies into code with AI</p>
-              </div>
-            </button>
-
-            <div className="flex items-center gap-3">
-              {isAuthenticated ? (
-                <>
-                  <button
-                    onClick={() => setShowBotLibrary(true)}
-                    className="btn btn-secondary text-sm"
-                  >
-                    📚 My Bots
-                  </button>
-                  {generatedCode && backtestResults && (
-                    <button
-                      onClick={handleSaveBot}
-                      className="btn btn-primary text-sm"
-                    >
-                      💾 Save Bot
-                    </button>
-                  )}
-                  {generatedCode && (
-                    <button
-                      onClick={handleReset}
-                      className="btn btn-secondary text-sm"
-                    >
-                      New Strategy
-                    </button>
-                  )}
-                  <div className="flex items-center gap-2 pl-3 border-l border-gray-700">
-                    <span className="text-sm text-gray-400">{user?.email}</span>
-                    <button
-                      onClick={signout}
-                      className="text-sm text-gray-400 hover:text-white"
-                    >
-                      Sign Out
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  {generatedCode && (
-                    <button
-                      onClick={handleReset}
-                      className="btn btn-secondary text-sm"
-                    >
-                      New Strategy
-                    </button>
-                  )}
-                  <button
-                    onClick={() => setShowLogin(true)}
-                    className="btn btn-secondary text-sm"
-                  >
-                    Sign In
-                  </button>
-                  <button
-                    onClick={() => setShowSignup(true)}
-                    className="btn btn-primary text-sm"
-                  >
-                    Sign Up
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-dark-bg">
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="max-w-7xl mx-auto px-6 py-8">
+        {/* Navigation */}
+        <div className="flex items-center justify-between mb-6">
+          {/* Left: Logo */}
+          <button
+            onClick={() => setShowLanding(true)}
+            className="text-white hover:opacity-80 transition-opacity"
+          >
+            <span className="text-2xl font-serif italic">Mobius</span>
+          </button>
+
+          {/* Right: Action Buttons & Auth */}
+          <div className="flex items-center gap-3">
+            {/* Dashboard & Community buttons */}
+            <button
+              onClick={handleGetStarted}
+              className="px-4 py-2 text-sm font-light rounded-lg border border-white/20 transition-colors text-white/80 hover:border-accent hover:text-accent"
+            >
+              Dashboard
+            </button>
+            <button
+              onClick={() => navigate('/community')}
+              className={`px-4 py-2 text-sm font-light rounded-lg border border-white/20 transition-colors ${
+                location.pathname === '/community'
+                  ? 'border-accent text-accent'
+                  : 'text-white/80 hover:border-accent hover:text-accent'
+              }`}
+            >
+              Community
+            </button>
+
+            {isAuthenticated ? (
+              <>
+                {generatedCode && backtestResults && (
+                  <button
+                    onClick={handleSaveBot}
+                    className="btn btn-primary text-sm"
+                  >
+                    💾 Save Bot
+                  </button>
+                )}
+                {generatedCode && (
+                  <button
+                    onClick={handleReset}
+                    className="btn btn-secondary text-sm"
+                  >
+                    New Strategy
+                  </button>
+                )}
+                <div className="flex items-center gap-2 pl-3 border-l border-gray-700">
+                  <span className="text-sm text-gray-400">
+                    {user?.full_name ? user.full_name.split(' ')[0] : user?.email}
+                  </span>
+                  <div className="relative group">
+                    <button className="text-sm text-gray-400 hover:text-white p-1">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    </button>
+
+                    {/* Dropdown Menu */}
+                    <div className="absolute right-0 top-full mt-1 w-32 bg-dark-surface border border-dark-border rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                      <div className="py-1">
+                        <button
+                          onClick={() => setShowBotLibrary(true)}
+                          className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-dark-bg hover:text-white transition-colors"
+                        >
+                          📚 My Bots
+                        </button>
+                        <button
+                          onClick={handleSignOut}
+                          className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-dark-bg hover:text-red-300 transition-colors"
+                        >
+                          Sign Out
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {generatedCode && (
+                  <button
+                    onClick={handleReset}
+                    className="btn btn-secondary text-sm"
+                  >
+                    New Strategy
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowLogin(true)}
+                  className="btn btn-secondary text-sm"
+                >
+                  Sign In
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+        {error && (
+          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400">
+            <p className="font-medium">Error</p>
+            <p className="text-sm mt-1">{error}</p>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center max-w-2xl w-full px-6">
@@ -820,6 +818,9 @@ function AppContent() {
             setShowLogin(false)
             setShowSignup(true)
           }}
+          onSuccess={() => {
+            setShowLogin(false)
+          }}
         />
       )}
 
@@ -830,6 +831,9 @@ function AppContent() {
             setShowSignup(false)
             setShowLogin(true)
           }}
+          onSuccess={() => {
+            setShowSignup(false)
+          }}
         />
       )}
 
@@ -838,18 +842,18 @@ function AppContent() {
         <BotLibrary
           onClose={() => setShowBotLibrary(false)}
           onLoadBot={handleLoadBot}
+          user={user}
+          onSignOut={handleSignOut}
+          onShowBotLibrary={() => setShowBotLibrary(true)}
         />
       )}
+
     </div>
   )
 }
 
 function App() {
-  return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
-  )
+  return <AppContent />
 }
 
 export default App

@@ -62,8 +62,31 @@ def get_social_sentiment_for_date(
     except Exception as e:
         logger.error(f"Error getting real historical sentiment: {e}")
 
-    # If no real data available, log warning
-    logger.warning(f"⚠️ No historical {source} data for {symbol} on {date}")
+    # If no real data available, try mock data fallback
+    logger.warning(f"⚠️ No historical {source} data for {symbol} on {date}, trying mock data")
+    
+    try:
+        if source == 'twitter':
+            from tools.social_media import _mock_twitter_sentiment
+            mock_result = _mock_twitter_sentiment(symbol)
+            if mock_result and mock_result.get('success'):
+                mock_sentiment = mock_result.get('avg_sentiment', 0.0)
+                cache[cache_key] = mock_sentiment
+                logger.info(f"✅ Mock {source} sentiment for {symbol} on {date}: {mock_sentiment:.2f}")
+                return mock_sentiment
+        elif source == 'reddit':
+            from tools.social_media import _mock_reddit_sentiment
+            mock_result = _mock_reddit_sentiment(symbol)
+            if mock_result and mock_result.get('success'):
+                mock_sentiment = mock_result.get('avg_sentiment', 0.0)
+                cache[cache_key] = mock_sentiment
+                logger.info(f"✅ Mock {source} sentiment for {symbol} on {date}: {mock_sentiment:.2f}")
+                return mock_sentiment
+    except Exception as e:
+        logger.error(f"Error getting mock {source} sentiment: {e}")
+    
+    # If mock data also fails, return None
+    logger.warning(f"⚠️ No mock {source} data available for {symbol} on {date}")
     cache[cache_key] = None
     return None
 

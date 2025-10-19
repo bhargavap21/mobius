@@ -5,10 +5,43 @@
   --color-dark-surface: #1a1a1a;
   --color-dark-border: #2a2a2a;
   --color-dark-hover: #252525;
-  --color-accent-primary: #3b82f6;
+  --color-accent: #7c3aed;
+  --color-accent-primary: #7c3aed;
+  --color-accent-light: #8b5cf6;
+  --color-accent-dark: #5b21b6;
+  --color-accent-600: #9333ea;
+  --color-accent-400: #c084fc;
   --color-accent-success: #10b981;
   --color-accent-warning: #f59e0b;
   --color-accent-danger: #ef4444;
+  --color-fg: #e5e7eb;
+  --color-fg-muted: #9ca3af;
+  --color-line: #23262f;
+}
+
+/* Purple accent for italic/emphasized text */
+em,
+.italic {
+  color: var(--color-accent);
+  font-style: italic;
+}
+
+/* Global link styling */
+a,
+.link {
+  color: var(--color-accent);
+  transition: color 0.2s;
+}
+
+a:hover,
+.link:hover {
+  color: var(--color-accent-400);
+}
+
+/* Focus rings */
+:focus-visible {
+  outline: 2px solid var(--color-accent-400);
+  outline-offset: 2px;
 }
 
 /* Ensure text inputs are white */
@@ -34,14 +67,14 @@ input::placeholder {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  background: linear-gradient(135deg, #6d28d9 0%, #7c3aed 100%);
   color: white;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  background: linear-gradient(135deg, #5b21b6 0%, #6d28d9 100%);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.5);
 }
 
 .btn-secondary {
@@ -54,10 +87,10 @@ input::placeholder {
   background: #353535;
 }
 
-/* Card styles */
+/* Card styles - no borders */
 .card {
   background: rgba(26, 26, 26, 0.5);
-  border: 1px solid #2a2a2a;
+  border: none;
   border-radius: 1rem;
   padding: 1.5rem;
   backdrop-filter: blur(10px);
@@ -90,4 +123,26 @@ input::placeholder {
 
 .animate-pulse-slow {
   animation: pulseSlow 4s ease-in-out infinite;
+}
+
+/* Spline embed styling - optimized for performance */
+.spline-embed {
+  /* Zoom out to show the entire scene */
+  transform: scale(0.8) translateY(-5%) translateZ(0);
+  transform-origin: center center;
+  will-change: transform;
+  /* Isolate to its own layer for better performance */
+  contain: layout style paint;
+  /* Reduce repaints */
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  /* Hardware acceleration */
+  -webkit-transform: scale(0.8) translateY(-5%) translateZ(0);
+}
+
+@media (max-width: 768px) {
+  .spline-embed {
+    transform: scale(0.9) translateY(-3%) translateZ(0);
+    -webkit-transform: scale(0.9) translateY(-3%) translateZ(0);
+  }
 }
