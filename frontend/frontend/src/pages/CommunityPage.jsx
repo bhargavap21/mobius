@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { Share2, Users, Star, TrendingUp, Eye, Download, Heart, ArrowLeft, Plus, Save, Sparkles } from 'lucide-react'
+import { Share2, Users, Star, TrendingUp, Eye, Download, Heart, ArrowLeft, Save, Sparkles } from 'lucide-react'
 
 export default function CommunityPage({ userAgents = [], loadingBots = false }) {
   const navigate = useNavigate()
@@ -214,10 +214,6 @@ export default function CommunityPage({ userAgents = [], loadingBots = false }) 
     navigate(`/?remix=${agentId}`)
   }
 
-  const handleGoCreateAgents = () => {
-    navigate('/')
-  }
-
   return (
     <div className="min-h-screen bg-dark-bg">
       {/* Navbar */}
@@ -284,19 +280,9 @@ export default function CommunityPage({ userAgents = [], loadingBots = false }) 
       {/* Header */}
       <div className="bg-dark-bg border-b border-dark-border">
         <div className="max-w-7xl mx-auto px-6 py-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-semibold text-white mb-2">Community</h1>
-              <p className="text-gray-400">Share your trading agents and discover strategies from other traders</p>
-            </div>
-
-            <button
-              onClick={handleGoCreateAgents}
-              className="px-6 py-3 rounded-lg bg-accent text-white hover:bg-accent/90 transition-colors flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Create Agents
-            </button>
+          <div>
+            <h1 className="text-3xl md:text-4xl font-light tracking-tight text-white mb-2">Community</h1>
+            <p className="text-base text-gray-400">Share your trading agents and discover strategies from other traders</p>
           </div>
         </div>
       </div>
@@ -357,7 +343,7 @@ export default function CommunityPage({ userAgents = [], loadingBots = false }) 
                 Browse Community Instead
               </button>
               <button
-                onClick={handleGoCreateAgents}
+                onClick={() => navigate('/')}
                 className="bg-accent-primary text-white px-6 py-3 rounded-lg hover:bg-accent-primary/90 transition-colors"
               >
                 Create Your First Agent
