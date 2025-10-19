@@ -166,6 +166,14 @@ function AppContent() {
     } catch (err) {
       console.error('Error during job submission:', err)
 
+      // If error message indicates job FAILED (not just connection issue), don't poll
+      if (err.message && (err.message.includes('500') || err.message.includes('400'))) {
+        console.error('Job failed on backend, not polling')
+        setError(err.message)
+        setLoading(false)
+        return
+      }
+
       // If we have a session ID, try to retrieve the result
       // (job may have completed even if connection dropped)
       if (newSessionId) {
@@ -201,7 +209,7 @@ function AppContent() {
         }
       }
 
-      // Start polling for result
+      // Start polling for result (only for connection issues, not backend failures)
       if (newSessionId && useMultiAgent) {
         console.log('⏱️  Starting polling for job completion...')
         pollForResult(newSessionId)
