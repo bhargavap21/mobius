@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import { Share2, Users, Star, TrendingUp, Eye, Download, Heart, ArrowLeft, Plus, Save, Sparkles } from 'lucide-react'
 
-export default function CommunityPage({ userAgents = [], isAuthenticated = false }) {
+export default function CommunityPage({ userAgents = [], isAuthenticated = false, loadingBots = false }) {
   const navigate = useNavigate()
+  const { user, getAuthHeaders } = useAuth()
   const [activeTab, setActiveTab] = useState('shared')
   const [sharedAgents, setSharedAgents] = useState([])
   const [loading, setLoading] = useState(false)
@@ -33,20 +35,47 @@ export default function CommunityPage({ userAgents = [], isAuthenticated = false
 
   const handleShareAgent = async (agentData) => {
     try {
+      console.log('📤 Sharing agent:', agentData)
+      console.log('👤 Current user:', user)
+      console.log('👤 User ID:', user?.id)
+      console.log('👤 Auth headers:', getAuthHeaders())
+      
+      const requestData = {
+        ...agentData,
+        user_id: user?.id || "demo_user"
+      }
+      console.log('📤 Request data:', requestData)
+      
       const response = await fetch('http://localhost:8000/api/community/share', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...getAuthHeaders(),
         },
-        body: JSON.stringify(agentData),
+        body: JSON.stringify(requestData),
       })
 
       if (response.ok) {
+        const result = await response.json()
+        console.log('✅ Agent shared successfully:', result)
+        
+        // Show success message
+        alert('✅ Agent shared successfully!')
+        
+        // Switch back to shared agents tab and refresh
+        setActiveTab('shared')
+        fetchSharedAgents()
+        
+        // Reset the form
         setShowShareForm(false)
-        fetchSharedAgents() // Refresh the list
+      } else {
+        const errorText = await response.text()
+        console.error('❌ Failed to share agent:', response.status, errorText)
+        alert(`❌ Failed to share agent: ${response.status} ${errorText}`)
       }
     } catch (error) {
-      console.error('Error sharing agent:', error)
+      console.error('❌ Error sharing agent:', error)
+      alert('❌ Error sharing agent. Please try again.')
     }
   }
 
@@ -141,20 +170,22 @@ export default function CommunityPage({ userAgents = [], isAuthenticated = false
         const agentConfig = await response.json()
         
         // Save to user's bot collection
-        const saveResponse = await fetch('http://localhost:8000/api/bots', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            name: `${agentConfig.name} (Saved)`,
-            description: `Saved from community: ${agentConfig.description}`,
-            strategy_config: agentConfig.strategy,
-            backtest_results: agentConfig.backtest_results,
-            source: 'community',
-            original_agent_id: agentId
-          }),
-        })
+          const saveResponse = await fetch('http://localhost:8000/api/bots', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...getAuthHeaders(),
+            },
+            body: JSON.stringify({
+              name: `${agentConfig.name} (Saved)`,
+              description: `Saved from community: ${agentConfig.description}`,
+              strategy_config: agentConfig.strategy,
+              backtest_results: agentConfig.backtest_results,
+              source: 'community',
+              original_agent_id: agentId,
+              user_id: user?.id || "demo_user"
+            }),
+          })
 
         if (saveResponse.ok) {
           console.log(`✅ Agent saved to My Bots: ${agentId}`)
@@ -289,6 +320,7 @@ export default function CommunityPage({ userAgents = [], isAuthenticated = false
             userAgents={userAgents}
             onShare={handleShareAgent}
             onCancel={() => setActiveTab('shared')}
+            loadingBots={loadingBots}
           />
         )}
       </div>
@@ -537,21 +569,34 @@ function AgentPlacard({ agent, onLike, onDownload, onSaveToMyBots, onRemix, isAu
 }
 
 // Share Agent Form Component
-function ShareAgentForm({ userAgents, onShare, onCancel }) {
+function ShareAgentForm({ userAgents, onShare, onCancel, loadingBots = false }) {
   const [selectedAgent, setSelectedAgent] = useState('')
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [tags, setTags] = useState('')
+
+  // Reset form when agent is selected
+  useEffect(() => {
+    if (selectedAgent) {
+      const agent = userAgents.find(a => a.id === selectedAgent)
+      if (agent) {
+        setName(agent.name || '')
+        setDescription(agent.description || '')
+        setTags('')
+      }
+    }
+  }, [selectedAgent, userAgents])
 
   const handleSubmit = (e) => {
     e.preventDefault()
     if (!selectedAgent || !name || !description) return
 
     const agentData = {
-      original_bot_id: selectedAgent,
+      agent_id: selectedAgent,
       name,
       description,
-      tags: tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0)
+      tags: tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0),
+      is_public: true
     }
 
     onShare(agentData)
@@ -571,13 +616,24 @@ function ShareAgentForm({ userAgents, onShare, onCancel }) {
             onChange={(e) => setSelectedAgent(e.target.value)}
             className="w-full px-3 py-2 bg-dark-bg border border-dark-border rounded-lg text-white focus:outline-none focus:border-accent-primary"
             required
+            disabled={loadingBots}
           >
-            <option value="">Choose an agent...</option>
-            {userAgents.map((agent) => (
-              <option key={agent.id} value={agent.id}>
-                {agent.name} - {agent.description}
-              </option>
-            ))}
+            <option value="">
+              {loadingBots ? "Loading your bots..." : "Choose an agent..."}
+            </option>
+            {userAgents.length === 0 && !loadingBots && (
+              <option value="" disabled>No bots found. Create some bots first!</option>
+            )}
+            {userAgents.map((agent) => {
+              const returnText = agent.totalReturn !== null 
+                ? ` - ${agent.totalReturn > 0 ? '+' : ''}${agent.totalReturn.toFixed(1)}% return`
+                : ''
+              return (
+                <option key={agent.id} value={agent.id}>
+                  {agent.name}{returnText}
+                </option>
+              )
+            })}
           </select>
         </div>
 
