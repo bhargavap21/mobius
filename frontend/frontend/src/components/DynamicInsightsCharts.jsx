@@ -1,4 +1,4 @@
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Area, ComposedChart } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Area, ComposedChart, Scatter } from 'recharts'
 
 // Custom tooltip defined outside component to avoid React version issues
 const CustomTooltip = ({ active, payload }) => {
@@ -168,11 +168,32 @@ function RenderVisualization({ visualization, data }) {
   })
 
 
-  // Get y-axis config
+  // Get y-axis config with intelligent defaults
   const yAxisConfig = chart_config?.y_axis || {}
-  const yDomain = yAxisConfig.min !== undefined && yAxisConfig.max !== undefined
-    ? [yAxisConfig.min, yAxisConfig.max]
-    : undefined
+
+  // Determine if we need dual Y-axes (sentiment + price scenario)
+  const needsDualAxis = additionalMetrics.some(metric =>
+    (metric.includes('price') || metric.includes('close')) &&
+    (primaryMetric.includes('sentiment') || primaryMetric.includes('rsi') || primaryMetric.includes('percentage'))
+  )
+
+  // Auto-detect appropriate Y-axis domain based on data type
+  let yDomain = undefined
+  let yDomainRight = undefined
+
+  if (yAxisConfig.min !== undefined && yAxisConfig.max !== undefined) {
+    yDomain = [yAxisConfig.min, yAxisConfig.max]
+  } else if (primaryMetric && data && data.length > 0) {
+    // Auto-calculate domain based on metric type
+    if (primaryMetric.includes('sentiment') || primaryMetric.includes('tweet')) {
+      yDomain = [-1, 1]  // Sentiment scores are typically -1 to 1
+    } else if (primaryMetric.includes('rsi') || primaryMetric.includes('RSI')) {
+      yDomain = [0, 100]  // RSI is 0-100
+    } else if (primaryMetric.includes('percentage') || primaryMetric.includes('pct')) {
+      yDomain = [0, 100]  // Percentages are 0-100
+    }
+    // For price and other metrics, let Recharts auto-scale
+  }
 
   return (
     <div className="bg-white/5 rounded-lg p-3 border border-white/10">
@@ -193,11 +214,22 @@ function RenderVisualization({ visualization, data }) {
               }}
             />
             <YAxis
+              yAxisId="left"
               stroke="#888"
               tick={{ fill: '#888', fontSize: 12 }}
               domain={yDomain}
               label={yAxisConfig.label ? { value: yAxisConfig.label, angle: -90, position: 'insideLeft', style: { fill: '#888' } } : undefined}
             />
+            {needsDualAxis && (
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                stroke="#888"
+                tick={{ fill: '#888', fontSize: 12 }}
+                domain={yDomainRight}
+                label={{ value: 'Price ($)', angle: 90, position: 'insideRight', style: { fill: '#888' } }}
+              />
+            )}
             <Tooltip content={<CustomTooltip />} />
             <Legend wrapperStyle={{ paddingTop: '20px' }} iconType="line" />
 
@@ -277,6 +309,7 @@ function RenderVisualization({ visualization, data }) {
                   </>
                 ) : (
                   <Line
+                    yAxisId="left"
                     type="monotone"
                     dataKey={(point) => {
                       // Try exact field name first
@@ -286,7 +319,7 @@ function RenderVisualization({ visualization, data }) {
 
                       // Fallback to common field name variations
                       if (primaryMetric.includes('sentiment') || primaryMetric.includes('tweet')) {
-                        return point.tweet_sentiment_score ?? point.sentimentScore ?? point.sentiment ?? point.twitter_sentiment ?? point.reddit_sentiment ?? 0
+                        return point.tweet_sentiment_score ?? point.sentimentScore ?? point.sentiment ?? point.twitter_sentiment ?? point.reddit_sentiment ?? point.wsb_sentiment_score ?? 0
                       }
                       if (primaryMetric.includes('price')) {
                         return point.price ?? point.close ?? 0
@@ -314,14 +347,26 @@ function RenderVisualization({ visualization, data }) {
                       if (primaryMetric.includes('volume')) {
                         return point.volume ?? point.Volume ?? 0
                       }
-                      
+
                       return 0
                     }}
                     stroke="#7c3aed"
                     strokeWidth={2}
                     dot={(props) => {
-                      // Show dots on trade exit points
+                      // Show dots on trade entry/exit points
                       const { cx, cy, payload } = props
+                      if (payload && payload.trade_entry) {
+                        return (
+                          <circle
+                            cx={cx}
+                            cy={cy}
+                            r={6}
+                            fill="#22c55e"
+                            stroke="#fff"
+                            strokeWidth={2}
+                          />
+                        )
+                      }
                       if (payload && payload.trade_exit) {
                         const pnl = payload.trade_exit.pnl_pct || 0
                         const color = pnl >= 0 ? '#22c55e' : '#ef4444'
@@ -379,34 +424,40 @@ function RenderVisualization({ visualization, data }) {
                   </>
                 )}
 
-                {/* Additional metrics */}
-                {additionalMetrics.map((metric, metricIdx) => (
-                  <Line
-                    key={`metric-${metricIdx}`}
-                    type="monotone"
-                    dataKey={(point) => {
-                      // Try direct metric first
-                      if (point[metric] !== undefined) return point[metric]
-                      
-                      // Handle common variations for additional metrics
-                      if (metric.includes('price')) {
-                        return point.price ?? point.close ?? 0
-                      }
-                      if (metric.includes('rsi')) {
-                        return point.rsi ?? point.RSI ?? 0
-                      }
-                      if (metric.includes('macd')) {
-                        return point.macd ?? point.MACD ?? 0
-                      }
-                      
-                      return 0
-                    }}
-                    stroke={metricIdx === 0 ? '#ffffff' : metricIdx === 1 ? '#22c55e' : '#3b82f6'}
-                    strokeWidth={2}
-                    dot={false}
-                    name={metric.replace(/_/g, ' ').toUpperCase()}
-                  />
-                ))}
+                {/* Additional metrics - use right axis for price if dual axis mode */}
+                {additionalMetrics.map((metric, metricIdx) => {
+                  const isPrice = metric.includes('price') || metric.includes('close')
+                  const useRightAxis = needsDualAxis && isPrice
+
+                  return (
+                    <Line
+                      key={`metric-${metricIdx}`}
+                      yAxisId={useRightAxis ? 'right' : 'left'}
+                      type="monotone"
+                      dataKey={(point) => {
+                        // Try direct metric first
+                        if (point[metric] !== undefined) return point[metric]
+
+                        // Handle common variations for additional metrics
+                        if (metric.includes('price')) {
+                          return point.price ?? point.close ?? point.gme_price ?? point.tsla_price ?? 0
+                        }
+                        if (metric.includes('rsi')) {
+                          return point.rsi ?? point.RSI ?? 0
+                        }
+                        if (metric.includes('macd')) {
+                          return point.macd ?? point.MACD ?? 0
+                        }
+
+                        return 0
+                      }}
+                      stroke={isPrice ? '#ffffff' : metricIdx === 1 ? '#22c55e' : '#3b82f6'}
+                      strokeWidth={isPrice ? 3 : 2}
+                      dot={false}
+                      name={metric.replace(/_/g, ' ').toUpperCase()}
+                    />
+                  )
+                })}
               </>
             )}
           </ComposedChart>

@@ -409,12 +409,16 @@ class Backtester:
                 info_point['position_unrealized_pnl_pct'] = round(((price - position['entry_price']) / position['entry_price']) * 100, 2)
                 
                 # Calculate and track stop loss level
-                stop_loss_pct = exit_conditions.get('stop_loss', 0.01) or 0.01  # Default 1%, handle None
+                stop_loss_pct = exit_conditions.get('stop_loss')
+                if stop_loss_pct is None or stop_loss_pct == 0:
+                    stop_loss_pct = 0.01  # Default 1%
                 stop_loss_price = position['entry_price'] * (1 - stop_loss_pct)
                 info_point['stop_loss_level'] = round(stop_loss_price, 2)
 
                 # Track take profit level
-                take_profit_pct = exit_conditions.get('take_profit', 0.02) or 0.02  # Default 2%, handle None
+                take_profit_pct = exit_conditions.get('take_profit')
+                if take_profit_pct is None or take_profit_pct == 0:
+                    take_profit_pct = 0.02  # Default 2%
                 take_profit_price = position['entry_price'] * (1 + take_profit_pct)
                 info_point['take_profit_level'] = round(take_profit_price, 2)
             else:
