@@ -334,7 +334,7 @@ async def progress_stream(session_id: str):
 
 
 @app.post("/api/strategy/create_multi_agent")
-async def create_strategy_multi_agent(request: StrategyRequest):
+async def create_strategy_multi_agent(request: StrategyRequest, fast_mode: bool = False):
     """
     Create and optimize a trading strategy using multi-agent system
 
@@ -363,11 +363,16 @@ async def create_strategy_multi_agent(request: StrategyRequest):
 
         supervisor = SupervisorAgent()
 
+        # Adjust parameters based on fast mode
+        days = 30 if fast_mode else 90  # Ultra-fast mode uses only 30 days
+        initial_capital = 10000
+        
         result = await supervisor.process({
             'user_query': request.strategy_description,
-            'days': 180,
-            'initial_capital': 10000,
-            'session_id': session_id  # Pass session ID for progress updates
+            'days': days,
+            'initial_capital': initial_capital,
+            'session_id': session_id,  # Pass session ID for progress updates
+            'fast_mode': fast_mode
         })
 
         if not result.get('success'):

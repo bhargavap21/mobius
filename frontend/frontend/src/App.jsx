@@ -80,8 +80,9 @@ function AppContent() {
 
   // View state - show landing page by default
   const [showLanding, setShowLanding] = useState(true)
+  const [fastMode, setFastMode] = useState(false)
 
-  const handleGenerateStrategy = async (userInput, useMultiAgent = true) => {
+  const handleGenerateStrategy = async (userInput, useMultiAgent = true, useFastMode = false) => {
     setLoading(true)
     setError(null)
     setBacktestResults(null)
@@ -105,7 +106,10 @@ function AppContent() {
         setProgressSteps(['🚀 Starting multi-agent workflow...'])
       }
 
-      const response = await fetch(endpoint, {
+      // Add fast mode parameter to URL
+      const url = useFastMode ? `${endpoint}?fast_mode=true` : endpoint
+      
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -706,7 +710,7 @@ function AppContent() {
           </div>
         ) : !generatedCode ? (
           <div className="max-w-7xl mx-auto px-6 py-8 w-full">
-            <StrategyInput onGenerate={handleGenerateStrategy} />
+            <StrategyInput onGenerate={handleGenerateStrategy} fastMode={fastMode} onFastModeChange={setFastMode} />
           </div>
         ) : (
           <div className="flex flex-1 gap-0 overflow-hidden">

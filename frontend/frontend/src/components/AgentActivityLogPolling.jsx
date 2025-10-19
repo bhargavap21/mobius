@@ -8,23 +8,55 @@ const AgentActivityLogPolling = ({ sessionId, onComplete }) => {
   const [autoScroll, setAutoScroll] = useState(true)
   const scrollRef = useRef(null)
   const eventIndexRef = useRef(0) // Use ref to persist across renders
+  const abortControllerRef = useRef(null) // Add abort controller for request cancellation
+  const isPollingRef = useRef(false) // Prevent concurrent requests
+  const retryCountRef = useRef(0) // Track retry attempts
+  const maxRetries = 3 // Maximum retry attempts
+  const circuitBreakerRef = useRef(false) // Circuit breaker to temporarily stop polling
 
   useEffect(() => {
     if (!sessionId) return
 
     let intervalId
     eventIndexRef.current = 0 // Reset for new session
+    retryCountRef.current = 0 // Reset retry counter for new session
+    circuitBreakerRef.current = false // Reset circuit breaker for new session
 
     const pollForEvents = async () => {
+      // Check circuit breaker
+      if (circuitBreakerRef.current) {
+        console.log('[AgentActivityLogPolling] Circuit breaker open, skipping request')
+        return
+      }
+
+      // Prevent concurrent requests
+      if (isPollingRef.current) {
+        console.log('[AgentActivityLogPolling] Request already in progress, skipping...')
+        return
+      }
+
+      isPollingRef.current = true
+
       try {
+        // Cancel any existing request
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort()
+        }
+
+        // Create new abort controller
+        abortControllerRef.current = new AbortController()
+
         const url = `http://localhost:8000/api/strategy/events/${sessionId}?from=${eventIndexRef.current}`
         console.log('[AgentActivityLogPolling] Polling:', url, 'from index:', eventIndexRef.current)
-        const response = await fetch(url)
+        
+        const response = await fetch(url, {
+          signal: abortControllerRef.current.signal,
+          timeout: 5000 // 5 second timeout
+        })
 
         if (!response.ok) {
           if (response.status === 404) {
             console.log('[AgentActivityLogPolling] Session not found yet (404), will retry...')
-            // Session not found yet, keep polling
             return
           }
           throw new Error(`HTTP error! status: ${response.status}`)
@@ -32,6 +64,10 @@ const AgentActivityLogPolling = ({ sessionId, onComplete }) => {
 
         const data = await response.json()
         console.log('[AgentActivityLogPolling] Poll response:', data)
+
+        // Reset retry counter on successful request
+        retryCountRef.current = 0
+        setError(null)
 
         if (data.events && data.events.length > 0) {
           console.log('[AgentActivityLogPolling] Received', data.events.length, 'new events')
@@ -54,20 +90,49 @@ const AgentActivityLogPolling = ({ sessionId, onComplete }) => {
           }
         }
       } catch (error) {
-        console.error('[AgentActivityLogPolling] Error polling for events:', error)
-        setError(error.message)
+        if (error.name === 'AbortError') {
+          console.log('[AgentActivityLogPolling] Request aborted')
+          return
+        }
+        
+        retryCountRef.current += 1
+        console.error('[AgentActivityLogPolling] Error polling for events:', error, `(attempt ${retryCountRef.current}/${maxRetries})`)
+        
+        if (retryCountRef.current >= maxRetries) {
+          setError(`Failed to connect after ${maxRetries} attempts. Please refresh the page.`)
+          console.error('[AgentActivityLogPolling] Max retries exceeded, opening circuit breaker')
+          circuitBreakerRef.current = true
+          
+          // Reset circuit breaker after 30 seconds
+          setTimeout(() => {
+            circuitBreakerRef.current = false
+            retryCountRef.current = 0
+            console.log('[AgentActivityLogPolling] Circuit breaker reset, resuming polling')
+          }, 30000)
+          
+          return
+        }
+        
+        // Reset error after successful retry
+        setError(null)
+      } finally {
+        isPollingRef.current = false
       }
     }
 
     // Start polling immediately
     pollForEvents()
 
-    // Poll every 1000ms (1 second) - reduced from 300ms to prevent ERR_INSUFFICIENT_RESOURCES
-    intervalId = setInterval(pollForEvents, 1000)
+    // Poll every 2000ms (2 seconds) to prevent resource exhaustion
+    intervalId = setInterval(pollForEvents, 2000)
 
     return () => {
       if (intervalId) {
         clearInterval(intervalId)
+      }
+      // Cancel any pending requests on cleanup
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
       }
     }
   }, [sessionId, onComplete])

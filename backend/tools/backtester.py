@@ -270,7 +270,7 @@ class Backtester:
         if stop_loss:
             logger.info(f"Stop loss: {stop_loss*100:.1f}%")
 
-        # Fetch historical data
+        # Fetch historical data with optimized caching
         df = self.get_historical_data(symbol, start_date, end_date)
 
         if df.empty:

@@ -37,7 +37,7 @@ class SupervisorAgent(BaseAgent):
         self.backtest_runner = BacktestRunnerAgent()
         self.strategy_analyst = StrategyAnalystAgent()
         self.insights_generator = InsightsGeneratorAgent()
-        self.max_iterations = 3  # Reduced from 5 to 3 for faster performance
+        self.max_iterations = 1  # Reduced to 1 for fastest performance - users can refine manually if needed
 
         # Initialize intelligent orchestrator for data-driven learning
         self.orchestrator = IntelligentOrchestrator()
