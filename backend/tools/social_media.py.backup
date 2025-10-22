@@ -1,0 +1,338 @@
+"""
+Social Media Tools - Reddit, Twitter sentiment analysis
+
+Monitor social media for stock mentions and sentiment
+"""
+
+import logging
+import re
+from datetime import datetime, timedelta
+from typing import Dict, List, Any, Optional
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+from config import settings
+
+logger = logging.getLogger(__name__)
+
+# Initialize sentiment analyzer
+sentiment_analyzer = SentimentIntensityAnalyzer()
+
+
+def get_reddit_sentiment(
+    ticker: str,
+    subreddit: str = "wallstreetbets",
+    limit: int = 100,
+    hours: int = 24,
+) -> Dict[str, Any]:
+    """
+    Get Reddit sentiment for a stock ticker
+
+    Args:
+        ticker: Stock ticker symbol (e.g., "TSLA", "AAPL")
+        subreddit: Subreddit to search (default: wallstreetbets)
+        limit: Max posts to analyze
+        hours: Time window in hours
+
+    Returns:
+        Sentiment analysis results
+    """
+    try:
+        logger.info(
+            f"🔴 Analyzing Reddit sentiment for {ticker} in r/{subreddit} (last {hours}h)"
+        )
+
+        # Check if Reddit credentials are configured
+        if not settings.reddit_client_id or not settings.reddit_client_secret:
+            logger.error("❌ Reddit API not configured - no mock data available")
+            return {
+                "success": False,
+                "error": "Reddit API credentials not configured. Please add REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET to .env",
+                "ticker": ticker,
+            }
+
+        import praw
+
+        # Initialize Reddit client
+        reddit = praw.Reddit(
+            client_id=settings.reddit_client_id,
+            client_secret=settings.reddit_client_secret,
+            user_agent=settings.reddit_user_agent,
+        )
+
+        subreddit_obj = reddit.subreddit(subreddit)
+
+        mentions = 0
+        sentiment_scores = []
+        post_details = []
+
+        # Try multiple search patterns for better results
+        ticker_patterns = [
+            ticker.upper(),
+            f"${ticker.upper()}",
+            ticker.lower()
+        ]
+
+        # Add specific patterns for known tickers
+        if ticker.upper() == "GME":
+            ticker_patterns.extend(["GameStop", "GAMESTOP", "Game Stop"])
+
+        # Use .hot() instead of search for better results
+        # Get more posts and filter manually for better coverage
+        all_posts = []
+
+        # Get hot posts
+        for post in subreddit_obj.hot(limit=limit):
+            all_posts.append(post)
+
+        # Get new posts
+        for post in subreddit_obj.new(limit=limit):
+            if post not in all_posts:
+                all_posts.append(post)
+
+        # Analyze posts for ticker mentions
+        for post in all_posts:
+            # Check if post is within time window (expand to 7 days for backtesting)
+            post_time = datetime.fromtimestamp(post.created_utc)
+            time_diff = datetime.now() - post_time
+            if time_diff > timedelta(days=7):
+                continue
+
+            # Check if ticker is mentioned in title or text
+            full_text = f"{post.title} {post.selftext}".upper()
+
+            # Check for any pattern match
+            if any(pattern.upper() in full_text for pattern in ticker_patterns):
+                mentions += 1
+
+                # Analyze sentiment
+                text = f"{post.title} {post.selftext}"
+                sentiment = sentiment_analyzer.polarity_scores(text)
+
+                sentiment_scores.append(sentiment["compound"])
+
+                post_details.append(
+                    {
+                        "title": post.title[:100],
+                        "score": post.score,
+                        "comments": post.num_comments,
+                        "sentiment": sentiment["compound"],
+                        "url": f"https://reddit.com{post.permalink}",
+                    }
+                )
+
+        # Calculate aggregate sentiment
+        avg_sentiment = (
+            sum(sentiment_scores) / len(sentiment_scores) if sentiment_scores else 0
+        )
+
+        # Determine bullish/bearish
+        is_bullish = avg_sentiment > 0.1
+        is_bearish = avg_sentiment < -0.1
+
+        result = {
+            "success": True,
+            "ticker": ticker,
+            "subreddit": subreddit,
+            "mentions": mentions,
+            "avg_sentiment": round(avg_sentiment, 3),
+            "bullish": is_bullish,
+            "bearish": is_bearish,
+            "sentiment_label": (
+                "Bullish 🚀" if is_bullish else "Bearish 📉" if is_bearish else "Neutral"
+            ),
+            "time_window_hours": hours,
+            "top_posts": sorted(post_details, key=lambda x: x["score"], reverse=True)[
+                :5
+            ],
+        }
+
+        logger.info(
+            f"✅ {ticker}: {mentions} mentions, sentiment: {avg_sentiment:.3f} ({result['sentiment_label']})"
+        )
+
+        return result
+
+    except Exception as e:
+        logger.error(f"❌ Error analyzing Reddit sentiment for {ticker}: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "ticker": ticker,
+        }
+
+
+
+        Twitter sentiment analysis
+    """
+    try:
+        logger.info(f"🐦 Analyzing Twitter sentiment for '{keyword}'")
+
+        # Twitter API requires implementation via Apify or official API
+        logger.error("❌ Twitter sentiment not implemented - requires Apify integration")
+
+        return {
+            "success": False,
+            "error": "Twitter sentiment requires Apify integration. Please implement data extraction pipeline.",
+            "keyword": keyword,
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Error analyzing Twitter sentiment: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "keyword": keyword,
+        }
+
+
+
+    # Generic sentiment
+    return {
+        "success": True,
+        "keyword": keyword,
+        "user": user,
+        "tweets_analyzed": 50,
+        "avg_sentiment": 0.35,
+        "positive_tweets": 28,
+        "negative_tweets": 12,
+        "neutral_tweets": 10,
+        "bullish": True,
+        "recent_tweets": [
+            {
+                "text": f"Bullish on {keyword}! 📈",
+                "sentiment": 0.65,
+                "likes": 234,
+                "retweets": 45,
+                "timestamp": "3 hours ago",
+            }
+        ],
+        "note": "⚠️  Using mock data (Twitter API not implemented)",
+    }
+
+
+def analyze_social_sentiment(ticker: str) -> Dict[str, Any]:
+    """
+    Comprehensive social media sentiment analysis
+
+    Combines Reddit + Twitter sentiment for a ticker
+
+    Args:
+        ticker: Stock ticker symbol
+
+    Returns:
+        Combined sentiment analysis
+    """
+    logger.info(f"📊 Running comprehensive social sentiment analysis for {ticker}")
+
+    # Get Reddit sentiment
+    reddit_data = get_reddit_sentiment(ticker)
+
+    # Get Twitter sentiment
+    twitter_data = get_twitter_sentiment(ticker)
+
+    # Combine sentiments
+    combined_sentiment = (
+        reddit_data.get("avg_sentiment", 0) * 0.6
+        + twitter_data.get("avg_sentiment", 0) * 0.4
+    )
+
+    is_bullish = combined_sentiment > 0.15
+    total_mentions = reddit_data.get("mentions", 0) + twitter_data.get(
+        "tweets_analyzed", 0
+    )
+
+    result = {
+        "success": True,
+        "ticker": ticker,
+        "combined_sentiment": round(combined_sentiment, 3),
+        "bullish": is_bullish,
+        "bearish": combined_sentiment < -0.15,
+        "total_mentions": total_mentions,
+        "reddit": {
+            "mentions": reddit_data.get("mentions", 0),
+            "sentiment": reddit_data.get("avg_sentiment", 0),
+            "bullish": reddit_data.get("bullish", False),
+        },
+        "twitter": {
+            "mentions": twitter_data.get("tweets_analyzed", 0),
+            "sentiment": twitter_data.get("avg_sentiment", 0),
+            "bullish": twitter_data.get("bullish", False),
+        },
+        "recommendation": (
+            "Strong Buy Signal 🚀" if combined_sentiment > 0.5 else
+            "Buy Signal ✅" if combined_sentiment > 0.15 else
+            "Sell Signal ⚠️" if combined_sentiment < -0.15 else
+            "Hold/Neutral ➡️"
+        ),
+    }
+
+    logger.info(
+        f"✅ Combined sentiment for {ticker}: {combined_sentiment:.3f} - {result['recommendation']}"
+    )
+
+    return result
+
+
+# Tool schemas for Claude
+SOCIAL_MEDIA_TOOLS = [
+    {
+        "name": "get_reddit_sentiment",
+        "description": "Analyze Reddit sentiment for a stock ticker. Searches r/wallstreetbets (or other subreddit) for mentions and calculates bullish/bearish sentiment score.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "ticker": {
+                    "type": "string",
+                    "description": "Stock ticker symbol (e.g., 'TSLA', 'GME', 'AAPL')",
+                },
+                "subreddit": {
+                    "type": "string",
+                    "description": "Subreddit to search (default: wallstreetbets)",
+                    "default": "wallstreetbets",
+                },
+                "hours": {
+                    "type": "integer",
+                    "description": "Time window in hours to analyze (default: 24)",
+                    "default": 24,
+                },
+            },
+            "required": ["ticker"],
+        },
+    },
+    {
+        "name": "get_twitter_sentiment",
+        "description": "Analyze Twitter/X sentiment for a keyword or specific user's tweets. Useful for tracking influencer sentiment (e.g., Elon Musk tweets about Tesla).",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "keyword": {
+                    "type": "string",
+                    "description": "Keyword to search for (e.g., 'Tesla', 'TSLA', 'Bitcoin')",
+                },
+                "user": {
+                    "type": "string",
+                    "description": "Twitter username to monitor (e.g., 'elonmusk'). Optional.",
+                },
+                "hours": {
+                    "type": "integer",
+                    "description": "Time window in hours (default: 24)",
+                    "default": 24,
+                },
+            },
+            "required": ["keyword"],
+        },
+    },
+    {
+        "name": "analyze_social_sentiment",
+        "description": "Comprehensive social media sentiment analysis combining Reddit and Twitter data for a stock ticker. Returns overall bullish/bearish signal.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "ticker": {
+                    "type": "string",
+                    "description": "Stock ticker symbol",
+                }
+            },
+            "required": ["ticker"],
+        },
+    },
+]

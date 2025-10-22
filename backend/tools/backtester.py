@@ -25,7 +25,6 @@ class Backtester:
         )
         self.social_cache = {}  # Cache for social sentiment
         self.news_cache = {}  # Cache for news
-        self.mock_data_cache = {}  # Cache for mock visualization data
 
     def evaluate_condition(
         self,
@@ -156,71 +155,7 @@ class Backtester:
             logger.error(f"Error fetching historical data: {str(e)}")
             raise
 
-    def _add_mock_visualization_data(self, info_point: Dict[str, Any], symbol: str, date_idx) -> None:
-        """
-        Add mock data for common visualization fields that might be needed
-        """
-        import random
-        import hashlib
-        
-        date_str = date_idx.strftime('%Y-%m-%d')
-        cache_key = f"{symbol}_{date_str}"
-        
-        # Use cached mock data if available
-        if cache_key in self.mock_data_cache:
-            info_point.update(self.mock_data_cache[cache_key])
-            return
-        
-        # Generate deterministic mock data based on symbol and date
-        seed_string = f"{symbol}_{date_str}"
-        seed = int(hashlib.md5(seed_string.encode()).hexdigest()[:8], 16)
-        random.seed(seed)
-        
-        mock_data = {}
-        
-        # Mock sentiment data
-        mock_data['wsb_sentiment_score'] = round(random.uniform(0.2, 0.8), 3)
-        mock_data['reddit_sentiment'] = round(random.uniform(0.1, 0.7), 3)
-        mock_data['twitter_sentiment'] = round(random.uniform(0.0, 0.9), 3)
-        mock_data['elon_tweet_sentiment'] = round(random.uniform(0.3, 0.9), 3) if symbol.upper() == 'TSLA' else round(random.uniform(0.0, 0.6), 3)
-        mock_data['social_sentiment'] = round(random.uniform(0.2, 0.7), 3)
-        
-        # Mock technical indicators
-        mock_data['rsi'] = round(random.uniform(20, 80), 2)
-        mock_data['macd'] = round(random.uniform(-0.5, 0.5), 4)
-        mock_data['macd_signal'] = round(random.uniform(-0.3, 0.3), 4)
-        mock_data['sma_20'] = round(random.uniform(50, 200), 2)
-        mock_data['sma_50'] = round(random.uniform(45, 190), 2)
-        
-        # Mock price-based data
-        base_price = info_point.get('price', 100)
-        mock_data['gme_price'] = round(base_price * random.uniform(0.95, 1.05), 2)
-        mock_data['tsla_price'] = round(base_price * random.uniform(0.98, 1.08), 2) if symbol.upper() != 'TSLA' else base_price
-        
-        # Mock trade analysis data
-        mock_data['exit_type_percentage'] = {
-            'profit_target': random.randint(30, 70),
-            'stop_loss': random.randint(15, 40),
-            'rsi_exit': random.randint(5, 25)
-        }
-        
-        # Mock timing data
-        mock_data['tweet_timing'] = {
-            'market_hours': random.randint(60, 90),
-            'after_hours': random.randint(10, 40)
-        }
-        
-        # Mock volatility data
-        mock_data['volatility'] = round(random.uniform(0.1, 0.4), 3)
-        mock_data['volume_ratio'] = round(random.uniform(0.5, 2.0), 2)
-        
-        # Mock news sentiment
-        mock_data['news_sentiment'] = round(random.uniform(-0.3, 0.6), 3)
-        mock_data['news_count'] = random.randint(3, 15)
-        
-        # Cache and add to info point
-        self.mock_data_cache[cache_key] = mock_data
-        info_point.update(mock_data)
+    # Mock visualization data removed - charts will only show real data
 
     def run_backtest(
         self,
@@ -354,9 +289,6 @@ class Backtester:
 
             # Track additional info (indicators/sentiment) based on strategy type
             info_point = {'date': idx.strftime('%Y-%m-%d'), 'price': round(price, 2)}
-            
-            # Generate mock data for common visualization fields
-            self._add_mock_visualization_data(info_point, symbol, idx)
 
             # Check what data to track based on entry conditions
             for condition in entry_conditions_list:

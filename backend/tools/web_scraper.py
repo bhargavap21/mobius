@@ -267,11 +267,15 @@ def scrape_company_news(company_name: str, ticker: str) -> Dict[str, Any]:
     try:
         logger.info(f"📰 Scraping news for {company_name} ({ticker})")
 
-        # For hackathon, we'll return mock news
-        # In production, you'd use NewsAPI or scrape Google News
-        logger.warning("⚠️  Using mock news data (NewsAPI not implemented)")
+        # News API requires implementation
+        logger.error("❌ News scraping not implemented - requires NewsAPI or web scraping integration")
 
-        return _mock_company_news(company_name, ticker)
+        return {
+            "success": False,
+            "error": "News scraping requires API integration. Please implement data extraction pipeline.",
+            "company": company_name,
+            "ticker": ticker,
+        }
 
     except Exception as e:
         logger.error(f"❌ Error scraping news for {company_name}: {e}")
@@ -280,173 +284,3 @@ def scrape_company_news(company_name: str, ticker: str) -> Dict[str, Any]:
             "error": str(e),
             "company": company_name,
         }
-
-
-def _mock_company_news(company_name: str, ticker: str) -> Dict[str, Any]:
-    """Generate mock news data"""
-    mock_news = {
-        "TSLA": [
-            {
-                "title": "Tesla Announces Record Q4 Deliveries",
-                "source": "Reuters",
-                "published": "2 hours ago",
-                "sentiment": "positive",
-                "summary": "Tesla delivered record numbers in Q4, exceeding analyst expectations.",
-            },
-            {
-                "title": "Cybertruck Production Ramps Up",
-                "source": "Bloomberg",
-                "published": "5 hours ago",
-                "sentiment": "positive",
-                "summary": "Tesla increases Cybertruck production capacity at Giga Texas.",
-            },
-            {
-                "title": "Analysts Debate Tesla's Valuation",
-                "source": "CNBC",
-                "published": "1 day ago",
-                "sentiment": "neutral",
-                "summary": "Wall Street analysts split on Tesla's current stock price.",
-            },
-        ],
-        "AAPL": [
-            {
-                "title": "Apple Vision Pro Sales Exceed Expectations",
-                "source": "TechCrunch",
-                "published": "3 hours ago",
-                "sentiment": "positive",
-                "summary": "Vision Pro sees strong early adoption among developers.",
-            },
-        ],
-        "NVDA": [
-            {
-                "title": "NVIDIA Unveils Next-Gen AI Chips",
-                "source": "The Verge",
-                "published": "1 hour ago",
-                "sentiment": "very_positive",
-                "summary": "New Blackwell GPU architecture promises 2x performance.",
-            },
-        ],
-    }
-
-    articles = mock_news.get(
-        ticker.upper(),
-        [
-            {
-                "title": f"{company_name} Stock Analysis Update",
-                "source": "Financial Times",
-                "published": "6 hours ago",
-                "sentiment": "neutral",
-                "summary": f"Market analysts provide update on {company_name} stock.",
-            }
-        ],
-    )
-
-    return {
-        "success": True,
-        "company": company_name,
-        "ticker": ticker,
-        "articles_count": len(articles),
-        "articles": articles,
-        "note": "⚠️  Using mock news data (NewsAPI not configured)",
-    }
-
-
-def monitor_company_website(ticker: str, company_url: str) -> Dict[str, Any]:
-    """
-    Monitor a company's investor relations or press release page
-
-    Args:
-        ticker: Stock ticker
-        company_url: URL to monitor (e.g., investor relations page)
-
-    Returns:
-        Recent updates from company website
-    """
-    try:
-        logger.info(f"🏢 Monitoring {ticker} website: {company_url}")
-
-        # Scrape the page
-        result = scrape_website(company_url, extract_type="links")
-
-        if not result["success"]:
-            return result
-
-        # Filter for recent press releases or announcements
-        links = result["data"].get("links", [])
-        recent_updates = []
-
-        keywords = ["press", "release", "announcement", "news", "investor"]
-
-        for link in links:
-            text = link["text"].lower()
-            if any(keyword in text for keyword in keywords):
-                recent_updates.append(link)
-
-        return {
-            "success": True,
-            "ticker": ticker,
-            "url": company_url,
-            "updates_count": len(recent_updates),
-            "recent_updates": recent_updates[:10],
-            "last_checked": "now",
-        }
-
-    except Exception as e:
-        logger.error(f"❌ Error monitoring {ticker} website: {e}")
-        return {
-            "success": False,
-            "error": str(e),
-            "ticker": ticker,
-        }
-
-
-# Tool schemas for Claude
-WEB_SCRAPING_TOOLS = [
-    {
-        "name": "scrape_website",
-        "description": "Extract data from any website. Can get text content, links, or tables. Use this to gather information from company websites, news sites, or any public webpage.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "url": {
-                    "type": "string",
-                    "description": "Website URL to scrape (must be full URL including https://)",
-                },
-                "selector": {
-                    "type": "string",
-                    "description": "CSS selector to target specific elements (optional). Example: '.article-title', '#main-content'",
-                },
-                "extract_type": {
-                    "type": "string",
-                    "enum": ["text", "links", "table"],
-                    "description": "What to extract from the page",
-                    "default": "text",
-                },
-                "javascript": {
-                    "type": "boolean",
-                    "description": "Whether page requires JavaScript rendering (default: false)",
-                    "default": False,
-                },
-            },
-            "required": ["url"],
-        },
-    },
-    {
-        "name": "scrape_company_news",
-        "description": "Get recent news articles about a company. Returns headlines, summaries, and sentiment.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "company_name": {
-                    "type": "string",
-                    "description": "Company name (e.g., 'Tesla', 'Apple')",
-                },
-                "ticker": {
-                    "type": "string",
-                    "description": "Stock ticker symbol (e.g., 'TSLA', 'AAPL')",
-                },
-            },
-            "required": ["company_name", "ticker"],
-        },
-    },
-]
