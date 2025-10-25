@@ -38,7 +38,9 @@ Extract and return JSON with this structure:
 {{
     "name": "descriptive strategy name",
     "description": "brief summary",
-    "asset": "stock ticker (e.g., TSLA, AAPL)",
+    "asset": "stock ticker (e.g., TSLA, AAPL) OR list of tickers for portfolio",
+    "assets": ["TSLA", "AAPL", "NVDA"],  // Use for multi-stock portfolios, null for single stock
+    "portfolio_mode": false,  // true if strategy trades multiple stocks as portfolio
     "entry_conditions": {{
         "signal": "rsi|macd|sma|sentiment|news|price",
         "description": "exact description of what triggers entry",
@@ -58,13 +60,20 @@ Extract and return JSON with this structure:
     }},
     "risk_management": {{
         "position_size": 1.0,
-        "max_positions": 1
+        "max_positions": 1,  // For portfolios, set to number of stocks
+        "allocation": "equal"  // equal, sentiment_weighted, market_cap_weighted
     }},
     "data_sources": ["twitter", "reddit", "news", "price", "rsi", "macd", "sma"]
 }}
 
 CRITICAL PARSING RULES:
-1. Signal Type Detection:
+1. Multi-Stock Detection:
+   - "portfolio", "multiple stocks", "several stocks" → portfolio_mode: true, set assets list
+   - "TSLA, AAPL, NVDA" or "TSLA and AAPL" → portfolio_mode: true, assets: ["TSLA", "AAPL", "NVDA"]
+   - If portfolio_mode true, set max_positions to number of stocks in assets list
+   - Single stock → portfolio_mode: false, asset: "TICKER", assets: null
+
+2. Signal Type Detection:
    - "RSI" → signal: "rsi"
    - "MACD" → signal: "macd"
    - "moving average" or "SMA" → signal: "sma"
@@ -72,15 +81,20 @@ CRITICAL PARSING RULES:
    - "reddit", "wallstreetbets" → signal: "sentiment", source: "reddit"
    - "news", "announcement" → signal: "news"
 
-2. Exit Conditions - CRITICAL:
+3. Exit Conditions - CRITICAL:
    - If user specifies custom exit indicator (e.g., "sell when RSI > 70", "sell when MACD crosses"), set custom_exit and DO NOT include take_profit/stop_loss
    - ONLY include take_profit/stop_loss if user explicitly mentions percentages (e.g., "+2% profit", "-1% stop loss")
    - If user only mentions custom exit without TP/SL, set take_profit: null, stop_loss: null
 
-3. Examples:
+4. Examples:
    - "Sell when RSI > 70" → custom_exit: "RSI above 70", take_profit: null, stop_loss: null
    - "Sell at +2% profit or -1% stop loss" → take_profit: 0.02, stop_loss: 0.01, custom_exit: null
    - "Sell when RSI > 70 or at -1% stop loss" → custom_exit: "RSI above 70", stop_loss: 0.01, take_profit: null
+
+5. Portfolio Examples:
+   - "Trade TSLA, AAPL, NVDA based on RSI" → portfolio_mode: true, assets: ["TSLA", "AAPL", "NVDA"], max_positions: 3
+   - "Create a portfolio of GME and AMC based on WSB sentiment" → portfolio_mode: true, assets: ["GME", "AMC"], max_positions: 2, signal: "sentiment", source: "reddit"
+   - "Buy BYND when sentiment positive" → portfolio_mode: false, asset: "BYND", assets: null, max_positions: 1
 
 Return ONLY valid JSON, no other text."""
 

@@ -165,10 +165,10 @@ class Backtester:
         initial_capital: float = 10000.0
     ) -> Dict[str, Any]:
         """
-        Run backtest for a given strategy
+        Run backtest for a given strategy (single stock or portfolio)
 
         Args:
-            strategy: Parsed strategy dict with asset, entry/exit conditions
+            strategy: Parsed strategy dict with asset/assets, entry/exit conditions
             start_date: Start date for backtest (defaults to 6 months ago)
             end_date: End date for backtest (defaults to today)
             initial_capital: Starting capital in USD
@@ -181,7 +181,17 @@ class Backtester:
         if not end_date:
             end_date = datetime.now()
 
-        symbol = strategy.get('asset', 'SPY')
+        # Check if portfolio mode (multiple stocks)
+        portfolio_mode = strategy.get('portfolio_mode', False)
+        assets_list = strategy.get('assets', None)
+
+        if portfolio_mode and assets_list:
+            # Portfolio mode - run multi-asset backtest
+            logger.info(f"🎯 Running PORTFOLIO backtest with {len(assets_list)} assets: {assets_list}")
+            return self.run_portfolio_backtest(strategy, start_date, end_date, initial_capital)
+        else:
+            # Single asset mode (original behavior)
+            symbol = strategy.get('asset', 'SPY')
         exit_conditions = strategy.get('exit_conditions', {})
         take_profit = exit_conditions.get('take_profit') if exit_conditions else None
         stop_loss = exit_conditions.get('stop_loss') if exit_conditions else None
@@ -650,6 +660,214 @@ class Backtester:
             f"Backtest complete: {len(trades)} trades, "
             f"{total_return:.2f}% return vs {buy_hold_return:.2f}% buy-hold"
         )
+
+        return results
+
+    def run_portfolio_backtest(
+        self,
+        strategy: Dict[str, Any],
+        start_date: datetime,
+        end_date: datetime,
+        initial_capital: float = 10000.0
+    ) -> Dict[str, Any]:
+        """
+        Run backtest for portfolio of multiple stocks
+
+        Args:
+            strategy: Parsed strategy dict with assets list, entry/exit conditions
+            start_date: Start date for backtest
+            end_date: End date for backtest
+            initial_capital: Starting capital in USD
+
+        Returns:
+            Dict containing portfolio backtest results and metrics
+        """
+        assets_list = strategy.get('assets', [])
+        if not assets_list:
+            return {
+                'error': 'No assets specified for portfolio backtest',
+                'summary': {}
+            }
+
+        logger.info(f"🎯 Starting portfolio backtest with {len(assets_list)} assets")
+        logger.info(f"   Assets: {assets_list}")
+        logger.info(f"   Period: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
+
+        # Get allocation strategy
+        allocation_strategy = strategy.get('risk_management', {}).get('allocation', 'equal')
+        max_positions = strategy.get('risk_management', {}).get('max_positions', len(assets_list))
+
+        # Capital allocation per asset (equal weight for Phase 1)
+        capital_per_asset = initial_capital / len(assets_list)
+
+        # Track individual asset results
+        asset_results = {}
+        all_trades = []
+        portfolio_history = {}  # Date -> portfolio value
+
+        # Run backtest for each asset independently
+        for asset in assets_list:
+            logger.info(f"  📊 Backtesting {asset}...")
+
+            # Create single-asset strategy for this stock
+            single_asset_strategy = strategy.copy()
+            single_asset_strategy['asset'] = asset
+            single_asset_strategy['portfolio_mode'] = False
+            single_asset_strategy['assets'] = None
+
+            # Run single-asset backtest with allocated capital
+            try:
+                result = self.run_backtest(
+                    single_asset_strategy,
+                    start_date,
+                    end_date,
+                    capital_per_asset
+                )
+
+                asset_results[asset] = result
+
+                # Add asset identifier to trades
+                if 'trades' in result:
+                    for trade in result['trades']:
+                        trade['asset'] = asset
+                        all_trades.append(trade)
+
+                # Aggregate portfolio history across all assets
+                if 'portfolio_history' in result:
+                    for point in result['portfolio_history']:
+                        date = point['date']
+                        value = point['portfolio_value']
+
+                        if date not in portfolio_history:
+                            portfolio_history[date] = 0
+                        portfolio_history[date] += value
+
+                logger.info(f"    ✅ {asset}: {result['summary']['total_return']:.2f}% return, {result['summary']['total_trades']} trades")
+
+            except Exception as e:
+                logger.error(f"    ❌ {asset} backtest failed: {e}")
+                asset_results[asset] = {
+                    'error': str(e),
+                    'summary': {
+                        'symbol': asset,
+                        'total_return': 0,
+                        'total_trades': 0,
+                        'final_capital': capital_per_asset
+                    }
+                }
+
+        # Convert portfolio history to sorted list
+        portfolio_history_list = [
+            {'date': date, 'portfolio_value': value}
+            for date, value in sorted(portfolio_history.items())
+        ]
+
+        # Calculate portfolio-level metrics
+        total_final_capital = sum(
+            result['summary'].get('final_capital', capital_per_asset)
+            for result in asset_results.values()
+        )
+
+        total_return = ((total_final_capital - initial_capital) / initial_capital) * 100
+
+        total_trades = sum(
+            result['summary'].get('total_trades', 0)
+            for result in asset_results.values()
+        )
+
+        total_winning_trades = sum(
+            result['summary'].get('winning_trades', 0)
+            for result in asset_results.values()
+        )
+
+        total_losing_trades = sum(
+            result['summary'].get('losing_trades', 0)
+            for result in asset_results.values()
+        )
+
+        portfolio_win_rate = (total_winning_trades / total_trades * 100) if total_trades > 0 else 0
+
+        # Calculate portfolio Sharpe ratio
+        if len(portfolio_history_list) > 1:
+            daily_returns = []
+            for i in range(1, len(portfolio_history_list)):
+                prev_val = portfolio_history_list[i-1]['portfolio_value']
+                curr_val = portfolio_history_list[i]['portfolio_value']
+                daily_return = (curr_val - prev_val) / prev_val
+                daily_returns.append(daily_return)
+
+            if daily_returns:
+                avg_daily_return = sum(daily_returns) / len(daily_returns)
+                std_daily_return = (sum((r - avg_daily_return) ** 2 for r in daily_returns) / len(daily_returns)) ** 0.5
+                sharpe_ratio = (avg_daily_return / std_daily_return * (252 ** 0.5)) if std_daily_return > 0 else 0
+            else:
+                sharpe_ratio = 0
+        else:
+            sharpe_ratio = 0
+
+        # Calculate max drawdown for portfolio
+        peak = initial_capital
+        max_drawdown = 0
+        for point in portfolio_history_list:
+            if point['portfolio_value'] > peak:
+                peak = point['portfolio_value']
+            drawdown = ((peak - point['portfolio_value']) / peak) * 100
+            if drawdown > max_drawdown:
+                max_drawdown = drawdown
+
+        # Calculate buy & hold for each asset and aggregate
+        total_buy_hold_final = 0
+        for asset, result in asset_results.items():
+            if 'summary' in result and 'buy_hold_return' in result['summary']:
+                buy_hold_return_pct = result['summary']['buy_hold_return']
+                buy_hold_final = capital_per_asset * (1 + buy_hold_return_pct / 100)
+                total_buy_hold_final += buy_hold_final
+            else:
+                total_buy_hold_final += capital_per_asset
+
+        buy_hold_return = ((total_buy_hold_final - initial_capital) / initial_capital) * 100
+
+        # Sort trades by date
+        all_trades_sorted = sorted(all_trades, key=lambda t: t.get('entry_date', ''))
+
+        results = {
+            'summary': {
+                'portfolio_mode': True,
+                'assets': assets_list,
+                'num_assets': len(assets_list),
+                'allocation_strategy': allocation_strategy,
+                'start_date': start_date.strftime('%Y-%m-%d'),
+                'end_date': end_date.strftime('%Y-%m-%d'),
+                'initial_capital': initial_capital,
+                'final_capital': total_final_capital,
+                'total_return': round(total_return, 2),
+                'buy_hold_return': round(buy_hold_return, 2),
+                'total_trades': total_trades,
+                'winning_trades': total_winning_trades,
+                'losing_trades': total_losing_trades,
+                'win_rate': round(portfolio_win_rate, 2),
+                'max_drawdown': round(max_drawdown, 2),
+                'sharpe_ratio': round(sharpe_ratio, 2),
+            },
+            'portfolio_history': portfolio_history_list,
+            'trades': all_trades_sorted,
+            'asset_breakdown': {
+                asset: {
+                    'symbol': asset,
+                    'total_return': result['summary'].get('total_return', 0),
+                    'total_trades': result['summary'].get('total_trades', 0),
+                    'win_rate': result['summary'].get('win_rate', 0),
+                    'final_capital': result['summary'].get('final_capital', capital_per_asset),
+                    'initial_capital': capital_per_asset,
+                }
+                for asset, result in asset_results.items()
+            }
+        }
+
+        logger.info(f"✅ Portfolio backtest complete:")
+        logger.info(f"   Total return: {total_return:.2f}% vs {buy_hold_return:.2f}% buy-hold")
+        logger.info(f"   Total trades: {total_trades} across {len(assets_list)} assets")
+        logger.info(f"   Win rate: {portfolio_win_rate:.2f}%")
 
         return results
 
