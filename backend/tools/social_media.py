@@ -198,6 +198,184 @@ def get_twitter_sentiment(
         }
 
 
+def get_trending_stocks_reddit(
+    subreddit: str = "wallstreetbets",
+    limit: int = 100,
+    top_n: int = 10,
+    min_mentions: int = 3
+) -> Dict[str, Any]:
+    """
+    Get trending stocks from Reddit based on mention frequency and sentiment
+
+    Args:
+        subreddit: Subreddit to search (default: wallstreetbets)
+        limit: Max posts to analyze
+        top_n: Number of top trending stocks to return
+        min_mentions: Minimum mentions required to be included
+
+    Returns:
+        Dict with trending stocks ranked by weighted score (mentions + sentiment)
+    """
+    try:
+        logger.info(f"📈 Getting trending stocks from r/{subreddit}")
+
+        # Check if Reddit credentials are configured
+        if not settings.reddit_client_id or not settings.reddit_client_secret:
+            logger.error("❌ Reddit API not configured")
+            return {
+                "success": False,
+                "error": "Reddit API credentials not configured",
+                "trending_stocks": []
+            }
+
+        import praw
+        from collections import defaultdict
+
+        # Initialize Reddit client
+        reddit = praw.Reddit(
+            client_id=settings.reddit_client_id,
+            client_secret=settings.reddit_client_secret,
+            user_agent=settings.reddit_user_agent,
+        )
+
+        subreddit_obj = reddit.subreddit(subreddit)
+
+        # Track mentions and sentiment for each ticker
+        ticker_data = defaultdict(lambda: {
+            'mentions': 0,
+            'sentiment_scores': [],
+            'upvotes': 0,
+            'posts': []
+        })
+
+        # Ticker patterns: either $TICKER or standalone uppercase 2-5 letters
+        ticker_pattern_with_dollar = re.compile(r'\$([A-Z]{1,5})\b')
+        ticker_pattern_standalone = re.compile(r'\b[A-Z]{2,5}\b')  # At least 2 letters to filter out 'A', 'I'
+
+        # Exclude common words that look like tickers
+        excluded_words = {
+            'THE', 'AND', 'FOR', 'ARE', 'BUT', 'NOT', 'YOU', 'ALL',
+            'CAN', 'HER', 'WAS', 'ONE', 'OUR', 'OUT', 'DAY', 'GET',
+            'HAS', 'HIM', 'HIS', 'HOW', 'ITS', 'MAY', 'NEW', 'NOW',
+            'OLD', 'SEE', 'TWO', 'WHO', 'BOY', 'DID', 'ITS', 'LET',
+            'PUT', 'SAY', 'SHE', 'TOO', 'USE', 'YOLO', 'WSB', 'IMO',
+            'EDIT', 'TLDR', 'ELI5', 'AMA', 'TIL', 'PSA', 'FYI', 'BTW',
+            'ATH', 'ATL', 'DD', 'ER', 'EOD', 'EOW', 'PM', 'AM',
+            'USA', 'SEC', 'CEO', 'CFO', 'IPO', 'ETF', 'ROTH', 'IRA',
+            # Additional common words
+            'I', 'A', 'TO', 'IN', 'IT', 'IS', 'AT', 'ON', 'BY', 'OF',
+            'SO', 'IF', 'OR', 'AS', 'BE', 'DO', 'GO', 'NO', 'UP', 'WE',
+            'MY', 'AN', 'ME', 'US', 'HE', 'VERY', 'MUCH', 'BEEN', 'JUST',
+            'LIKE', 'HAVE', 'WILL', 'THIS', 'THAT', 'FROM', 'THEY', 'WERE',
+            'WHAT', 'WHEN', 'WHERE', 'WHICH', 'YEAR', 'ALSO', 'MORE', 'SOME',
+            'WITH', 'INTO', 'THAN', 'OVER', 'SUCH', 'ONLY', 'EVEN', 'WELL',
+            'BACK', 'GOOD', 'VERY', 'HIGH', 'MUCH', 'BOTH', 'EACH', 'MOST'
+        }
+
+        # Get hot and new posts
+        all_posts = []
+        for post in subreddit_obj.hot(limit=limit):
+            all_posts.append(post)
+
+        for post in subreddit_obj.new(limit=limit // 2):
+            if post not in all_posts:
+                all_posts.append(post)
+
+        logger.info(f"   Analyzing {len(all_posts)} posts...")
+
+        # Analyze posts for ticker mentions
+        for post in all_posts:
+            # Check if post is recent (last 3 days)
+            post_time = datetime.fromtimestamp(post.created_utc)
+            time_diff = datetime.now() - post_time
+            if time_diff > timedelta(days=3):
+                continue
+
+            # Extract text
+            full_text = f"{post.title} {post.selftext}"
+            full_text_upper = full_text.upper()
+
+            # Find tickers with $ prefix (high confidence)
+            dollar_tickers = ticker_pattern_with_dollar.findall(full_text_upper)
+
+            # Find standalone uppercase tickers (medium confidence)
+            standalone_tickers = ticker_pattern_standalone.findall(full_text_upper)
+
+            # Combine tickers (prioritize $ tickers)
+            mentioned_tickers = set()
+
+            # Add $TICKER matches (high confidence)
+            for ticker in dollar_tickers:
+                if ticker not in excluded_words:
+                    mentioned_tickers.add(ticker)
+
+            # Add standalone matches if not in excluded words
+            for ticker in standalone_tickers:
+                if ticker not in excluded_words and len(ticker) >= 2:
+                    mentioned_tickers.add(ticker)
+
+            # Analyze sentiment for this post
+            sentiment_score = sentiment_analyzer.polarity_scores(full_text)['compound']
+
+            # Update ticker data
+            for ticker in mentioned_tickers:
+                ticker_data[ticker]['mentions'] += 1
+                ticker_data[ticker]['sentiment_scores'].append(sentiment_score)
+                ticker_data[ticker]['upvotes'] += post.score
+                ticker_data[ticker]['posts'].append({
+                    'title': post.title,
+                    'score': post.score,
+                    'url': f"https://reddit.com{post.permalink}"
+                })
+
+        # Calculate weighted scores for each ticker
+        trending_stocks = []
+        for ticker, data in ticker_data.items():
+            if data['mentions'] >= min_mentions:
+                avg_sentiment = sum(data['sentiment_scores']) / len(data['sentiment_scores'])
+
+                # Weighted score: mentions * (1 + sentiment) * log(upvotes + 1)
+                import math
+                upvote_factor = math.log10(data['upvotes'] + 10)
+                weighted_score = data['mentions'] * (1 + avg_sentiment) * upvote_factor
+
+                trending_stocks.append({
+                    'ticker': ticker,
+                    'mentions': data['mentions'],
+                    'avg_sentiment': round(avg_sentiment, 3),
+                    'upvotes': data['upvotes'],
+                    'weighted_score': round(weighted_score, 2),
+                    'sample_posts': data['posts'][:3]  # Top 3 posts
+                })
+
+        # Sort by weighted score
+        trending_stocks.sort(key=lambda x: x['weighted_score'], reverse=True)
+
+        # Return top N
+        top_trending = trending_stocks[:top_n]
+
+        logger.info(f"✅ Found {len(trending_stocks)} trending stocks")
+        if top_trending:
+            top_3_str = ', '.join([f"{s['ticker']} ({s['mentions']} mentions)" for s in top_trending[:3]])
+            logger.info(f"   Top 3: {top_3_str}")
+
+        return {
+            "success": True,
+            "subreddit": subreddit,
+            "trending_stocks": top_trending,
+            "total_analyzed": len(all_posts),
+            "timestamp": datetime.now().isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Error getting trending stocks: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "trending_stocks": []
+        }
+
+
 def analyze_social_sentiment(ticker: str) -> Dict[str, Any]:
     """
     Comprehensive social media sentiment analysis

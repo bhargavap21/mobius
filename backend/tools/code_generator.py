@@ -60,8 +60,10 @@ Extract and return JSON with this structure:
     }},
     "risk_management": {{
         "position_size": 1.0,
-        "max_positions": 1,  // For portfolios, set to number of stocks
-        "allocation": "equal"  // equal, sentiment_weighted, market_cap_weighted
+        "max_positions": 1,  // For portfolios, set to number of stocks or "dynamic" for trending
+        "allocation": "equal",  // equal, signal_weighted, dynamic_trending, market_cap_weighted
+        "dynamic_selection": false,  // true if stocks should be selected dynamically based on trending/signal strength
+        "top_n": null  // For dynamic selection, how many top trending stocks to select
     }},
     "data_sources": ["twitter", "reddit", "news", "price", "rsi", "macd", "sma"]
 }}
@@ -92,9 +94,21 @@ CRITICAL PARSING RULES:
    - "Sell when RSI > 70 or at -1% stop loss" → custom_exit: "RSI above 70", stop_loss: 0.01, take_profit: null
 
 5. Portfolio Examples:
-   - "Trade TSLA, AAPL, NVDA based on RSI" → portfolio_mode: true, assets: ["TSLA", "AAPL", "NVDA"], max_positions: 3
-   - "Create a portfolio of GME and AMC based on WSB sentiment" → portfolio_mode: true, assets: ["GME", "AMC"], max_positions: 2, signal: "sentiment", source: "reddit"
+   - "Trade TSLA, AAPL, NVDA based on RSI" → portfolio_mode: true, assets: ["TSLA", "AAPL", "NVDA"], max_positions: 3, allocation: "equal"
+   - "Create a portfolio of GME and AMC based on WSB sentiment" → portfolio_mode: true, assets: ["GME", "AMC"], max_positions: 2, signal: "sentiment", source: "reddit", allocation: "equal"
    - "Buy BYND when sentiment positive" → portfolio_mode: false, asset: "BYND", assets: null, max_positions: 1
+
+6. Dynamic Allocation Detection:
+   - "trending stocks", "most mentioned", "top stocks" → dynamic_selection: true, assets: null
+   - "trending on wallstreetbets" → dynamic_selection: true, source: "reddit", assets: null
+   - "allocate more to stocks with higher sentiment" → allocation: "signal_weighted"
+   - "weight by sentiment strength" → allocation: "signal_weighted"
+   - If dynamic_selection is true, set assets: null (stocks will be selected at runtime)
+
+7. Dynamic Portfolio Examples:
+   - "Trade the top 5 trending stocks on wallstreetbets" → portfolio_mode: true, dynamic_selection: true, top_n: 5, source: "reddit", assets: null, allocation: "signal_weighted"
+   - "Create a portfolio of trending WSB stocks, allocate more to higher sentiment" → portfolio_mode: true, dynamic_selection: true, allocation: "signal_weighted", source: "reddit"
+   - "Trade top 3 stocks with highest Reddit mentions" → portfolio_mode: true, dynamic_selection: true, top_n: 3, source: "reddit", allocation: "signal_weighted"
 
 Return ONLY valid JSON, no other text."""
 

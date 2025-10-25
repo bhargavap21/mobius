@@ -671,7 +671,7 @@ class Backtester:
         initial_capital: float = 10000.0
     ) -> Dict[str, Any]:
         """
-        Run backtest for portfolio of multiple stocks
+        Run backtest for portfolio of multiple stocks with dynamic allocation
 
         Args:
             strategy: Parsed strategy dict with assets list, entry/exit conditions
@@ -682,32 +682,116 @@ class Backtester:
         Returns:
             Dict containing portfolio backtest results and metrics
         """
+        # Get allocation settings
+        risk_mgmt = strategy.get('risk_management', {})
+        allocation_strategy = risk_mgmt.get('allocation', 'equal')
+        dynamic_selection = risk_mgmt.get('dynamic_selection', False)
+        top_n = risk_mgmt.get('top_n', 5)
+
+        # Handle dynamic stock selection (trending stocks)
         assets_list = strategy.get('assets', [])
-        if not assets_list:
-            return {
-                'error': 'No assets specified for portfolio backtest',
-                'summary': {}
-            }
+        stock_weights = {}  # ticker -> allocation weight
+
+        if dynamic_selection:
+            logger.info(f"🎯 Dynamic stock selection enabled - finding trending stocks")
+
+            # Get trending stocks from Reddit
+            from tools.social_media import get_trending_stocks_reddit
+
+            source = strategy.get('entry_conditions', {}).get('parameters', {}).get('source', 'reddit')
+            if source == 'reddit':
+                trending_data = get_trending_stocks_reddit(
+                    subreddit="wallstreetbets",
+                    limit=100,
+                    top_n=top_n,
+                    min_mentions=3
+                )
+
+                if trending_data['success'] and trending_data['trending_stocks']:
+                    # Extract tickers and their weights
+                    trending_stocks = trending_data['trending_stocks']
+                    assets_list = [stock['ticker'] for stock in trending_stocks]
+
+                    # Calculate weights based on signal strength (weighted_score)
+                    if allocation_strategy == 'signal_weighted':
+                        total_score = sum(stock['weighted_score'] for stock in trending_stocks)
+                        for stock in trending_stocks:
+                            weight = stock['weighted_score'] / total_score
+                            stock_weights[stock['ticker']] = weight
+                    else:
+                        # Equal weight
+                        for stock in trending_stocks:
+                            stock_weights[stock['ticker']] = 1.0 / len(trending_stocks)
+
+                    logger.info(f"   Selected {len(assets_list)} trending stocks: {assets_list}")
+                    if allocation_strategy == 'signal_weighted':
+                        logger.info(f"   Using signal-weighted allocation")
+                        for ticker, weight in list(stock_weights.items())[:5]:
+                            logger.info(f"      {ticker}: {weight*100:.1f}%")
+                else:
+                    logger.error("❌ Failed to get trending stocks - falling back to default")
+                    return {
+                        'error': 'Failed to get trending stocks from Reddit',
+                        'summary': {}
+                    }
+        else:
+            # Static asset list with optional signal weighting
+            if not assets_list:
+                return {
+                    'error': 'No assets specified for portfolio backtest',
+                    'summary': {}
+                }
+
+            # Calculate weights for static portfolio
+            if allocation_strategy == 'signal_weighted':
+                # Get current signal strength for each asset
+                logger.info(f"📊 Calculating signal-weighted allocation for {len(assets_list)} assets")
+
+                from tools.social_media import get_reddit_sentiment
+                signal_strengths = {}
+
+                for asset in assets_list:
+                    # Get sentiment as proxy for signal strength
+                    sentiment_data = get_reddit_sentiment(asset, limit=50, hours=72)
+                    if sentiment_data.get('success'):
+                        # Use absolute sentiment + mention count as strength
+                        mentions = sentiment_data.get('mentions', 1)
+                        sentiment = sentiment_data.get('avg_sentiment', 0)
+                        strength = mentions * (1 + abs(sentiment))
+                        signal_strengths[asset] = strength
+                    else:
+                        signal_strengths[asset] = 1.0  # Default
+
+                # Normalize to weights
+                total_strength = sum(signal_strengths.values())
+                for asset in assets_list:
+                    stock_weights[asset] = signal_strengths[asset] / total_strength
+
+                logger.info(f"   Signal-weighted allocation:")
+                for asset, weight in stock_weights.items():
+                    logger.info(f"      {asset}: {weight*100:.1f}%")
+            else:
+                # Equal weight
+                for asset in assets_list:
+                    stock_weights[asset] = 1.0 / len(assets_list)
 
         logger.info(f"🎯 Starting portfolio backtest with {len(assets_list)} assets")
         logger.info(f"   Assets: {assets_list}")
+        logger.info(f"   Allocation: {allocation_strategy}")
         logger.info(f"   Period: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
-
-        # Get allocation strategy
-        allocation_strategy = strategy.get('risk_management', {}).get('allocation', 'equal')
-        max_positions = strategy.get('risk_management', {}).get('max_positions', len(assets_list))
-
-        # Capital allocation per asset (equal weight for Phase 1)
-        capital_per_asset = initial_capital / len(assets_list)
 
         # Track individual asset results
         asset_results = {}
         all_trades = []
         portfolio_history = {}  # Date -> portfolio value
 
-        # Run backtest for each asset independently
+        # Run backtest for each asset independently with weighted allocation
         for asset in assets_list:
-            logger.info(f"  📊 Backtesting {asset}...")
+            # Get allocated capital for this asset
+            weight = stock_weights.get(asset, 1.0 / len(assets_list))
+            capital_for_asset = initial_capital * weight
+
+            logger.info(f"  📊 Backtesting {asset} (${capital_for_asset:,.2f} / {weight*100:.1f}%)...")
 
             # Create single-asset strategy for this stock
             single_asset_strategy = strategy.copy()
@@ -721,7 +805,7 @@ class Backtester:
                     single_asset_strategy,
                     start_date,
                     end_date,
-                    capital_per_asset
+                    capital_for_asset
                 )
 
                 asset_results[asset] = result
@@ -854,11 +938,13 @@ class Backtester:
             'asset_breakdown': {
                 asset: {
                     'symbol': asset,
+                    'allocation_weight': stock_weights.get(asset, 1.0 / len(assets_list)),
+                    'allocated_capital': initial_capital * stock_weights.get(asset, 1.0 / len(assets_list)),
                     'total_return': result['summary'].get('total_return', 0),
                     'total_trades': result['summary'].get('total_trades', 0),
                     'win_rate': result['summary'].get('win_rate', 0),
-                    'final_capital': result['summary'].get('final_capital', capital_per_asset),
-                    'initial_capital': capital_per_asset,
+                    'final_capital': result['summary'].get('final_capital', 0),
+                    'initial_capital': initial_capital * stock_weights.get(asset, 1.0 / len(assets_list)),
                 }
                 for asset, result in asset_results.items()
             }
