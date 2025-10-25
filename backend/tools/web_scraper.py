@@ -284,3 +284,40 @@ def scrape_company_news(company_name: str, ticker: str) -> Dict[str, Any]:
             "error": str(e),
             "company": company_name,
         }
+
+
+# Tool schemas for Claude
+WEB_SCRAPING_TOOLS = [
+    {
+        "name": "scrape_website",
+        "description": "Scrape content from a website URL. Extract text, links, and tables.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "Full URL to scrape (e.g., 'https://example.com')",
+                }
+            },
+            "required": ["url"],
+        },
+    },
+    {
+        "name": "scrape_company_news",
+        "description": "Scrape recent news articles about a company (requires NewsAPI or implementation).",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "company_name": {
+                    "type": "string",
+                    "description": "Company name (e.g., 'Tesla', 'Apple')",
+                },
+                "ticker": {
+                    "type": "string",
+                    "description": "Stock ticker symbol (e.g., 'TSLA', 'AAPL')",
+                },
+            },
+            "required": ["company_name", "ticker"],
+        },
+    },
+]

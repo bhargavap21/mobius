@@ -42,8 +42,12 @@ def get_reddit_sentiment(
 
         # Check if Reddit credentials are configured
         if not settings.reddit_client_id or not settings.reddit_client_secret:
-            logger.warning("⚠️  Reddit API not configured, using mock data")
-            return _mock_reddit_sentiment(ticker, subreddit)
+            logger.error("❌ Reddit API not configured - credentials required")
+            return {
+                "success": False,
+                "error": "Reddit API credentials not configured. Please add REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET to .env",
+                "ticker": ticker,
+            }
 
         import praw
 
@@ -156,98 +160,6 @@ def get_reddit_sentiment(
         }
 
 
-def _mock_reddit_sentiment(ticker: str, subreddit: str) -> Dict[str, Any]:
-    """
-    Generate mock Reddit sentiment data for testing
-
-    Args:
-        ticker: Stock ticker
-        subreddit: Subreddit name
-
-    Returns:
-        Mock sentiment data
-    """
-    # Generate realistic mock data based on ticker
-    mock_data = {
-        "TSLA": {
-            "mentions": 247,
-            "avg_sentiment": 0.65,
-            "bullish": True,
-            "top_posts": [
-                {
-                    "title": "TSLA to the moon! Elon just announced new factory 🚀",
-                    "score": 1523,
-                    "comments": 342,
-                    "sentiment": 0.82,
-                },
-                {
-                    "title": "Why I'm bullish on Tesla - DD inside",
-                    "score": 892,
-                    "comments": 156,
-                    "sentiment": 0.71,
-                },
-                {
-                    "title": "TSLA 500c FDs are printing 💰",
-                    "score": 654,
-                    "comments": 89,
-                    "sentiment": 0.45,
-                },
-            ],
-        },
-        "GME": {
-            "mentions": 892,
-            "avg_sentiment": 0.78,
-            "bullish": True,
-            "top_posts": [
-                {
-                    "title": "GME still has potential, holding strong 💎🙌",
-                    "score": 3421,
-                    "comments": 567,
-                    "sentiment": 0.89,
-                }
-            ],
-        },
-        "AAPL": {
-            "mentions": 123,
-            "avg_sentiment": 0.15,
-            "bullish": True,
-            "top_posts": [
-                {
-                    "title": "AAPL steady as always, boring but reliable",
-                    "score": 445,
-                    "comments": 67,
-                    "sentiment": 0.25,
-                }
-            ],
-        },
-    }
-
-    # Get mock data or generate neutral sentiment
-    data = mock_data.get(
-        ticker.upper(), {"mentions": 45, "avg_sentiment": 0.05, "bullish": False}
-    )
-
-    sentiment = data["avg_sentiment"]
-    is_bullish = sentiment > 0.1
-    is_bearish = sentiment < -0.1
-
-    return {
-        "success": True,
-        "ticker": ticker,
-        "subreddit": subreddit,
-        "mentions": data["mentions"],
-        "avg_sentiment": sentiment,
-        "bullish": is_bullish,
-        "bearish": is_bearish,
-        "sentiment_label": (
-            "Bullish 🚀" if is_bullish else "Bearish 📉" if is_bearish else "Neutral"
-        ),
-        "time_window_hours": 24,
-        "top_posts": data.get("top_posts", []),
-        "note": "⚠️  Using mock data (Reddit API not configured)",
-    }
-
-
 def get_twitter_sentiment(
     keyword: str,
     user: Optional[str] = None,
@@ -267,11 +179,15 @@ def get_twitter_sentiment(
     try:
         logger.info(f"🐦 Analyzing Twitter sentiment for '{keyword}'")
 
-        # Twitter API is expensive and requires approval
-        # For hackathon, we'll use mock data
-        logger.warning("⚠️  Using mock Twitter data (API not implemented)")
+        # Twitter API requires Apify integration (Phase 1, Week 2)
+        logger.error("❌ Twitter sentiment not implemented - requires Apify integration")
 
-        return _mock_twitter_sentiment(keyword, user)
+        return {
+            "success": False,
+            "error": "Twitter sentiment requires Apify integration. Coming in Phase 1, Week 2.",
+            "keyword": keyword,
+            "user": user,
+        }
 
     except Exception as e:
         logger.error(f"❌ Error analyzing Twitter sentiment: {e}")
@@ -280,72 +196,6 @@ def get_twitter_sentiment(
             "error": str(e),
             "keyword": keyword,
         }
-
-
-def _mock_twitter_sentiment(keyword: str, user: Optional[str] = None) -> Dict[str, Any]:
-    """
-    Generate mock Twitter sentiment data
-
-    Args:
-        keyword: Search keyword
-        user: Twitter user
-
-    Returns:
-        Mock Twitter sentiment data
-    """
-    # Elon Musk tweet examples
-    if user and user.lower() in ["elonmusk", "elon"]:
-        return {
-            "success": True,
-            "keyword": keyword,
-            "user": "elonmusk",
-            "tweets_analyzed": 15,
-            "avg_sentiment": 0.72,
-            "positive_tweets": 12,
-            "negative_tweets": 1,
-            "neutral_tweets": 2,
-            "bullish": True,
-            "recent_tweets": [
-                {
-                    "text": "Tesla production hitting new records! Cybertruck ramping up nicely 🚙⚡",
-                    "sentiment": 0.85,
-                    "likes": 45230,
-                    "retweets": 8934,
-                    "timestamp": "2 hours ago",
-                },
-                {
-                    "text": "Just drove the new Model S Plaid. Acceleration is insane! 🚀",
-                    "sentiment": 0.91,
-                    "likes": 67421,
-                    "retweets": 12456,
-                    "timestamp": "5 hours ago",
-                },
-            ],
-            "note": "⚠️  Using mock data (Twitter API not implemented)",
-        }
-
-    # Generic sentiment
-    return {
-        "success": True,
-        "keyword": keyword,
-        "user": user,
-        "tweets_analyzed": 50,
-        "avg_sentiment": 0.35,
-        "positive_tweets": 28,
-        "negative_tweets": 12,
-        "neutral_tweets": 10,
-        "bullish": True,
-        "recent_tweets": [
-            {
-                "text": f"Bullish on {keyword}! 📈",
-                "sentiment": 0.65,
-                "likes": 234,
-                "retweets": 45,
-                "timestamp": "3 hours ago",
-            }
-        ],
-        "note": "⚠️  Using mock data (Twitter API not implemented)",
-    }
 
 
 def analyze_social_sentiment(ticker: str) -> Dict[str, Any]:

@@ -14,6 +14,7 @@ import LandingPage from './components/LandingPage'
 import RefineSidebar from './components/RefineSidebar'
 import DeploymentPage from './components/DeploymentPage'
 import DeploymentMonitor from './components/DeploymentMonitor'
+import ChatHistorySidebar from './components/ChatHistorySidebar'
 import './index.css'
 
 function AppContent() {
@@ -612,42 +613,72 @@ function AppContent() {
     )
   }
 
+  const handleNewChat = () => {
+    setStrategy(null)
+    setGeneratedCode(null)
+    setBacktestResults(null)
+    setInsightsConfig(null)
+    setCurrentBotId(null)
+    setError(null)
+    setSessionId(null)
+  }
+
+  const handleLoadBotFromSidebar = (botData) => {
+    setStrategy(botData.strategy_config)
+    setGeneratedCode(botData.generated_code)
+    setBacktestResults(botData.backtest_results)
+    setInsightsConfig(botData.insights_config)
+    setCurrentBotId(botData.id)
+    console.log('Loaded bot from sidebar:', botData.name)
+  }
+
   return (
-    <div className="min-h-screen bg-dark-bg">
-      {/* Token Expired Notification */}
-      {tokenExpiredError && (
-        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 max-w-md w-full mx-4">
-          <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 backdrop-blur-md">
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 text-red-400 text-xl">!</div>
-              <div className="flex-1">
-                <h3 className="text-red-400 font-semibold mb-1">Session Expired</h3>
-                <p className="text-red-200 text-sm mb-3">
-                  Your authentication token has expired. Please sign in again to continue.
-                </p>
-                <button
-                  onClick={() => {
-                    clearExpiredError()
-                    setShowLogin(true)
-                  }}
-                  className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm rounded-lg transition-colors"
-                >
-                  Sign In Again
-                </button>
-              </div>
-              <button
-                onClick={clearExpiredError}
-                className="flex-shrink-0 text-red-400 hover:text-red-300 transition-colors"
-              >
-                X
-              </button>
-            </div>
-          </div>
-        </div>
+    <div className="min-h-screen bg-dark-bg flex">
+      {/* Chat History Sidebar */}
+      {isAuthenticated && (
+        <ChatHistorySidebar
+          onNewChat={handleNewChat}
+          onLoadBot={handleLoadBotFromSidebar}
+          currentBotId={currentBotId}
+        />
       )}
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      {/* Main Content Container */}
+      <div className="flex-1 flex flex-col">
+        {/* Token Expired Notification */}
+        {tokenExpiredError && (
+          <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 max-w-md w-full mx-4">
+            <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 backdrop-blur-md">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 text-red-400 text-xl">!</div>
+                <div className="flex-1">
+                  <h3 className="text-red-400 font-semibold mb-1">Session Expired</h3>
+                  <p className="text-red-200 text-sm mb-3">
+                    Your authentication token has expired. Please sign in again to continue.
+                  </p>
+                  <button
+                    onClick={() => {
+                      clearExpiredError()
+                      setShowLogin(true)
+                    }}
+                    className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm rounded-lg transition-colors"
+                  >
+                    Sign In Again
+                  </button>
+                </div>
+                <button
+                  onClick={clearExpiredError}
+                  className="flex-shrink-0 text-red-400 hover:text-red-300 transition-colors"
+                >
+                  X
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Main Content */}
+        <main className="max-w-7xl mx-auto px-6 py-8 flex-1">
         {/* Navigation */}
         <div className="flex items-center justify-between mb-6">
           {/* Left: Logo */}
@@ -894,6 +925,9 @@ function AppContent() {
           </div>
         )}
       </main>
+
+      </div>
+      {/* End Main Content Container */}
 
       {/* Auth Modals */}
       {showLogin && (

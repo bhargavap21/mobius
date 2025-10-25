@@ -693,9 +693,10 @@ def backtest_strategy(
 
     backtester = Backtester()
 
-    # Try current year first (2025), then fallback to previous years if no data
+    # Try current year first, then fallback to previous years if no data
     current_date = datetime.now()
-    years_to_try = [2025, 2024, 2023, 2022]  # Priority order
+    current_year = current_date.year
+    years_to_try = [current_year, current_year - 1, current_year - 2, current_year - 3]  # Priority order
 
     for year_offset, target_year in enumerate(years_to_try):
         # Calculate dates for this year
