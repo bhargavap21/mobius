@@ -15,6 +15,7 @@ import RefineSidebar from './components/RefineSidebar'
 import DeploymentPage from './components/DeploymentPage'
 import DeploymentMonitor from './components/DeploymentMonitor'
 import ChatHistorySidebar from './components/ChatHistorySidebar'
+import SessionExpiredModal from './components/SessionExpiredModal'
 import './index.css'
 
 function AppContent() {
@@ -92,6 +93,12 @@ function AppContent() {
   const [fastMode, setFastMode] = useState(false)
 
   const handleGenerateStrategy = async (userInput, useMultiAgent = true, useFastMode = false) => {
+    // Check authentication first before starting generation
+    if (!isAuthenticated || !user) {
+      handleTokenExpired()
+      return
+    }
+
     setLoading(true)
     setError(null)
     setBacktestResults(null)
@@ -120,11 +127,12 @@ function AppContent() {
 
       // Add fast mode parameter to URL
       const url = useFastMode ? `${endpoint}?fast_mode=true` : endpoint
-      
+
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...getAuthHeaders()
         },
         body: JSON.stringify({
           strategy_description: userInput,
@@ -133,6 +141,13 @@ function AppContent() {
       })
 
       console.log(`[App] Response status: ${response.status} ${response.statusText}`)
+
+      // Check for 401/403 Unauthorized (expired token)
+      if (response.status === 401 || response.status === 403) {
+        setLoading(false)
+        handleTokenExpired()
+        return
+      }
 
       if (!response.ok) {
         const errorText = await response.text()
@@ -457,8 +472,8 @@ function AppContent() {
         console.error('  Status:', response.status, response.statusText)
         console.error('  Response:', errorText)
 
-        // Check for 401 Unauthorized (expired token)
-        if (response.status === 401) {
+        // Check for 401/403 Unauthorized (expired token)
+        if (response.status === 401 || response.status === 403) {
           handleTokenExpired()
           return
         }
@@ -480,12 +495,14 @@ function AppContent() {
   }
 
   const handleLoadBot = (botData) => {
-    setStrategy(botData.strategy)
-    setGeneratedCode(botData.code)
+    // Handle both transformed (from BotLibrary) and raw (from API) formats
+    setStrategy(botData.strategy || botData.strategy_config)
+    setGeneratedCode(botData.code || botData.generated_code)
     setBacktestResults(botData.backtest_results)
     setInsightsConfig(botData.insights_config)
     setCurrentBotId(botData.id)
     setShowBotLibrary(false)
+    setShowLanding(false)
     console.log('Loaded bot:', botData.name)
   }
 
@@ -623,59 +640,27 @@ function AppContent() {
     setSessionId(null)
   }
 
-  const handleLoadBotFromSidebar = (botData) => {
-    setStrategy(botData.strategy_config)
-    setGeneratedCode(botData.generated_code)
-    setBacktestResults(botData.backtest_results)
-    setInsightsConfig(botData.insights_config)
-    setCurrentBotId(botData.id)
-    console.log('Loaded bot from sidebar:', botData.name)
-  }
-
   return (
     <div className="min-h-screen bg-dark-bg flex">
       {/* Chat History Sidebar */}
       {isAuthenticated && (
         <ChatHistorySidebar
           onNewChat={handleNewChat}
-          onLoadBot={handleLoadBotFromSidebar}
+          onLoadBot={handleLoadBot}
           currentBotId={currentBotId}
         />
       )}
 
       {/* Main Content Container */}
       <div className="flex-1 flex flex-col">
-        {/* Token Expired Notification */}
-        {tokenExpiredError && (
-          <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 max-w-md w-full mx-4">
-            <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 backdrop-blur-md">
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 text-red-400 text-xl">!</div>
-                <div className="flex-1">
-                  <h3 className="text-red-400 font-semibold mb-1">Session Expired</h3>
-                  <p className="text-red-200 text-sm mb-3">
-                    Your authentication token has expired. Please sign in again to continue.
-                  </p>
-                  <button
-                    onClick={() => {
-                      clearExpiredError()
-                      setShowLogin(true)
-                    }}
-                    className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm rounded-lg transition-colors"
-                  >
-                    Sign In Again
-                  </button>
-                </div>
-                <button
-                  onClick={clearExpiredError}
-                  className="flex-shrink-0 text-red-400 hover:text-red-300 transition-colors"
-                >
-                  X
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Session Expired Modal */}
+        <SessionExpiredModal
+          isOpen={tokenExpiredError}
+          onClose={() => {
+            clearExpiredError()
+            setShowLogin(true)
+          }}
+        />
 
         {/* Main Content */}
         <main className="max-w-7xl mx-auto px-6 py-8 flex-1">

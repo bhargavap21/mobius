@@ -6,9 +6,12 @@ import DynamicInsightsCharts from './DynamicInsightsCharts'
 // Custom tooltip defined outside component to avoid React version issues
 const CustomTooltip = ({ active, payload }) => {
   if (active && payload && payload.length) {
+    const data = payload[0].payload
+    const hasCashAndPosition = data.cash !== undefined && data.position_value !== undefined
+
     return (
       <div className="bg-dark-surface border border-dark-border rounded-lg p-3 shadow-lg">
-        <p className="text-white font-semibold mb-2">{payload[0].payload.date}</p>
+        <p className="text-white font-semibold mb-2">{data.date}</p>
         <p className="text-accent-primary text-sm font-semibold">
           Strategy: ${payload[0].value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </p>
@@ -17,14 +20,16 @@ const CustomTooltip = ({ active, payload }) => {
             Buy & Hold: ${payload[1].value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
         )}
-        <div className="border-t border-dark-border mt-2 pt-2">
-          <p className="text-gray-400 text-xs">
-            Cash: ${payload[0].payload.cash.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </p>
-          <p className="text-gray-400 text-xs">
-            Position: ${payload[0].payload.position_value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </p>
-        </div>
+        {hasCashAndPosition && (
+          <div className="border-t border-dark-border mt-2 pt-2">
+            <p className="text-gray-400 text-xs">
+              Cash: ${data.cash.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+            <p className="text-gray-400 text-xs">
+              Position: ${data.position_value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+          </div>
+        )}
       </div>
     )
   }
@@ -257,9 +262,9 @@ export default function BacktestResults({ results, insightsConfig }) {
         </div>
 
         <div className="space-y-2">
-          {displayedTrades.map((trade) => (
+          {displayedTrades.map((trade, index) => (
             <div
-              key={trade.trade_number}
+              key={`${trade.asset || trade.symbol}-${trade.trade_number}-${index}`}
               className={`p-3 rounded-lg border ${
                 trade.pnl > 0
                   ? 'bg-green-400/5 border-green-400/20'

@@ -5,15 +5,16 @@ FastAPI Backend for AI Trading Bot Generator
 import logging
 import asyncio
 import json
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import Optional, AsyncGenerator, Any        
+from typing import Optional, AsyncGenerator, Any
 import queue
 import uuid
 from uuid import UUID
 from datetime import datetime
+from middleware.auth_middleware import get_optional_user_id, get_current_user_id
 
 from orchestrator import get_orchestrator
 from tools.market_data import (
@@ -217,7 +218,10 @@ async def create_strategy(request: StrategyRequest):
 
 
 @app.post("/api/strategy/backtest", response_model=BacktestResponse)
-async def backtest(request: BacktestRequest):
+async def backtest(
+    request: BacktestRequest,
+    user_id: Optional[UUID] = Depends(get_optional_user_id)
+):
     """
     Run backtest on a trading strategy
 
@@ -226,6 +230,7 @@ async def backtest(request: BacktestRequest):
     2. Fetches historical data from Alpaca
     3. Simulates trades based on strategy rules
     4. Returns performance metrics and trade history
+    5. Auto-saves to chat history
     """
     try:
         logger.info(f"📊 Running backtest for {request.strategy.get('asset', 'unknown')}")
@@ -237,6 +242,32 @@ async def backtest(request: BacktestRequest):
             take_profit=request.take_profit,
             stop_loss=request.stop_loss
         )
+
+        # Auto-save to chat history after successful backtest
+        if user_id:
+            try:
+                from db.repositories.bot_repository import BotRepository
+                from db.models import TradingBotCreate
+                import uuid
+
+                bot_repo = BotRepository()
+
+                # Create auto-saved bot entry
+                bot_data = TradingBotCreate(
+                    name=request.strategy.get('name', 'Untitled Strategy'),
+                    description=request.strategy.get('description', ''),
+                    strategy_config=request.strategy,
+                    generated_code="",  # Not available at backtest stage
+                    backtest_results=results,
+                    session_id=request.session_id if hasattr(request, 'session_id') else str(uuid.uuid4()),
+                    is_saved=False  # Auto-saved, not manually saved
+                )
+
+                await bot_repo.create(user_id=user_id, bot_data=bot_data)
+                logger.info(f"✅ Auto-saved strategy to chat history for user {user_id}")
+            except Exception as save_error:
+                logger.error(f"⚠️ Failed to auto-save strategy: {save_error}")
+                # Don't fail the backtest if auto-save fails
 
         return BacktestResponse(
             success=True,
@@ -336,7 +367,11 @@ async def progress_stream(session_id: str):
 
 
 @app.post("/api/strategy/create_multi_agent")
-async def create_strategy_multi_agent(request: StrategyRequest, fast_mode: bool = False):
+async def create_strategy_multi_agent(
+    request: StrategyRequest,
+    fast_mode: bool = False,
+    user_id: UUID = Depends(get_current_user_id)
+):
     """
     Create and optimize a trading strategy using multi-agent system
 
@@ -392,6 +427,31 @@ async def create_strategy_multi_agent(request: StrategyRequest, fast_mode: bool 
             "insights_config": result.get('insights_config'),  # Pass insights config to frontend
             "message": f"Strategy optimized through {result['iterations']} iterations"
         }
+
+        # Auto-save to chat history after successful strategy creation
+        # user_id is guaranteed to exist now since endpoint requires authentication
+        try:
+            from db.repositories.bot_repository import BotRepository
+            from db.models import TradingBotCreate
+            bot_repo = BotRepository()
+
+            # Create auto-saved bot entry
+            bot_data = TradingBotCreate(
+                name=result['strategy'].get('name', 'Untitled Strategy'),
+                description=request.strategy_description[:200] if len(request.strategy_description) > 200 else request.strategy_description,
+                strategy_config=result['strategy'],
+                generated_code=result['code'],
+                backtest_results=result['backtest_results'],
+                insights_config=result.get('insights_config'),
+                session_id=session_id,
+                is_saved=False  # Auto-saved, not manually saved
+            )
+
+            await bot_repo.create(user_id=user_id, bot_data=bot_data)
+            logger.info(f"✅ Auto-saved strategy to chat history for user {user_id}")
+        except Exception as save_error:
+            logger.error(f"⚠️ Failed to auto-save strategy: {save_error}")
+            # Don't fail the request if auto-save fails
 
         # Store result for later retrieval (in case connection drops)
         if session_id:

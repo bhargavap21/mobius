@@ -830,25 +830,44 @@ class Backtester:
 
             except Exception as e:
                 logger.error(f"    ❌ {asset} backtest failed: {e}")
+                # Get allocated capital for this asset
+                allocated_capital = initial_capital * stock_weights.get(asset, 1.0 / len(assets_list))
                 asset_results[asset] = {
                     'error': str(e),
                     'summary': {
                         'symbol': asset,
                         'total_return': 0,
                         'total_trades': 0,
-                        'final_capital': capital_per_asset
+                        'final_capital': allocated_capital
                     }
                 }
 
-        # Convert portfolio history to sorted list
+        # Convert portfolio history to sorted list and add buy & hold tracking
+        # First, aggregate buy & hold values across all assets for each date
+        buy_hold_history = {}  # Date -> buy & hold value
+        for asset, result in asset_results.items():
+            if 'portfolio_history' in result:
+                for point in result['portfolio_history']:
+                    date = point['date']
+                    buy_hold_val = point.get('buy_hold_value', 0)
+
+                    if date not in buy_hold_history:
+                        buy_hold_history[date] = 0
+                    buy_hold_history[date] += buy_hold_val
+
+        # Create portfolio history list with both strategy and buy & hold values
         portfolio_history_list = [
-            {'date': date, 'portfolio_value': value}
+            {
+                'date': date,
+                'portfolio_value': value,
+                'buy_hold_value': buy_hold_history.get(date, initial_capital)
+            }
             for date, value in sorted(portfolio_history.items())
         ]
 
         # Calculate portfolio-level metrics
         total_final_capital = sum(
-            result['summary'].get('final_capital', capital_per_asset)
+            result['summary'].get('final_capital', 0)
             for result in asset_results.values()
         )
 
@@ -902,17 +921,34 @@ class Backtester:
         # Calculate buy & hold for each asset and aggregate
         total_buy_hold_final = 0
         for asset, result in asset_results.items():
+            # Get allocated capital for this asset
+            allocated_capital = initial_capital * stock_weights.get(asset, 1.0 / len(assets_list))
+
             if 'summary' in result and 'buy_hold_return' in result['summary']:
                 buy_hold_return_pct = result['summary']['buy_hold_return']
-                buy_hold_final = capital_per_asset * (1 + buy_hold_return_pct / 100)
+                buy_hold_final = allocated_capital * (1 + buy_hold_return_pct / 100)
                 total_buy_hold_final += buy_hold_final
             else:
-                total_buy_hold_final += capital_per_asset
+                total_buy_hold_final += allocated_capital
 
         buy_hold_return = ((total_buy_hold_final - initial_capital) / initial_capital) * 100
 
         # Sort trades by date
         all_trades_sorted = sorted(all_trades, key=lambda t: t.get('entry_date', ''))
+
+        # Calculate avg_win, avg_loss, max_win, max_loss, profit_factor from all trades
+        winning_pnls = [t['pnl'] for t in all_trades if t.get('pnl', 0) > 0]
+        losing_pnls = [t['pnl'] for t in all_trades if t.get('pnl', 0) < 0]
+
+        avg_win = sum(winning_pnls) / len(winning_pnls) if winning_pnls else 0
+        avg_loss = sum(losing_pnls) / len(losing_pnls) if losing_pnls else 0
+        max_win = max(winning_pnls) if winning_pnls else 0
+        max_loss = min(losing_pnls) if losing_pnls else 0
+
+        # Calculate profit factor (total wins / total losses)
+        total_wins = sum(winning_pnls) if winning_pnls else 0
+        total_losses = abs(sum(losing_pnls)) if losing_pnls else 0
+        profit_factor = (total_wins / total_losses) if total_losses > 0 else (total_wins if total_wins > 0 else 0)
 
         results = {
             'summary': {
@@ -932,6 +968,11 @@ class Backtester:
                 'win_rate': round(portfolio_win_rate, 2),
                 'max_drawdown': round(max_drawdown, 2),
                 'sharpe_ratio': round(sharpe_ratio, 2),
+                'avg_win': round(avg_win, 2),
+                'avg_loss': round(avg_loss, 2),
+                'max_win': round(max_win, 2),
+                'max_loss': round(max_loss, 2),
+                'profit_factor': round(profit_factor, 2),
             },
             'portfolio_history': portfolio_history_list,
             'trades': all_trades_sorted,

@@ -53,6 +53,14 @@ class StrategyAnalystAgent(BaseAgent):
 
         summary = backtest_results.get('summary', {})
 
+        # Check if portfolio or single-stock backtest
+        is_portfolio = summary.get('portfolio_mode', False)
+
+        if is_portfolio:
+            assets_info = f"Portfolio ({len(summary.get('assets', []))} assets): {', '.join(summary.get('assets', []))}"
+        else:
+            assets_info = f"Single Stock: {summary.get('symbol', 'N/A')}"
+
         # Build analysis prompt
         analysis_prompt = f"""You are a professional trading strategy analyst. Analyze this backtest result and provide detailed feedback.
 
@@ -65,7 +73,7 @@ STRATEGY CONFIGURATION:
 - Exit Conditions: {strategy.get('exit_conditions', {})}
 
 BACKTEST RESULTS (Iteration {iteration}):
-- Symbol: {summary.get('symbol', 'N/A')}
+- Assets: {assets_info}
 - Timeframe: {summary.get('start_date', 'N/A')} to {summary.get('end_date', 'N/A')}
 - Total Trades: {summary.get('total_trades', 0)}
 - Win Rate: {summary.get('win_rate', 0)}%
@@ -74,6 +82,8 @@ BACKTEST RESULTS (Iteration {iteration}):
 - Max Drawdown: {summary.get('max_drawdown', 0)}%
 - Sharpe Ratio: {summary.get('sharpe_ratio', 0)}
 - Profit Factor: {summary.get('profit_factor', 0)}
+- Average Win: ${summary.get('avg_win', 0)}
+- Average Loss: ${summary.get('avg_loss', 0)}
 - External Data Found: {summary.get('external_data_found', 0)} days
 - Data Points Checked: {summary.get('data_points_checked', 0)} days
 

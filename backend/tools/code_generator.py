@@ -133,6 +133,15 @@ Return ONLY valid JSON, no other text."""
             logger.info(f"   Asset: {parsed.get('asset')}")
             logger.info(f"   Data sources: {parsed.get('data_sources')}")
 
+            # Check if strategy requires dynamic selection without specific assets
+            if parsed.get('dynamic_selection') and not parsed.get('asset') and not parsed.get('assets'):
+                logger.error(f"   ❌ Strategy requires dynamic trending stock selection")
+                return {
+                    "success": False,
+                    "error": "This strategy requires real-time trending stock data from Reddit. Backtesting is not available for dynamic trending strategies because historical trending data is not accessible. For backtesting, please specify exact stock symbols (e.g., 'Trade GME and AMC based on Reddit sentiment'). For live trading with trending stocks, deploy the bot directly.",
+                    "strategy": parsed
+                }
+
             return {
                 "success": True,
                 "strategy": parsed,

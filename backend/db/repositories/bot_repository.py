@@ -58,6 +58,7 @@ class BotRepository:
                 'backtest_results': bot_data.backtest_results,
                 'insights_config': bot_data.insights_config,
                 'session_id': bot_data.session_id,
+                'is_saved': bot_data.is_saved if hasattr(bot_data, 'is_saved') else False,
             }
 
             logger.info(f"💾 Prepared bot_dict with user_id: {bot_dict['user_id']}")

@@ -6,7 +6,7 @@ const ChatHistorySidebar = ({ onClose, onLoadBot, onNewChat, currentBotId }) => 
   const [bots, setBots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const { getAuthHeaders, user } = useAuth();
+  const { getAuthHeaders, user, handleTokenExpired } = useAuth();
 
   useEffect(() => {
     loadBots();
@@ -21,6 +21,12 @@ const ChatHistorySidebar = ({ onClose, onLoadBot, onNewChat, currentBotId }) => 
         headers: getAuthHeaders(),
       });
 
+      // Check for 401/403 Unauthorized (expired token)
+      if (response.status === 401 || response.status === 403) {
+        handleTokenExpired();
+        return;
+      }
+
       if (!response.ok) {
         throw new Error('Failed to load chat history');
       }
@@ -31,6 +37,32 @@ const ChatHistorySidebar = ({ onClose, onLoadBot, onNewChat, currentBotId }) => 
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadBotDetails = async (botId) => {
+    try {
+      const response = await fetch(`http://localhost:8000/bots/${botId}`, {
+        headers: getAuthHeaders(),
+      });
+
+      // Check for 401/403 Unauthorized (expired token)
+      if (response.status === 401 || response.status === 403) {
+        handleTokenExpired();
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error('Failed to load bot details');
+      }
+
+      const bot = await response.json();
+
+      // Pass full bot data to parent
+      onLoadBot(bot);
+    } catch (err) {
+      console.error('Error loading bot details:', err);
+      setError('Failed to load bot');
     }
   };
 
@@ -46,6 +78,12 @@ const ChatHistorySidebar = ({ onClose, onLoadBot, onNewChat, currentBotId }) => 
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
+
+      // Check for 401/403 Unauthorized (expired token)
+      if (response.status === 401 || response.status === 403) {
+        handleTokenExpired();
+        return;
+      }
 
       if (!response.ok) {
         throw new Error('Failed to delete bot');
@@ -122,12 +160,12 @@ const ChatHistorySidebar = ({ onClose, onLoadBot, onNewChat, currentBotId }) => 
 
             {/* Bots for this date */}
             {groupedBots[date].map(bot => (
-              <button
+              <div
                 key={bot.id}
-                onClick={() => onLoadBot(bot)}
-                className={`w-full group flex items-start gap-2 px-3 py-2 rounded-lg hover:bg-gray-800 transition-all duration-150 text-left mb-1 ${
+                className={`w-full group flex items-start gap-2 px-3 py-2 rounded-lg hover:bg-gray-800 transition-all duration-150 mb-1 cursor-pointer ${
                   currentBotId === bot.id ? 'bg-gray-800' : ''
                 }`}
+                onClick={() => loadBotDetails(bot.id)}
               >
                 <MessageSquare className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
 
@@ -155,7 +193,7 @@ const ChatHistorySidebar = ({ onClose, onLoadBot, onNewChat, currentBotId }) => 
                 {bot.is_favorite && (
                   <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400 flex-shrink-0" />
                 )}
-              </button>
+              </div>
             ))}
           </div>
         ))}
