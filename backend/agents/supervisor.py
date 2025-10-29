@@ -397,10 +397,8 @@ class SupervisorAgent(BaseAgent):
         logger.info(f"🎉 WORKFLOW COMPLETE - {iteration} iterations")
         logger.info(f"{'='*60}\n")
 
-        if progress:
-            await progress.emit_complete(session_id, iteration)
-            # Close session to mark it as inactive
-            progress.close_session(session_id)
+        # Note: Complete event will be emitted by caller AFTER storing result in job_storage
+        # This ensures the result is available when the client receives the complete event
 
         final_summary = backtest_results.get('summary', {})
         logger.info(f"📊 Final Results:")

@@ -5,7 +5,7 @@ FastAPI Backend for AI Trading Bot Generator
 import logging
 import asyncio
 import json
-from fastapi import FastAPI, HTTPException, Query, Depends
+from fastapi import FastAPI, HTTPException, Query, Depends, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -317,24 +317,257 @@ async def get_events(session_id: str, from_: int = Query(0, alias="from")):
     }
 
 
+async def _run_multi_agent_workflow(
+    session_id: str,
+    strategy_description: str,
+    fast_mode: bool,
+    user_id: UUID
+):
+    """
+    Helper function to run the multi-agent workflow
+    This can be called from both the new two-step flow and legacy endpoint
+    """
+    try:
+        logger.info(f"🤖 Multi-Agent Workflow Starting: '{strategy_description[:100]}...' (Session: {session_id})")
+
+        from agents.supervisor import SupervisorAgent
+        from db.repositories.bot_repository import BotRepository
+        from db.models import TradingBotCreate
+        from job_storage import job_storage
+
+        supervisor = SupervisorAgent()
+
+        # Adjust parameters based on fast mode
+        days = 30 if fast_mode else 90
+        initial_capital = 10000
+
+        result = await supervisor.process({
+            'user_query': strategy_description,
+            'days': days,
+            'initial_capital': initial_capital,
+            'session_id': session_id,
+            'fast_mode': fast_mode
+        })
+
+        if not result.get('success'):
+            error_data = {
+                "success": False,
+                "error": result.get('error', 'Multi-agent workflow failed')
+            }
+            job_storage.store_result(session_id, error_data)
+
+            # Emit error complete event AFTER storing result
+            from progress_manager import progress_manager
+            if progress_manager:
+                await progress_manager.emit_event(session_id, {
+                    'type': 'error',
+                    'agent': 'Supervisor',
+                    'action': 'Workflow failed',
+                    'message': error_data['error'],
+                    'icon': '❌'
+                })
+            return
+
+        response_data = {
+            "success": True,
+            "session_id": session_id,
+            "strategy": result['strategy'],
+            "code": result['code'],
+            "backtest_results": result['backtest_results'],
+            "iterations": result['iterations'],
+            "iteration_history": result['iteration_history'],
+            "final_analysis": result['final_analysis'],
+            "insights_config": result.get('insights_config'),
+            "message": f"Strategy optimized through {result['iterations']} iterations"
+        }
+
+        # ARCHITECTURAL FIX: Store result and emit complete event BEFORE slow database save
+        # This prevents WebSocket timeout (30s) from firing during database operations
+
+        # Store result in job_storage IMMEDIATELY (this is fast, synchronous)
+        job_storage.store_result(session_id, response_data)
+        logger.info(f"💾 Result stored in job_storage for session {session_id[:8]}")
+
+        # Emit complete event IMMEDIATELY (before slow database operations)
+        from progress_manager import progress_manager
+        if progress_manager:
+            await progress_manager.emit_complete(session_id, result['iterations'])
+            logger.info(f"✅ Complete event emitted for session {session_id[:8]}")
+            # Small yield to let WebSocket grab the event from queue
+            await asyncio.sleep(0.05)
+
+        # NOW do slow database operations in background (don't block WebSocket)
+        async def save_to_database():
+            """Background task to save strategy to database"""
+            try:
+                bot_repo = BotRepository()
+                bot_data = TradingBotCreate(
+                    name=result['strategy'].get('name', 'Untitled Strategy'),
+                    description=strategy_description[:200] if len(strategy_description) > 200 else strategy_description,
+                    strategy_config=result['strategy'],
+                    generated_code=result['code'],
+                    backtest_results=result['backtest_results'],
+                    insights_config=result.get('insights_config'),
+                    session_id=session_id,
+                    is_saved=False
+                )
+                await bot_repo.create(user_id=user_id, bot_data=bot_data)
+                logger.info(f"✅ Auto-saved strategy to chat history for user {user_id}")
+            except Exception as save_error:
+                logger.error(f"⚠️ Failed to auto-save strategy: {save_error}")
+
+        # Run database save in background - don't wait for it
+        asyncio.create_task(save_to_database())
+        logger.info(f"🔄 Database save running in background for session {session_id[:8]}")
+
+        logger.info(f"✅ Workflow complete for session {session_id[:8]}")
+
+    except Exception as e:
+        logger.error(f"❌ Error in multi-agent workflow: {e}")
+        import traceback
+        traceback.print_exc()
+
+        error_data = {
+            "success": False,
+            "error": str(e)
+        }
+        from job_storage import job_storage
+        job_storage.store_result(session_id, error_data)
+
+
+@app.post("/api/sessions")
+async def create_session(user_id: UUID = Depends(get_current_user_id)):
+    """
+    Step 1: Create a session (no work starts yet)
+    Returns a session_id for the client to open SSE and then start workflow
+    """
+    from progress_manager import progress_manager
+
+    session_id = str(uuid.uuid4())
+    # Pre-create the session and event history
+    progress_manager.create_session(session_id)
+
+    logger.info(f"📡 Created session {session_id[:8]} for user {user_id}")
+
+    return {"sessionId": session_id}
+
+
+@app.websocket("/ws/strategy/progress/{session_id}")
+async def websocket_progress(websocket: WebSocket, session_id: str):
+    """
+    WebSocket endpoint for real-time progress updates
+    Step 2: Client connects to this BEFORE starting the workflow
+    """
+    from progress_manager import progress_manager
+
+    await websocket.accept()
+    logger.info(f"🔌 WebSocket client connected for session: {session_id[:8]}")
+
+    try:
+        # Get or create session queue
+        if session_id in progress_manager.sessions:
+            logger.info(f"📡 WS client connected to existing session: {session_id[:8]}")
+            queue = progress_manager.sessions[session_id]
+        else:
+            logger.info(f"📡 Creating new WS session: {session_id[:8]}")
+            queue = progress_manager.create_session(session_id)
+
+        # Send buffered events first (if any)
+        if session_id in progress_manager.event_history:
+            logger.info(f"📡 Sending {len(progress_manager.event_history[session_id])} buffered events")
+            for event in progress_manager.event_history[session_id]:
+                await websocket.send_json(event)
+
+        # Send ready signal
+        await websocket.send_json({
+            'type': 'ready',
+            'message': 'Stream ready, you can start the workflow'
+        })
+        logger.info(f"✅ Sent ready signal for session: {session_id[:8]}")
+
+        # Stream events as they arrive
+        logger.info(f"🔄 Entering event loop for session: {session_id[:8]}")
+        while True:
+            try:
+                # Wait for new event with timeout
+                import time
+                wait_start = time.time()
+                logger.debug(f"⏳ Waiting for event from queue (session: {session_id[:8]}, qsize: {queue.qsize()})")
+                event = await asyncio.wait_for(queue.get(), timeout=30.0)
+                wait_end = time.time()
+                logger.info(f"📦 Retrieved event from queue: {event.get('type')} at {wait_end}, waited {wait_end - wait_start:.3f}s (session: {session_id[:8]})")
+
+                # Send event to client - explicitly catch connection errors
+                logger.info(f"🔜 About to send event: {event.get('type')} (session: {session_id[:8]})")
+                try:
+                    await websocket.send_json(event)
+                    logger.info(f"📤 Sent event to WS client: {event.get('type')} - {event.get('message', '')} (session: {session_id[:8]})")
+                except WebSocketDisconnect as ws_disc:
+                    logger.warning(f"⚠️ Client disconnected while sending event: {event.get('type')} - {ws_disc} (session: {session_id[:8]})")
+                    raise  # Re-raise to exit the loop
+                except Exception as send_error:
+                    logger.error(f"❌ Error sending event to client: {type(send_error).__name__}: {send_error} (session: {session_id[:8]})")
+                    import traceback
+                    traceback.print_exc()
+                    raise
+
+                # Check if it's a completion event
+                if event.get('type') in ['complete', 'error']:
+                    # CRITICAL: Give the client time to receive the complete event before closing
+                    # Without this delay, we close the connection immediately after sending,
+                    # and the client may not receive the event due to network buffering
+                    logger.info(f"⏸️  Sent complete event, waiting briefly before closing (session: {session_id[:8]})")
+                    await asyncio.sleep(0.5)  # Wait 500ms to ensure client receives the event
+                    logger.info(f"🎉 Workflow complete, closing WS for session: {session_id[:8]}")
+                    break
+
+            except asyncio.TimeoutError:
+                # Send heartbeat to keep connection alive
+                logger.debug(f"💓 Sending heartbeat (session: {session_id[:8]})")
+                try:
+                    await websocket.send_json({'type': 'heartbeat'})
+                except Exception as heartbeat_error:
+                    logger.warning(f"⚠️ Failed to send heartbeat, client may have disconnected: {heartbeat_error}")
+                    break  # Exit if we can't send heartbeat
+                continue
+
+    except WebSocketDisconnect:
+        logger.info(f"🔌 WebSocket client disconnected for session: {session_id[:8]}")
+    except Exception as e:
+        logger.error(f"❌ WebSocket error for session {session_id[:8]}: {e}")
+    finally:
+        progress_manager.close_session(session_id)
+
+
 @app.get("/api/strategy/progress/{session_id}")
 async def progress_stream(session_id: str):
     """
-    Server-Sent Events endpoint for real-time progress updates
+    Step 2: Server-Sent Events endpoint for real-time progress updates
+    Client opens this BEFORE starting the workflow to ensure no events are missed
     """
     from progress_manager import progress_manager
 
     async def event_generator() -> AsyncGenerator[str, None]:
         # Get or create session queue
         if session_id in progress_manager.sessions:
-            logger.info(f"📡 Using existing session: {session_id[:8]}")
+            logger.info(f"📡 SSE client connected to existing session: {session_id[:8]}")
             queue = progress_manager.sessions[session_id]
         else:
             logger.info(f"📡 Creating new SSE session: {session_id[:8]}")
             queue = progress_manager.create_session(session_id)
 
-        # Send initial connection message to establish SSE connection
-        yield f"data: {json.dumps({'type': 'connected', 'message': 'Connected to activity stream'})}\n\n"
+        # Send buffered events first (if any) so late joiners still see them
+        if session_id in progress_manager.event_history:
+            logger.info(f"📡 Sending {len(progress_manager.event_history[session_id])} buffered events")
+            for event in progress_manager.event_history[session_id]:
+                yield f"data: {json.dumps(event)}\n\n"
+
+        # Send ready signal
+        yield f"data: {json.dumps({'type': 'ready', 'message': 'Stream ready, you can start the workflow'})}\n\n"
+
+        # CRITICAL: Yield control to event loop to ensure the ready signal is sent
+        # before we start blocking on queue.get()
+        await asyncio.sleep(0)
 
         try:
             while True:
@@ -366,6 +599,36 @@ async def progress_stream(session_id: str):
     )
 
 
+@app.post("/api/sessions/{session_id}/start")
+async def start_workflow(
+    session_id: str,
+    request: StrategyRequest,
+    fast_mode: bool = False,
+    user_id: UUID = Depends(get_current_user_id)
+):
+    """
+    Step 3: Start the workflow AFTER SSE stream is open
+    This ensures all events are captured in real-time
+    """
+    from progress_manager import progress_manager
+
+    logger.info(f"📡 Starting workflow for session {session_id[:8]}")
+
+    # Verify session exists
+    if session_id not in progress_manager.sessions:
+        raise HTTPException(status_code=404, detail="Session not found. Create session first.")
+
+    # Start the actual workflow in background
+    asyncio.create_task(_run_multi_agent_workflow(
+        session_id=session_id,
+        strategy_description=request.strategy_description,
+        fast_mode=fast_mode,
+        user_id=user_id
+    ))
+
+    return {"status": "started", "sessionId": session_id}
+
+
 @app.post("/api/strategy/create_multi_agent")
 async def create_strategy_multi_agent(
     request: StrategyRequest,
@@ -373,7 +636,8 @@ async def create_strategy_multi_agent(
     user_id: UUID = Depends(get_current_user_id)
 ):
     """
-    Create and optimize a trading strategy using multi-agent system
+    Legacy endpoint: Create and optimize a trading strategy using multi-agent system
+    (Kept for backward compatibility, but new clients should use the two-step flow)
 
     This endpoint:
     1. Uses Supervisor agent to orchestrate the workflow

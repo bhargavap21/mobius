@@ -35,7 +35,13 @@ class ProgressManager:
 
         if session_id in self.sessions:
             event['timestamp'] = datetime.now().isoformat()
-            await self.sessions[session_id].put(event)
+            queue = self.sessions[session_id]
+            logger.info(f"📥 Putting event into queue (current size: {queue.qsize()})")
+            await queue.put(event)
+            logger.info(f"📥 Event added to queue (new size: {queue.qsize()})")
+
+            # Yield control to event loop so WebSocket can process the event immediately
+            await asyncio.sleep(0)
 
             # Also store in history for polling
             if session_id not in self.event_history:
