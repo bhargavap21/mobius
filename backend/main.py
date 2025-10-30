@@ -503,7 +503,7 @@ async def websocket_progress(websocket: WebSocket, session_id: str):
                 import time
                 wait_start = time.time()
                 logger.debug(f"⏳ Waiting for event from queue (session: {session_id[:8]}, qsize: {queue.qsize()})")
-                event = await asyncio.wait_for(queue.get(), timeout=30.0)
+                event = await asyncio.wait_for(queue.get(), timeout=300.0)  # 5 minutes for complex workflows
                 wait_end = time.time()
                 logger.info(f"📦 Retrieved event from queue: {event.get('type')} at {wait_end}, waited {wait_end - wait_start:.3f}s (session: {session_id[:8]})")
 
@@ -583,7 +583,7 @@ async def progress_stream(session_id: str):
             while True:
                 try:
                     # Wait for new event with timeout to keep connection alive
-                    event = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    event = await asyncio.wait_for(queue.get(), timeout=300.0)  # 5 minutes for complex workflows
 
                     # Check if it's a completion event
                     if event.get('type') == 'complete' or event.get('type') == 'error':
