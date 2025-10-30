@@ -6,7 +6,7 @@ import CodeDisplay from './components/CodeDisplay'
 import LoadingSpinner from './components/LoadingSpinner'
 import BacktestResults from './components/BacktestResults'
 import ProgressIndicator from './components/ProgressIndicator'
-import AgentActivityLogPolling from './components/AgentActivityLogPolling'
+import AgentActivityLogWS from './components/AgentActivityLogWS'
 import Login from './components/Login'
 import Signup from './components/Signup'
 import BotLibrary from './components/BotLibrary'
@@ -104,200 +104,92 @@ function AppContent() {
     setBacktestResults(null)
     setProgressSteps([])
     setCurrentIteration(0)
-    setSessionId(null) // Clear any old session ID
-
-    // Generate session ID on frontend first
-    const newSessionId = crypto.randomUUID()
-    console.log('[App] Generated session ID:', newSessionId)
-    // DON'T set sessionId state yet - wait for POST to succeed first!
 
     try {
-      // Use multi-agent endpoint by default (includes auto-backtesting and refinement)
-      const endpoint = useMultiAgent
-        ? 'http://localhost:8000/api/strategy/create_multi_agent'
-        : 'http://localhost:8000/api/strategy/create'
+      // STEP 1: Create session (no work starts yet)
+      console.log('[App] Step 1: Creating session...')
+      const sessionResponse = await fetch('http://localhost:8000/api/sessions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders()
+        }
+      })
 
-      // Show initial progress
-      if (useMultiAgent) {
-        setProgressSteps(['Starting multi-agent workflow...'])
+      if (!sessionResponse.ok) {
+        throw new Error(`Failed to create session: ${sessionResponse.status}`)
       }
 
-      console.log(`[App] Sending POST to ${endpoint}`)
-      console.log(`[App] Payload:`, { strategy_description: userInput, session_id: newSessionId })
+      const { sessionId: newSessionId } = await sessionResponse.json()
+      console.log('[App] ✅ Session created:', newSessionId)
 
-      // Add fast mode parameter to URL
-      const url = useFastMode ? `${endpoint}?fast_mode=true` : endpoint
+      // STEP 2: Set sessionId to mount SSE component (which will open stream)
+      setSessionId(newSessionId)
 
-      const response = await fetch(url, {
+      // STEP 3: Wait for SSE ready signal, then start workflow
+      // We'll use a Promise that resolves when the SSE component signals ready
+      await new Promise((resolve) => {
+        let resolved = false
+
+        window.wsStreamReady = (sid) => {
+          if (sid === newSessionId && !resolved) {
+            resolved = true
+            console.log('[App] ✅ WebSocket stream ready, starting workflow...')
+            resolve()
+          }
+        }
+
+        // Timeout after 5 seconds in case WebSocket doesn't connect
+        setTimeout(() => {
+          if (!resolved) {
+            resolved = true
+            console.warn('[App] ⚠️ WebSocket ready timeout, starting workflow anyway')
+            resolve()
+          }
+        }, 5000)
+      })
+
+      // STEP 3: Start the workflow (SSE stream is now open and waiting)
+      console.log('[App] Step 3: Starting workflow...')
+      const startUrl = useFastMode
+        ? `http://localhost:8000/api/sessions/${newSessionId}/start?fast_mode=true`
+        : `http://localhost:8000/api/sessions/${newSessionId}/start`
+
+      const startResponse = await fetch(startUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...getAuthHeaders()
         },
         body: JSON.stringify({
-          strategy_description: userInput,
-          session_id: newSessionId  // Pass session ID to backend
+          strategy_description: userInput
         }),
       })
 
-      console.log(`[App] Response status: ${response.status} ${response.statusText}`)
+      console.log(`[App] Workflow started: ${startResponse.status} ${startResponse.statusText}`)
 
       // Check for 401/403 Unauthorized (expired token)
-      if (response.status === 401 || response.status === 403) {
+      if (startResponse.status === 401 || startResponse.status === 403) {
         setLoading(false)
         handleTokenExpired()
         return
       }
 
-      if (!response.ok) {
-        const errorText = await response.text()
+      if (!startResponse.ok) {
+        const errorText = await startResponse.text()
         console.error(`[App] Request failed:`, errorText)
-        throw new Error(`Failed to generate strategy (${response.status}): ${errorText}`)
+        throw new Error(`Failed to start workflow (${startResponse.status}): ${errorText}`)
       }
 
-      const data = await response.json()
+      console.log('[App] ✅ Workflow started successfully, waiting for WebSocket events...')
+      // Note: Results will be handled by onWorkflowComplete callback when WebSocket signals completion
 
-      // NOW set the session ID - POST succeeded, backend has the session
-      console.log('[App] POST succeeded, setting sessionId state')
-      setSessionId(newSessionId)
-
-      setStrategy(data.strategy)
-      setGeneratedCode(data.code)
-
-      // Multi-agent endpoint returns backtest results automatically
-      if (useMultiAgent && data.backtest_results) {
-        setBacktestResults(data.backtest_results)
-        setInsightsConfig(data.insights_config)  // Store insights config
-        setCurrentIteration(data.iterations)
-
-        // Build progress summary from iteration history
-        if (data.iteration_history) {
-          const steps = data.iteration_history.map((iter, idx) => {
-            const iterNum = idx + 1
-            const results = iter.steps.find(s => s.agent === 'BacktestRunner')?.results
-            if (results) {
-              return `Iteration ${iterNum}: ${results.total_trades} trades, ${results.total_return?.toFixed(1)}% return`
-            }
-            return `Iteration ${iterNum}: Processing...`
-          })
-          setProgressSteps(steps)
-        }
-
-        console.log(`Multi-agent workflow completed in ${data.iterations} iterations`)
-        if (data.insights_config) {
-          console.log(`Generated ${data.insights_config.visualizations?.length || 0} custom visualizations`)
-        }
-
-        // Auto-save new bot after generation completes
-        setTimeout(() => handleSaveBot(true), 1000)
-      }
     } catch (err) {
-      console.error('Error during job submission:', err)
-
-      // If error message indicates job FAILED (not just connection issue), don't poll
-      if (err.message && (err.message.includes('500') || err.message.includes('400'))) {
-        console.error('Job failed on backend, not polling')
-        setError(err.message)
-        setLoading(false)
-        return
-      }
-
-      // If we have a session ID, try to retrieve the result
-      // (job may have completed even if connection dropped)
-      if (newSessionId) {
-        console.log('Attempting to retrieve result for session:', newSessionId)
-        try {
-          const resultResponse = await fetch(`http://localhost:8000/api/strategy/result/${newSessionId}`)
-          if (resultResponse.ok) {
-            const data = await resultResponse.json()
-            console.log('Retrieved completed job result after connection drop')
-            setStrategy(data.strategy)
-            setGeneratedCode(data.code)
-            setBacktestResults(data.backtest_results)
-            setInsightsConfig(data.insights_config)
-            setCurrentIteration(data.iterations)
-
-            if (data.iteration_history) {
-              const steps = data.iteration_history.map((iter, idx) => {
-                const iterNum = idx + 1
-                const results = iter.steps.find(s => s.agent === 'BacktestRunner')?.results
-                if (results) {
-                  return `Iteration ${iterNum}: ${results.total_trades} trades, ${results.total_return?.toFixed(1)}% return`
-                }
-                return `Iteration ${iterNum}: Processing...`
-              })
-              setProgressSteps(steps)
-            }
-
-            setLoading(false)
-            return // Success!
-          }
-        } catch (retrieveErr) {
-          console.log('Result not yet available, will poll...', retrieveErr)
-        }
-      }
-
-      // Start polling for result (only for connection issues, not backend failures)
-      if (newSessionId && useMultiAgent) {
-        console.log('Starting polling for job completion...')
-        pollForResult(newSessionId)
-      } else {
-        setError(err.message)
-        setLoading(false)
-      }
+      console.error('❌ Error during strategy generation:', err)
+      setError(err.message || 'Failed to generate strategy')
+      setLoading(false)
+      setSessionId(null)
     }
-  }
-
-  // Poll for job completion (in case connection dropped)
-  const pollForResult = async (sessionId, maxAttempts = 120, intervalMs = 5000) => {
-    let attempts = 0
-
-    const poll = async () => {
-      attempts++
-      console.log(`Polling attempt ${attempts}/${maxAttempts} for session ${sessionId.substring(0, 8)}...`)
-
-      try {
-        const response = await fetch(`http://localhost:8000/api/strategy/result/${sessionId}`)
-        if (response.ok) {
-          const data = await response.json()
-          console.log('Job completed! Retrieved result.')
-
-          setStrategy(data.strategy)
-          setGeneratedCode(data.code)
-          setBacktestResults(data.backtest_results)
-          setInsightsConfig(data.insights_config)
-          setCurrentIteration(data.iterations)
-
-          if (data.iteration_history) {
-            const steps = data.iteration_history.map((iter, idx) => {
-              const iterNum = idx + 1
-              const results = iter.steps.find(s => s.agent === 'BacktestRunner')?.results
-              if (results) {
-                return `Iteration ${iterNum}: ${results.total_trades} trades, ${results.total_return?.toFixed(1)}% return`
-              }
-              return `Iteration ${iterNum}: Processing...`
-            })
-            setProgressSteps(steps)
-          }
-
-          setLoading(false)
-          setError(null)
-          return true
-        }
-      } catch (err) {
-        console.log('Still waiting for job completion...')
-      }
-
-      // Continue polling
-      if (attempts < maxAttempts) {
-        setTimeout(poll, intervalMs)
-      } else {
-        setError('Job is taking longer than expected. Please check back later.')
-        setLoading(false)
-      }
-    }
-
-    poll()
   }
 
   const handleRunBacktest = async () => {
@@ -550,14 +442,8 @@ function AppContent() {
       setTimeout(() => handleSaveBot(true), 1000)
     } catch (err) {
       console.error('Error during refinement:', err)
-
-      // Try polling for result if connection dropped
-      if (newSessionId) {
-        pollForResult(newSessionId)
-      } else {
-        setError(err.message)
-        setLoading(false)
-      }
+      setError(err.message || 'Refinement failed')
+      setLoading(false)
     }
   }
 
@@ -778,18 +664,16 @@ function AppContent() {
                 </p>
               </div>
 
-              {/* Real-time Agent Activity Log */}
-              {sessionId && (
-                <div className="mt-6 w-full flex justify-center">
-                  <AgentActivityLogPolling
+              {/* Real-time Agent Activity Log (WebSocket-based) */}
+              {sessionId ? (
+                <div className="mt-6 w-full max-w-3xl">
+                  <AgentActivityLogWS
                     sessionId={sessionId}
                     onComplete={handleWorkflowComplete}
                   />
                 </div>
-              )}
-
-              {/* Fallback animated indicator if no session ID */}
-              {!sessionId && (
+              ) : (
+                /* Fallback animated indicator if no session ID */
                 <div className="flex justify-center w-full">
                   <ProgressIndicator />
                 </div>

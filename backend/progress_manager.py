@@ -62,6 +62,16 @@ class ProgressManager:
             'icon': '🎯'
         })
 
+    async def emit_supervisor_complete(self, session_id: str):
+        """Supervisor initial analysis complete"""
+        await self.emit_event(session_id, {
+            'type': 'agent_complete',
+            'agent': 'Supervisor',
+            'action': 'Query analyzed',
+            'message': 'Starting strategy generation workflow...',
+            'icon': '✅'
+        })
+
     async def emit_insights_generation(self, session_id: str):
         """Insights generator analyzing query"""
         await self.emit_event(session_id, {

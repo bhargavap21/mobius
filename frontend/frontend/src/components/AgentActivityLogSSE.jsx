@@ -1,104 +1,126 @@
 import React, { useState, useEffect, useRef } from 'react'
 import PropTypes from 'prop-types'
 
-const AgentActivityLogWS = ({ sessionId, onComplete }) => {
+const AgentActivityLogSSE = ({ sessionId, onComplete }) => {
   const [events, setEvents] = useState([])
   const [isComplete, setIsComplete] = useState(false)
   const [error, setError] = useState(null)
   const [autoScroll, setAutoScroll] = useState(true)
   const scrollRef = useRef(null)
-  const wsRef = useRef(null)
-  const isCompleteRef = useRef(false) // Track completion with ref for immediate access
+  const eventSourceRef = useRef(null)
 
   useEffect(() => {
     if (!sessionId) {
-      console.log('[AgentActivityLogWS] No sessionId, skipping')
+      console.log('[AgentActivityLogSSE] No sessionId, skipping')
       return
     }
 
-    console.log('[AgentActivityLogWS] 🚀 Setting up WebSocket for sessionId:', sessionId)
+    console.log('[AgentActivityLogSSE] 🚀 Setting up fetch-based SSE for sessionId:', sessionId)
 
+    let abortController = new AbortController()
     let cleanedUp = false
 
-    const connectWS = () => {
-      const wsUrl = `ws://localhost:8000/ws/strategy/progress/${sessionId}`
-      console.log('[AgentActivityLogWS] 🔌 Connecting to:', wsUrl)
+    const connectSSE = async () => {
+      try {
+        const url = `http://localhost:8000/api/strategy/progress/${sessionId}`
+        console.log('[AgentActivityLogSSE] 📡 Connecting to:', url)
 
-      const ws = new WebSocket(wsUrl)
-      wsRef.current = ws
+        const response = await fetch(url, {
+          signal: abortController.signal,
+          headers: {
+            'Accept': 'text/event-stream',
+          }
+        })
 
-      ws.onopen = () => {
-        console.log('[AgentActivityLogWS] ✅ WebSocket connection established')
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`)
+        }
+
+        console.log('[AgentActivityLogSSE] ✅ Connection established')
         setError(null)
-      }
 
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data)
-          console.log('[AgentActivityLogWS] 📨 Received event:', data)
+        const reader = response.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
 
-          // Handle ready signal - notify App that stream is ready
-          if (data.type === 'ready') {
-            console.log('[AgentActivityLogWS] ✅ Stream ready, signaling to App...')
-            if (window.wsStreamReady) {
-              window.wsStreamReady(sessionId)
-            }
-            return
+        while (!cleanedUp) {
+          const { done, value } = await reader.read()
+
+          if (done) {
+            console.log('[AgentActivityLogSSE] Stream ended')
+            break
           }
 
-          // Skip heartbeat events
-          if (data.type === 'heartbeat') {
-            console.log('[AgentActivityLogWS] 💓 Heartbeat received')
-            return
-          }
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || '' // Keep incomplete line in buffer
 
-          // Add event to list
-          if (!cleanedUp) {
-            setEvents(prev => [...prev, data])
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              try {
+                const data = line.slice(6) // Remove 'data: ' prefix
+                const event = JSON.parse(data)
+                console.log('[AgentActivityLogSSE] 📨 Received event:', event)
 
-            // Check for completion
-            if (data.type === 'complete' || data.type === 'error') {
-              console.log('[AgentActivityLogWS] 🎉 Workflow complete!')
-              setIsComplete(true)
-              isCompleteRef.current = true // Set ref immediately for onclose handler
+                // Handle ready signal - notify App that stream is ready
+                if (event.type === 'ready') {
+                  console.log('[AgentActivityLogSSE] ✅ Stream ready, signaling to App...')
+                  if (window.sseStreamReady) {
+                    window.sseStreamReady(sessionId)
+                  }
+                  continue
+                }
 
-              // Notify parent
-              if (onComplete) {
-                console.log('[AgentActivityLogWS] Notifying parent of completion')
-                onComplete(sessionId)
+                // Skip connection acknowledgment
+                if (event.type === 'connected') {
+                  console.log('[AgentActivityLogSSE] Connected to stream')
+                  continue
+                }
+
+                // Add event to list
+                if (!cleanedUp) {
+                  setEvents(prev => [...prev, event])
+
+                  // Check for completion
+                  if (event.type === 'complete' || event.type === 'error') {
+                    console.log('[AgentActivityLogSSE] 🎉 Workflow complete!')
+                    setIsComplete(true)
+
+                    // Notify parent
+                    if (onComplete) {
+                      console.log('[AgentActivityLogSSE] Notifying parent of completion')
+                      onComplete(sessionId)
+                    }
+
+                    reader.cancel()
+                    return
+                  }
+                }
+              } catch (err) {
+                console.error('[AgentActivityLogSSE] ❌ Error parsing event:', err)
               }
             }
           }
-        } catch (err) {
-          console.error('[AgentActivityLogWS] ❌ Error parsing message:', err)
         }
-      }
-
-      ws.onerror = (err) => {
-        console.error('[AgentActivityLogWS] ❌ WebSocket error:', err)
-        if (!cleanedUp) {
-          setError('Connection error. Please refresh the page.')
-        }
-      }
-
-      ws.onclose = () => {
-        console.log('[AgentActivityLogWS] 🔌 WebSocket connection closed')
-        // Use ref instead of state to avoid race condition with async state updates
-        if (!cleanedUp && !isCompleteRef.current) {
-          setError('Connection closed unexpectedly.')
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          console.log('[AgentActivityLogSSE] Connection aborted (cleanup)')
+        } else {
+          console.error('[AgentActivityLogSSE] ❌ Connection error:', err)
+          if (!cleanedUp) {
+            setError('Connection failed. Please refresh the page.')
+          }
         }
       }
     }
 
-    connectWS()
+    connectSSE()
 
     // Cleanup
     return () => {
-      console.log('[AgentActivityLogWS] 🧹 Cleaning up WebSocket connection')
+      console.log('[AgentActivityLogSSE] 🧹 Cleaning up SSE connection')
       cleanedUp = true
-      if (wsRef.current) {
-        wsRef.current.close()
-      }
+      abortController.abort()
     }
   }, [sessionId]) // Removed onComplete from deps to prevent re-running
 
@@ -161,47 +183,30 @@ const AgentActivityLogWS = ({ sessionId, onComplete }) => {
     }
   }
 
-  // Map phases to actual agents in the workflow
+  // Group events by agent phase
   const phases = [
-    { key: 'supervisor', label: 'Analyzing Strategy', icon: 'PARSE', agent: 'Supervisor' },
-    { key: 'insights', label: 'Planning Visualizations', icon: 'CHART', agent: 'InsightsGenerator' },
-    { key: 'code', label: 'Generating Code', icon: 'CODE', agent: 'CodeGenerator' },
-    { key: 'backtest', label: 'Running Backtest', icon: 'TEST', agent: 'BacktestRunner' },
-    { key: 'analyze', label: 'Analyzing Results', icon: 'ANALYZE', agent: 'StrategyAnalyst' },
+    { key: 'parse', label: 'Parsing Strategy', icon: 'PARSE' },
+    { key: 'code', label: 'Generating Code', icon: 'CODE' },
+    { key: 'backtest', label: 'Running Backtest', icon: 'TEST' },
+    { key: 'analyze', label: 'Analyzing Results', icon: 'ANALYZE' },
+    { key: 'refine', label: 'Refining Strategy', icon: 'REFINE' },
   ]
 
-  const getPhaseStatus = (phase) => {
-    // Find all events for this specific agent
-    const phaseEvents = events.filter(e => e.agent === phase.agent)
+  const getPhaseStatus = (phaseKey) => {
+    const phaseEvents = events.filter(e =>
+      e.agent?.toLowerCase().includes(phaseKey) ||
+      e.message?.toLowerCase().includes(phaseKey) ||
+      (phaseKey === 'parse' && e.type === 'agent_start' && e.agent === 'StrategyParser') ||
+      (phaseKey === 'code' && e.agent === 'CodeGenerator') ||
+      (phaseKey === 'backtest' && e.agent === 'BacktestRunner') ||
+      (phaseKey === 'analyze' && e.agent === 'StrategyAnalyst')
+    )
 
     if (phaseEvents.length === 0) return 'pending'
 
-    // Check the last event for this agent
     const lastEvent = phaseEvents[phaseEvents.length - 1]
-
-    // Special handling for workflow completion
-    const workflowComplete = events.some(e => e.type === 'complete' || e.type === 'error')
-
-    // If workflow is complete, ALL agents that ran at least once should show as done
-    if (workflowComplete && phaseEvents.length > 0) {
-      return 'done'
-    }
-
-    // If last event is agent_complete, phase is done (for current iteration)
-    if (lastEvent.type === 'agent_complete') {
-      // Check if there's an iteration_start after this complete
-      // (which would mean we're starting a new iteration and this agent will run again)
-      const lastCompleteIndex = events.lastIndexOf(lastEvent)
-      const hasIterationAfter = events.slice(lastCompleteIndex).some(e => e.type === 'iteration_start')
-
-      // If new iteration started, this phase might become active again
-      return hasIterationAfter ? 'done' : 'done'
-    }
-
-    // If last event is agent_start, phase is active
-    if (lastEvent.type === 'agent_start') return 'active'
-
-    return 'pending'
+    if (lastEvent.type === 'agent_complete') return 'done'
+    return 'active'
   }
 
   return (
@@ -209,7 +214,7 @@ const AgentActivityLogWS = ({ sessionId, onComplete }) => {
       {/* Phase Status Boxes */}
       <div className="space-y-3 mb-6">
         {phases.map((phase, idx) => {
-          const status = getPhaseStatus(phase)
+          const status = getPhaseStatus(phase.key)
           const isActive = status === 'active'
           const isDone = status === 'done'
           const isPending = status === 'pending'
@@ -300,9 +305,9 @@ const AgentActivityLogWS = ({ sessionId, onComplete }) => {
   )
 }
 
-AgentActivityLogWS.propTypes = {
+AgentActivityLogSSE.propTypes = {
   sessionId: PropTypes.string,
   onComplete: PropTypes.func
 }
 
-export default AgentActivityLogWS
+export default AgentActivityLogSSE

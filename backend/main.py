@@ -434,6 +434,12 @@ async def _run_multi_agent_workflow(
         from job_storage import job_storage
         job_storage.store_result(session_id, error_data)
 
+        # CRITICAL: Emit error event to WebSocket so client knows workflow failed
+        from progress_manager import progress_manager
+        if progress_manager:
+            await progress_manager.emit_error(session_id, 'Workflow', str(e))
+            logger.info(f"✅ Error event emitted for session {session_id[:8]}")
+
 
 @app.post("/api/sessions")
 async def create_session(user_id: UUID = Depends(get_current_user_id)):

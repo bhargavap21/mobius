@@ -200,7 +200,7 @@ function RenderVisualization({ visualization, data }) {
       <h3 className="text-sm font-light text-white mb-1">{title}</h3>
       <p className="text-xs text-white/50 mb-3">{description}</p>
 
-      <div className="relative">
+      <div className="relative" style={{ minHeight: '400px', height: '400px' }}>
         <ResponsiveContainer width="100%" height={400}>
           <ComposedChart data={data}>
             <CartesianGrid strokeDasharray="3 3" stroke="#333" />

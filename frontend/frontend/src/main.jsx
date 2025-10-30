@@ -64,15 +64,13 @@ function CommunityPageWrapper() {
 }
 
 createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <BrowserRouter>
-      <AuthProvider>
-        <Routes>
-          <Route path="/" element={<App />} />
-          <Route path="/community" element={<CommunityPageWrapper />} />
-          <Route path="/auth/confirm" element={<EmailConfirmation />} />
-        </Routes>
-      </AuthProvider>
-    </BrowserRouter>
-  </StrictMode>,
+  <BrowserRouter>
+    <AuthProvider>
+      <Routes>
+        <Route path="/" element={<App />} />
+        <Route path="/community" element={<CommunityPageWrapper />} />
+        <Route path="/auth/confirm" element={<EmailConfirmation />} />
+      </Routes>
+    </AuthProvider>
+  </BrowserRouter>,
 )

@@ -119,9 +119,10 @@ export default function BacktestResults({ results, insightsConfig }) {
       </div>
 
       {/* Portfolio Performance Chart */}
-      <div className="border-t border-white/10">
-        <h3 className="text-sm font-light text-white mb-0">Portfolio Value Over Time</h3>
-        <ResponsiveContainer width="100%" height={420}>
+      <div className="border-t border-white/10 pt-4">
+        <h3 className="text-sm font-light text-white mb-3">Portfolio Value Over Time</h3>
+        <div style={{ minHeight: '420px', height: '420px' }}>
+          <ResponsiveContainer width="100%" height={420}>
           <LineChart data={portfolio_history} margin={{ top: 5, right: 10, left: 0, bottom: -10 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
             <XAxis
@@ -159,6 +160,7 @@ export default function BacktestResults({ results, insightsConfig }) {
             />
           </LineChart>
         </ResponsiveContainer>
+        </div>
       </div>
 
       {/* Additional Info Charts (Indicators/Sentiment) - Dynamic or Legacy */}

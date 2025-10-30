@@ -138,6 +138,10 @@ class SupervisorAgent(BaseAgent):
         start_time = time.time()
         max_workflow_time = 600  # 10 minutes max
 
+        # Mark supervisor analysis as complete
+        if progress:
+            await progress.emit_supervisor_complete(session_id)
+
         for iteration in range(1, self.max_iterations + 1):
             # Safety check: prevent infinite loops
             if time.time() - start_time > max_workflow_time:
