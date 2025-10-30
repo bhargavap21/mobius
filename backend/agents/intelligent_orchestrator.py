@@ -34,6 +34,16 @@ class IntelligentOrchestrator:
     def __init__(self):
         self.insights_cache = {}  # Cache insights for reuse
         self.learning_history = []  # Track what we've learned
+        self.registered_tools = {}  # Store registered tools
+
+    def register_tool(self, name: str, description: str, input_schema: Dict, function: callable):
+        """Register a tool with the orchestrator"""
+        self.registered_tools[name] = {
+            'description': description,
+            'input_schema': input_schema,
+            'function': function
+        }
+        logger.debug(f"Registered tool: {name}")
 
     def analyze_backtest_data(self, backtest_results: Dict[str, Any],
                                strategy: Dict[str, Any]) -> Dict[str, Any]:
