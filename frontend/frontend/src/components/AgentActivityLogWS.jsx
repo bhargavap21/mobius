@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import PropTypes from 'prop-types'
+import { WS_URL } from '../config'
 
 const AgentActivityLogWS = ({ sessionId, onComplete }) => {
   const [events, setEvents] = useState([])
@@ -21,7 +22,7 @@ const AgentActivityLogWS = ({ sessionId, onComplete }) => {
     let cleanedUp = false
 
     const connectWS = () => {
-      const wsUrl = `ws://localhost:8000/ws/strategy/progress/${sessionId}`
+      const wsUrl = `${WS_URL}/ws/strategy/progress/${sessionId}`
       console.log('[AgentActivityLogWS] 🔌 Connecting to:', wsUrl)
 
       const ws = new WebSocket(wsUrl)

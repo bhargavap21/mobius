@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
+import { API_URL } from './config'
 import StrategyInput from './components/StrategyInput'
 import CodeDisplay from './components/CodeDisplay'
 import LoadingSpinner from './components/LoadingSpinner'
@@ -64,7 +65,7 @@ function AppContent() {
       if (!isAuthenticated) return
 
       try {
-        const response = await fetch('http://localhost:8000/bots?page=1&page_size=1', {
+        const response = await fetch(`${API_URL}/bots?page=1&page_size=1`, {
           headers: getAuthHeaders()
         })
 
@@ -108,7 +109,7 @@ function AppContent() {
     try {
       // STEP 1: Create session (no work starts yet)
       console.log('[App] Step 1: Creating session...')
-      const sessionResponse = await fetch('http://localhost:8000/api/sessions', {
+      const sessionResponse = await fetch(`${API_URL}/api/sessions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -152,8 +153,8 @@ function AppContent() {
       // STEP 3: Start the workflow (SSE stream is now open and waiting)
       console.log('[App] Step 3: Starting workflow...')
       const startUrl = useFastMode
-        ? `http://localhost:8000/api/sessions/${newSessionId}/start?fast_mode=true`
-        : `http://localhost:8000/api/sessions/${newSessionId}/start`
+        ? `${API_URL}/api/sessions/${newSessionId}/start?fast_mode=true`
+        : `${API_URL}/api/sessions/${newSessionId}/start`
 
       const startResponse = await fetch(startUrl, {
         method: 'POST',
@@ -199,7 +200,7 @@ function AppContent() {
     setError(null)
 
     try {
-      const response = await fetch('http://localhost:8000/api/strategy/backtest', {
+      const response = await fetch(`${API_URL}/api/strategy/backtest`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -237,7 +238,7 @@ function AppContent() {
 
     try {
       // Fetch the final results from the backend
-      const response = await fetch(`http://localhost:8000/api/strategy/result/${completedSessionId}`)
+      const response = await fetch(`${API_URL}/api/strategy/result/${completedSessionId}`)
 
       if (response.ok) {
         const data = await response.json()
@@ -302,7 +303,7 @@ function AppContent() {
     try {
       // If we have a current bot ID, update it instead of creating new
       if (currentBotId) {
-        const response = await fetch(`http://localhost:8000/bots/${currentBotId}`, {
+        const response = await fetch(`${API_URL}/bots/${currentBotId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -340,7 +341,7 @@ function AppContent() {
       console.log('  Strategy:', strategy)
       console.log('  Session ID:', sessionId)
 
-      const response = await fetch('http://localhost:8000/bots', {
+      const response = await fetch(`${API_URL}/bots`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -412,7 +413,7 @@ function AppContent() {
 
     try {
       // Call the NEW refine endpoint instead of recreating from scratch
-      const response = await fetch('http://localhost:8000/api/strategy/refine', {
+      const response = await fetch(`${API_URL}/api/strategy/refine`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

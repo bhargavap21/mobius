@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { API_URL } from '../config'
 
 const DeploymentPage = ({
   strategy,
@@ -35,7 +36,7 @@ const DeploymentPage = ({
     setError(null)
 
     try {
-      const response = await fetch('http://localhost:8000/deployments', {
+      const response = await fetch(`${API_URL}/deployments', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

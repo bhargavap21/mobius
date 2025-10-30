@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
+import { API_URL } from '../config'
 
 const DeploymentMonitor = ({ onBack }) => {
   const { getAuthHeaders, isAuthenticated } = useAuth()
@@ -16,7 +17,7 @@ const DeploymentMonitor = ({ onBack }) => {
     if (!isAuthenticated) return
 
     try {
-      const response = await fetch('http://localhost:8000/deployments', {
+      const response = await fetch(`${API_URL}/deployments', {
         headers: getAuthHeaders()
       })
 
@@ -43,13 +44,13 @@ const DeploymentMonitor = ({ onBack }) => {
 
     try {
       const [metricsRes, tradesRes, positionsRes] = await Promise.all([
-        fetch(`http://localhost:8000/deployments/${deploymentId}/metrics?limit=100`, {
+        fetch(`${API_URL}/deployments/${deploymentId}/metrics?limit=100`, {
           headers: getAuthHeaders()
         }),
-        fetch(`http://localhost:8000/deployments/${deploymentId}/trades?limit=50`, {
+        fetch(`${API_URL}/deployments/${deploymentId}/trades?limit=50`, {
           headers: getAuthHeaders()
         }),
-        fetch(`http://localhost:8000/deployments/${deploymentId}/positions`, {
+        fetch(`${API_URL}/deployments/${deploymentId}/positions`, {
           headers: getAuthHeaders()
         })
       ])
@@ -65,7 +66,7 @@ const DeploymentMonitor = ({ onBack }) => {
   // Handle deployment status change
   const handleStatusChange = async (deploymentId, action) => {
     try {
-      const response = await fetch(`http://localhost:8000/deployments/${deploymentId}/${action}`, {
+      const response = await fetch(`${API_URL}/deployments/${deploymentId}/${action}`, {
         method: 'POST',
         headers: getAuthHeaders()
       })

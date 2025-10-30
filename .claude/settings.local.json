@@ -30,7 +30,14 @@
       "Bash(git checkout:*)",
       "Bash(git add -A)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(for file in components/EmailConfirmation.jsx components/StrategySidebar.jsx components/DeploymentMonitor.jsx components/DeploymentPage.jsx pages/CommunityPage.jsx)",
+      "Bash(do)",
+      "Bash(if ! grep -q \"import.*API_URL\" \"$file\")",
+      "Bash(then)",
+      "Bash(echo:*)",
+      "Bash(fi)",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { API_URL } from '../config';
 import BotsGrid from './bots/BotsGrid';
 
 const BotLibrary = ({ onClose, onLoadBot, user, onSignOut, onShowBotLibrary }) => {
@@ -19,7 +20,7 @@ const BotLibrary = ({ onClose, onLoadBot, user, onSignOut, onShowBotLibrary }) =
 
     try {
       // Always fetch all bots - filtering will be done client-side
-      const url = 'http://localhost:8000/bots?page=1&page_size=50';
+      const url = `${API_URL}/bots?page=1&page_size=50`;
 
       const headers = getAuthHeaders();
       console.log('[BotLibrary] Auth headers:', headers);
@@ -51,7 +52,7 @@ const BotLibrary = ({ onClose, onLoadBot, user, onSignOut, onShowBotLibrary }) =
 
   const toggleFavorite = async (botId, currentStatus) => {
     try {
-      const response = await fetch(`http://localhost:8000/bots/${botId}/favorite`, {
+      const response = await fetch(`${API_URL}/bots/${botId}/favorite`, {
         method: 'POST',
         headers: {
           ...getAuthHeaders(),
@@ -77,7 +78,7 @@ const BotLibrary = ({ onClose, onLoadBot, user, onSignOut, onShowBotLibrary }) =
     }
 
     try {
-      const response = await fetch(`http://localhost:8000/bots/${botId}`, {
+      const response = await fetch(`${API_URL}/bots/${botId}`, {
         method: 'DELETE',
         headers: {
           ...getAuthHeaders(),
@@ -96,7 +97,7 @@ const BotLibrary = ({ onClose, onLoadBot, user, onSignOut, onShowBotLibrary }) =
 
   const loadBotDetails = async (botId) => {
     try {
-      const response = await fetch(`http://localhost:8000/bots/${botId}`, {
+      const response = await fetch(`${API_URL}/bots/${botId}`, {
         headers: {
           ...getAuthHeaders(),
         },

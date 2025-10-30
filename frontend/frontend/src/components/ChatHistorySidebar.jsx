@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { API_URL } from '../config';
 import { Plus, MessageSquare, Trash2, Star, Calendar } from 'lucide-react';
 
 const ChatHistorySidebar = ({ onClose, onLoadBot, onNewChat, currentBotId }) => {
@@ -17,7 +18,7 @@ const ChatHistorySidebar = ({ onClose, onLoadBot, onNewChat, currentBotId }) => 
     setError('');
 
     try {
-      const response = await fetch('http://localhost:8000/bots?page=1&page_size=100', {
+      const response = await fetch(`${API_URL}/bots?page=1&page_size=100', {
         headers: getAuthHeaders(),
       });
 
@@ -42,7 +43,7 @@ const ChatHistorySidebar = ({ onClose, onLoadBot, onNewChat, currentBotId }) => 
 
   const loadBotDetails = async (botId) => {
     try {
-      const response = await fetch(`http://localhost:8000/bots/${botId}`, {
+      const response = await fetch(`${API_URL}/bots/${botId}`, {
         headers: getAuthHeaders(),
       });
 
@@ -74,7 +75,7 @@ const ChatHistorySidebar = ({ onClose, onLoadBot, onNewChat, currentBotId }) => 
     }
 
     try {
-      const response = await fetch(`http://localhost:8000/bots/${botId}`, {
+      const response = await fetch(`${API_URL}/bots/${botId}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
