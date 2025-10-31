@@ -143,21 +143,32 @@ class SupervisorAgent(BaseAgent):
             await progress.emit_supervisor_complete(session_id)
 
         for iteration in range(1, self.max_iterations + 1):
-            # Safety check: prevent infinite loops
-            if time.time() - start_time > max_workflow_time:
-                logger.error(f"⚠️ Workflow exceeded maximum time ({max_workflow_time}s), stopping")
-                break
-            logger.info(f"\n{'='*60}")
-            logger.info(f"🔄 ITERATION {iteration}/{self.max_iterations}")
-            logger.info(f"{'='*60}\n")
+            try:
+                # Safety check: prevent infinite loops
+                if time.time() - start_time > max_workflow_time:
+                    logger.error(f"⚠️ Workflow exceeded maximum time ({max_workflow_time}s), stopping")
+                    break
+                logger.info(f"\n{'='*60}")
+                logger.info(f"🔄 ITERATION {iteration}/{self.max_iterations}")
+                logger.info(f"{'='*60}\n")
 
-            if progress:
-                await progress.emit_iteration_start(session_id, iteration, self.max_iterations)
+                if progress:
+                    await progress.emit_iteration_start(session_id, iteration, self.max_iterations)
 
-            iteration_data = {
-                'iteration': iteration,
-                'steps': []
-            }
+                iteration_data = {
+                    'iteration': iteration,
+                    'steps': []
+                }
+            except Exception as iteration_error:
+                logger.error(f"❌ Critical error in iteration {iteration}: {iteration_error}")
+                import traceback
+                traceback.print_exc()
+                if progress:
+                    await progress.emit_error(session_id, 'Supervisor', f"Iteration failed: {str(iteration_error)}")
+                return {
+                    'success': False,
+                    'error': f"Workflow failed at iteration {iteration}: {str(iteration_error)}"
+                }
 
             # STEP 1: Code Generation
             logger.info(f"📝 Step 1: Code Generation")
