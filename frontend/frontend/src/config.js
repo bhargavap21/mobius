@@ -14,6 +14,15 @@ const getApiUrl = () => {
 export const API_URL = getApiUrl()
 
 // WebSocket URL (derived from API URL)
-export const WS_URL = API_URL.replace(/^http/, 'ws')
+// Properly handles both http→ws and https→wss conversions
+const getWsUrl = () => {
+  const apiUrl = getApiUrl()
+  if (apiUrl.startsWith('https')) {
+    return apiUrl.replace(/^https/, 'wss')
+  }
+  return apiUrl.replace(/^http/, 'ws')
+}
+
+export const WS_URL = getWsUrl()
 
 console.log('API Configuration:', { API_URL, WS_URL })

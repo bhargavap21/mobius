@@ -7,9 +7,16 @@ const AgentActivityLogWS = ({ sessionId, onComplete }) => {
   const [isComplete, setIsComplete] = useState(false)
   const [error, setError] = useState(null)
   const [autoScroll, setAutoScroll] = useState(true)
+  const [reconnecting, setReconnecting] = useState(false)
   const scrollRef = useRef(null)
   const wsRef = useRef(null)
   const isCompleteRef = useRef(false) // Track completion with ref for immediate access
+  const reconnectAttemptRef = useRef(0) // Track reconnect attempts
+  const reconnectTimeoutRef = useRef(null) // Store reconnect timeout
+
+  const MAX_RECONNECT_ATTEMPTS = 5
+  const INITIAL_RECONNECT_DELAY = 1000 // 1 second
+  const MAX_RECONNECT_DELAY = 30000 // 30 seconds
 
   useEffect(() => {
     if (!sessionId) {
@@ -21,6 +28,34 @@ const AgentActivityLogWS = ({ sessionId, onComplete }) => {
 
     let cleanedUp = false
 
+    const reconnectWithBackoff = (attempt = 0) => {
+      if (cleanedUp || isCompleteRef.current) {
+        return
+      }
+
+      if (attempt >= MAX_RECONNECT_ATTEMPTS) {
+        console.error('[AgentActivityLogWS] ❌ Max reconnect attempts reached')
+        setError('Failed to reconnect after multiple attempts. Please refresh the page.')
+        setReconnecting(false)
+        return
+      }
+
+      // Exponential backoff: 1s, 2s, 4s, 8s, 16s, max 30s
+      const delay = Math.min(INITIAL_RECONNECT_DELAY * Math.pow(2, attempt), MAX_RECONNECT_DELAY)
+      
+      console.log(`[AgentActivityLogWS] 🔄 Scheduling reconnect attempt ${attempt + 1} in ${delay}ms...`)
+      setReconnecting(true)
+      setError(`Reconnecting... (attempt ${attempt + 1}/${MAX_RECONNECT_ATTEMPTS})`)
+
+      reconnectTimeoutRef.current = setTimeout(() => {
+        if (!cleanedUp && !isCompleteRef.current) {
+          console.log(`[AgentActivityLogWS] 🔄 Reconnecting (attempt ${attempt + 1})...`)
+          reconnectAttemptRef.current = attempt + 1
+          connectWS()
+        }
+      }, delay)
+    }
+
     const connectWS = () => {
       const wsUrl = `${WS_URL}/ws/strategy/progress/${sessionId}`
       console.log('[AgentActivityLogWS] 🔌 Connecting to:', wsUrl)
@@ -31,6 +66,13 @@ const AgentActivityLogWS = ({ sessionId, onComplete }) => {
       ws.onopen = () => {
         console.log('[AgentActivityLogWS] ✅ WebSocket connection established')
         setError(null)
+        setReconnecting(false)
+        reconnectAttemptRef.current = 0 // Reset reconnect attempts on successful connection
+        // Clear any pending reconnect timeout
+        if (reconnectTimeoutRef.current) {
+          clearTimeout(reconnectTimeoutRef.current)
+          reconnectTimeoutRef.current = null
+        }
       }
 
       ws.onmessage = (event) => {
@@ -62,6 +104,13 @@ const AgentActivityLogWS = ({ sessionId, onComplete }) => {
               console.log('[AgentActivityLogWS] 🎉 Workflow complete!')
               setIsComplete(true)
               isCompleteRef.current = true // Set ref immediately for onclose handler
+              setReconnecting(false)
+              
+              // Clear any pending reconnect timeout
+              if (reconnectTimeoutRef.current) {
+                clearTimeout(reconnectTimeoutRef.current)
+                reconnectTimeoutRef.current = null
+              }
 
               // Notify parent
               if (onComplete) {
@@ -77,16 +126,23 @@ const AgentActivityLogWS = ({ sessionId, onComplete }) => {
 
       ws.onerror = (err) => {
         console.error('[AgentActivityLogWS] ❌ WebSocket error:', err)
-        if (!cleanedUp) {
-          setError('Connection error. Please refresh the page.')
-        }
+        // Don't set error here - onclose will handle reconnection
       }
 
-      ws.onclose = () => {
-        console.log('[AgentActivityLogWS] 🔌 WebSocket connection closed')
+      ws.onclose = (event) => {
+        console.log('[AgentActivityLogWS] 🔌 WebSocket connection closed', { code: event.code, reason: event.reason })
+        
         // Use ref instead of state to avoid race condition with async state updates
         if (!cleanedUp && !isCompleteRef.current) {
-          setError('Connection closed unexpectedly.')
+          // Don't reconnect if it was a normal closure (code 1000) or if we're already reconnecting
+          if (event.code !== 1000 && reconnectAttemptRef.current < MAX_RECONNECT_ATTEMPTS) {
+            reconnectWithBackoff(reconnectAttemptRef.current)
+          } else if (event.code === 1000) {
+            // Normal closure - don't show error
+            console.log('[AgentActivityLogWS] Normal closure, not reconnecting')
+          } else {
+            setError('Connection closed unexpectedly.')
+          }
         }
       }
     }
@@ -97,6 +153,10 @@ const AgentActivityLogWS = ({ sessionId, onComplete }) => {
     return () => {
       console.log('[AgentActivityLogWS] 🧹 Cleaning up WebSocket connection')
       cleanedUp = true
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current)
+        reconnectTimeoutRef.current = null
+      }
       if (wsRef.current) {
         wsRef.current.close()
       }
@@ -252,8 +312,14 @@ const AgentActivityLogWS = ({ sessionId, onComplete }) => {
 
       {/* Error Display */}
       {error && (
-        <div className="p-4 bg-red-500/10 rounded-lg border border-red-500/30 mb-4">
-          <p className="text-red-400 text-sm">⚠️ {error}</p>
+        <div className={`p-4 rounded-lg border mb-4 ${
+          reconnecting 
+            ? 'bg-yellow-500/10 border-yellow-500/30' 
+            : 'bg-red-500/10 border-red-500/30'
+        }`}>
+          <p className={`text-sm ${reconnecting ? 'text-yellow-400' : 'text-red-400'}`}>
+            {reconnecting ? '🔄' : '⚠️'} {error}
+          </p>
         </div>
       )}
 

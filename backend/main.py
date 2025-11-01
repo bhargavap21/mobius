@@ -495,17 +495,39 @@ async def websocket_progress(websocket: WebSocket, session_id: str):
         })
         logger.info(f"✅ Sent ready signal for session: {session_id[:8]}")
 
+        # Start proactive heartbeat task (every 30 seconds)
+        heartbeat_interval = 30.0  # Send heartbeat every 30 seconds
+        last_heartbeat = asyncio.get_event_loop().time()
+        heartbeat_task = None
+        
+        async def send_heartbeat():
+            """Background task to send proactive heartbeats"""
+            try:
+                while True:
+                    await asyncio.sleep(heartbeat_interval)
+                    try:
+                        await websocket.send_json({'type': 'heartbeat'})
+                        logger.debug(f"💓 Sent proactive heartbeat (session: {session_id[:8]})")
+                    except Exception as e:
+                        logger.debug(f"💓 Failed to send heartbeat, connection may be closed: {e}")
+                        break
+            except asyncio.CancelledError:
+                logger.debug(f"💓 Heartbeat task cancelled (session: {session_id[:8]})")
+        
+        heartbeat_task = asyncio.create_task(send_heartbeat())
+
         # Stream events as they arrive
         logger.info(f"🔄 Entering event loop for session: {session_id[:8]}")
         while True:
             try:
-                # Wait for new event with timeout
+                # Wait for new event with shorter timeout (heartbeat handles keep-alive)
                 import time
                 wait_start = time.time()
                 logger.debug(f"⏳ Waiting for event from queue (session: {session_id[:8]}, qsize: {queue.qsize()})")
-                event = await asyncio.wait_for(queue.get(), timeout=300.0)  # 5 minutes for complex workflows
+                event = await asyncio.wait_for(queue.get(), timeout=300.0)  # 5 minutes max, but heartbeat keeps alive
                 wait_end = time.time()
                 logger.info(f"📦 Retrieved event from queue: {event.get('type')} at {wait_end}, waited {wait_end - wait_start:.3f}s (session: {session_id[:8]})")
+                last_heartbeat = asyncio.get_event_loop().time()  # Update last activity time
 
                 # Send event to client - explicitly catch connection errors
                 logger.info(f"🔜 About to send event: {event.get('type')} (session: {session_id[:8]})")
@@ -532,13 +554,9 @@ async def websocket_progress(websocket: WebSocket, session_id: str):
                     break
 
             except asyncio.TimeoutError:
-                # Send heartbeat to keep connection alive
-                logger.debug(f"💓 Sending heartbeat (session: {session_id[:8]})")
-                try:
-                    await websocket.send_json({'type': 'heartbeat'})
-                except Exception as heartbeat_error:
-                    logger.warning(f"⚠️ Failed to send heartbeat, client may have disconnected: {heartbeat_error}")
-                    break  # Exit if we can't send heartbeat
+                # This timeout is now mainly for safety - heartbeat task handles keep-alive
+                # But we still check timeout to prevent truly stuck connections
+                logger.debug(f"⏳ Queue timeout (session: {session_id[:8]}) - heartbeat task handles keep-alive")
                 continue
 
     except WebSocketDisconnect:
@@ -546,6 +564,13 @@ async def websocket_progress(websocket: WebSocket, session_id: str):
     except Exception as e:
         logger.error(f"❌ WebSocket error for session {session_id[:8]}: {e}")
     finally:
+        # Cancel heartbeat task
+        if heartbeat_task and not heartbeat_task.done():
+            heartbeat_task.cancel()
+            try:
+                await heartbeat_task
+            except asyncio.CancelledError:
+                pass
         progress_manager.close_session(session_id)
 
 
