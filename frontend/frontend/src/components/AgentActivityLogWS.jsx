@@ -77,6 +77,14 @@ const AgentActivityLogWS = ({ sessionId, onComplete }) => {
 
       ws.onmessage = (event) => {
         try {
+          // Handle WebSocket ping frame (text "ping")
+          if (event.data === 'ping') {
+            console.log('[AgentActivityLogWS] 💓 WebSocket ping received')
+            // Send pong response
+            ws.send('pong')
+            return
+          }
+
           const data = JSON.parse(event.data)
           console.log('[AgentActivityLogWS] 📨 Received event:', data)
 
@@ -95,9 +103,24 @@ const AgentActivityLogWS = ({ sessionId, onComplete }) => {
             return
           }
 
-          // Add event to list
+          // Add event to list (with deduplication based on timestamp)
           if (!cleanedUp) {
-            setEvents(prev => [...prev, data])
+            setEvents(prev => {
+              // Check if event already exists (prevent duplicates from reconnection)
+              const eventId = `${data.type}-${data.agent}-${data.timestamp || ''}`
+              const exists = prev.some(e => 
+                e.type === data.type && 
+                e.agent === data.agent && 
+                e.timestamp === data.timestamp
+              )
+              
+              if (exists) {
+                console.log('[AgentActivityLogWS] ⚠️ Duplicate event detected, skipping:', eventId)
+                return prev
+              }
+              
+              return [...prev, data]
+            })
 
             // Check for completion
             if (data.type === 'complete' || data.type === 'error') {
@@ -120,7 +143,12 @@ const AgentActivityLogWS = ({ sessionId, onComplete }) => {
             }
           }
         } catch (err) {
-          console.error('[AgentActivityLogWS] ❌ Error parsing message:', err)
+          // Handle non-JSON messages (like "ping")
+          if (event.data === 'ping' || event.data === 'pong') {
+            console.log(`[AgentActivityLogWS] 💓 WebSocket ${event.data} received`)
+            return
+          }
+          console.error('[AgentActivityLogWS] ❌ Error parsing message:', err, 'Raw data:', event.data)
         }
       }
 

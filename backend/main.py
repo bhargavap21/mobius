@@ -482,16 +482,21 @@ async def websocket_progress(websocket: WebSocket, session_id: str):
             logger.info(f"📡 Creating new WS session: {session_id[:8]}")
             queue = progress_manager.create_session(session_id)
 
-        # Send buffered events first (if any)
+        # Send ALL events from history on reconnect (not just buffered ones)
+        # This ensures client gets complete event log even after disconnect
         if session_id in progress_manager.event_history:
-            logger.info(f"📡 Sending {len(progress_manager.event_history[session_id])} buffered events")
-            for event in progress_manager.event_history[session_id]:
+            events_to_send = progress_manager.event_history[session_id]
+            logger.info(f"📡 Sending {len(events_to_send)} events from history (complete event log)")
+            for idx, event in enumerate(events_to_send):
                 try:
                     await websocket.send_json(event)
-                    logger.debug(f"📤 Sent buffered event: {event.get('type')}")
+                    logger.debug(f"📤 Sent historical event {idx+1}/{len(events_to_send)}: {event.get('type')}")
+                    # Small delay to prevent overwhelming the connection
+                    await asyncio.sleep(0.01)
                 except Exception as e:
-                    logger.warning(f"⚠️ Failed to send buffered event: {e}")
+                    logger.warning(f"⚠️ Failed to send historical event {idx+1}: {e}")
                     break  # Stop sending if connection is broken
+            logger.info(f"✅ Sent {len(events_to_send)} historical events")
         
         # CRITICAL: After sending buffered events, drain any events that accumulated in the queue
         # while disconnected. The queue might have events that were added after disconnect.
@@ -525,19 +530,23 @@ async def websocket_progress(websocket: WebSocket, session_id: str):
         })
         logger.info(f"✅ Sent ready signal for session: {session_id[:8]}")
 
-        # Start proactive heartbeat task (every 30 seconds)
-        heartbeat_interval = 30.0  # Send heartbeat every 30 seconds
-        last_heartbeat = asyncio.get_event_loop().time()
+        # Start proactive heartbeat task (every 20 seconds to prevent Fly.io timeout)
+        # Fly.io proxies have ~30s timeout, so we ping every 20s to stay alive
+        heartbeat_interval = 20.0  # Send ping every 20 seconds
         heartbeat_task = None
         
         async def send_heartbeat():
-            """Background task to send proactive heartbeats"""
+            """Background task to send WebSocket ping frames and JSON heartbeats"""
             try:
                 while True:
                     await asyncio.sleep(heartbeat_interval)
                     try:
+                        # Send WebSocket ping frame (required by Fly.io proxy)
+                        # FastAPI WebSocket doesn't expose ping directly, but we can send text ping
+                        await websocket.send_text("ping")  # Simple ping message
+                        # Also send JSON heartbeat for client compatibility
                         await websocket.send_json({'type': 'heartbeat'})
-                        logger.debug(f"💓 Sent proactive heartbeat (session: {session_id[:8]})")
+                        logger.debug(f"💓 Sent WebSocket ping + heartbeat (session: {session_id[:8]})")
                     except Exception as e:
                         logger.debug(f"💓 Failed to send heartbeat, connection may be closed: {e}")
                         break
@@ -547,17 +556,26 @@ async def websocket_progress(websocket: WebSocket, session_id: str):
         heartbeat_task = asyncio.create_task(send_heartbeat())
 
         # Stream events as they arrive
-        logger.info(f"🔄 Entering event loop for session: {session_id[:8]}")
+        logger.info(f"🔄 Entering event loop for session: {session_id[:8]} (queue size: {queue.qsize()})")
+        
+        # Track last event received to detect if workflow is stuck
+        last_event_time = asyncio.get_event_loop().time()
+        event_timeout = 300.0  # 5 minutes max between events
+        
         while True:
             try:
-                # Wait for new event with shorter timeout (heartbeat handles keep-alive)
+                # Wait for new event with timeout
                 import time
                 wait_start = time.time()
                 logger.debug(f"⏳ Waiting for event from queue (session: {session_id[:8]}, qsize: {queue.qsize()})")
-                event = await asyncio.wait_for(queue.get(), timeout=300.0)  # 5 minutes max, but heartbeat keeps alive
+                
+                # Use shorter timeout - heartbeat will keep connection alive
+                event = await asyncio.wait_for(queue.get(), timeout=60.0)  # 60s timeout, heartbeat every 20s
                 wait_end = time.time()
-                logger.info(f"📦 Retrieved event from queue: {event.get('type')} at {wait_end}, waited {wait_end - wait_start:.3f}s (session: {session_id[:8]})")
-                last_heartbeat = asyncio.get_event_loop().time()  # Update last activity time
+                wait_duration = wait_end - wait_start
+                
+                logger.info(f"📦 Retrieved event from queue: {event.get('type')} at {wait_end}, waited {wait_duration:.3f}s (session: {session_id[:8]})")
+                last_event_time = wait_end  # Update last event time
 
                 # Send event to client - explicitly catch connection errors
                 logger.info(f"🔜 About to send event: {event.get('type')} (session: {session_id[:8]})")
@@ -586,9 +604,30 @@ async def websocket_progress(websocket: WebSocket, session_id: str):
                     break
 
             except asyncio.TimeoutError:
-                # This timeout is now mainly for safety - heartbeat task handles keep-alive
-                # But we still check timeout to prevent truly stuck connections
-                logger.debug(f"⏳ Queue timeout (session: {session_id[:8]}) - heartbeat task handles keep-alive")
+                # Queue timeout - check if workflow is still active
+                current_time = asyncio.get_event_loop().time()
+                time_since_last_event = current_time - last_event_time
+                
+                logger.debug(f"⏳ Queue timeout (session: {session_id[:8]}) - heartbeat keeps connection alive")
+                logger.debug(f"⏳ Time since last event: {time_since_last_event:.1f}s")
+                
+                # If no events for too long, check if workflow completed
+                if time_since_last_event > event_timeout:
+                    logger.warning(f"⚠️ No events for {time_since_last_event:.1f}s - workflow may have completed or stalled")
+                    # Check if there's a completion event in history
+                    if session_id in progress_manager.event_history:
+                        last_event = progress_manager.event_history[session_id][-1] if progress_manager.event_history[session_id] else None
+                        if last_event and last_event.get('type') in ['complete', 'error']:
+                            logger.info(f"✅ Found completion event in history - workflow already completed")
+                            # Send completion event to client
+                            try:
+                                await websocket.send_json(last_event)
+                                logger.info(f"📤 Sent completion event from history")
+                                progress_manager.close_session(session_id, keep_history=True)
+                                break
+                            except Exception as e:
+                                logger.warning(f"⚠️ Failed to send completion event: {e}")
+                
                 continue
 
     except WebSocketDisconnect:
@@ -873,7 +912,7 @@ async def refine_strategy(request: RefineStrategyRequest):
 
         from agents.code_generator import CodeGeneratorAgent
         from agents.backtest_runner import BacktestRunnerAgent
-        from agents.analyst import StrategyAnalystAgent
+        from agents.strategy_analyst import StrategyAnalystAgent
 
         # Initialize agents
         code_gen = CodeGeneratorAgent()
