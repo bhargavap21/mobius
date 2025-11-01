@@ -492,6 +492,31 @@ async def websocket_progress(websocket: WebSocket, session_id: str):
                 except Exception as e:
                     logger.warning(f"⚠️ Failed to send buffered event: {e}")
                     break  # Stop sending if connection is broken
+        
+        # CRITICAL: After sending buffered events, drain any events that accumulated in the queue
+        # while disconnected. The queue might have events that were added after disconnect.
+        logger.info(f"📡 Checking queue for events accumulated during disconnect (qsize: {queue.qsize()})")
+        initial_queue_size = queue.qsize()
+        if initial_queue_size > 0:
+            logger.info(f"📡 Draining {initial_queue_size} events from queue that accumulated during disconnect")
+            # Drain queue non-blockingly - get all available events
+            drained_count = 0
+            while True:
+                try:
+                    # Try to get event without blocking
+                    event = queue.get_nowait()
+                    try:
+                        await websocket.send_json(event)
+                        logger.info(f"📤 Sent queued event: {event.get('type')}")
+                        drained_count += 1
+                    except Exception as e:
+                        logger.warning(f"⚠️ Failed to send queued event: {e}")
+                        # Put event back at front of queue if sending failed
+                        await queue.put(event)
+                        break
+                except asyncio.QueueEmpty:
+                    break
+            logger.info(f"✅ Drained {drained_count} events from queue")
 
         # Send ready signal
         await websocket.send_json({
