@@ -4,6 +4,8 @@ Intelligent Orchestrator - Learns from data and adapts strategies automatically
 import logging
 from typing import Dict, Any, List, Optional
 import numpy as np
+import os
+from anthropic import Anthropic
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +36,48 @@ class IntelligentOrchestrator:
     def __init__(self):
         self.insights_cache = {}  # Cache insights for reuse
         self.learning_history = []  # Track what we've learned
+        self.registered_tools = {}  # Store registered tools
+        self.client = Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
+        self.model = "claude-sonnet-4-20250514"
+
+    def register_tool(self, name: str, description: str, input_schema: Dict, function: callable):
+        """Register a tool with the orchestrator"""
+        self.registered_tools[name] = {
+            'description': description,
+            'input_schema': input_schema,
+            'function': function
+        }
+        logger.debug(f"Registered tool: {name}")
+
+    def chat(self, prompt: str) -> Dict[str, Any]:
+        """
+        Send a prompt to Claude and get a response
+
+        Args:
+            prompt: The prompt to send
+
+        Returns:
+            Dict with 'success' and 'response' keys
+        """
+        try:
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=4000,
+                messages=[{"role": "user", "content": prompt}]
+            )
+
+            response_text = response.content[0].text
+
+            return {
+                'success': True,
+                'response': response_text
+            }
+        except Exception as e:
+            logger.error(f"Error in orchestrator chat: {e}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
 
     def analyze_backtest_data(self, backtest_results: Dict[str, Any],
                                strategy: Dict[str, Any]) -> Dict[str, Any]:
