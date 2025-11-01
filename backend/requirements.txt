@@ -16,7 +16,6 @@ numpy>=2.1.3
 
 # Technical Analysis
 TA-Lib>=0.4.32
-pandas-ta>=0.3.14b0
 
 # Backtesting
 backtrader>=1.9.78.123
