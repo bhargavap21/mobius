@@ -21,10 +21,20 @@ class ProgressManager:
         self.max_event_history = max_event_history
 
     def create_session(self, session_id: str) -> asyncio.Queue:
-        """Create a new progress tracking session"""
+        """Create a new progress tracking session, or return existing one"""
+        # If session already exists, return existing queue (don't create new one!)
+        if session_id in self.sessions:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"📡 Session {session_id[:8]} already exists, reusing existing queue (size: {self.sessions[session_id].qsize()})")
+            return self.sessions[session_id]
+        
+        # Create new session
         queue = asyncio.Queue()
         self.sessions[session_id] = queue
-        self.event_history[session_id] = []
+        # Only initialize event_history if it doesn't exist (preserve history on reconnect)
+        if session_id not in self.event_history:
+            self.event_history[session_id] = []
         return queue
 
     def close_session(self, session_id: str, keep_history: bool = False):
