@@ -66,11 +66,7 @@ app = FastAPI(
 # Enable CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",  # Local development
-        "http://localhost:3000",  # Alternative local port
-        "https://mobius-invest.vercel.app",  # Production frontend
-    ],
+    allow_origins=["*"],  # In production, specify exact origins
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -438,12 +434,6 @@ async def _run_multi_agent_workflow(
         from job_storage import job_storage
         job_storage.store_result(session_id, error_data)
 
-        # CRITICAL: Emit error event to WebSocket so client knows workflow failed
-        from progress_manager import progress_manager
-        if progress_manager:
-            await progress_manager.emit_error(session_id, 'Workflow', str(e))
-            logger.info(f"✅ Error event emitted for session {session_id[:8]}")
-
 
 @app.post("/api/sessions")
 async def create_session(user_id: UUID = Depends(get_current_user_id)):
@@ -482,46 +472,11 @@ async def websocket_progress(websocket: WebSocket, session_id: str):
             logger.info(f"📡 Creating new WS session: {session_id[:8]}")
             queue = progress_manager.create_session(session_id)
 
-        # Send ALL events from history on reconnect (not just buffered ones)
-        # This ensures client gets complete event log even after disconnect
+        # Send buffered events first (if any)
         if session_id in progress_manager.event_history:
-            events_to_send = progress_manager.event_history[session_id]
-            logger.info(f"📡 Sending {len(events_to_send)} events from history (complete event log)")
-            for idx, event in enumerate(events_to_send):
-                try:
-                    await websocket.send_json(event)
-                    logger.debug(f"📤 Sent historical event {idx+1}/{len(events_to_send)}: {event.get('type')}")
-                    # Small delay to prevent overwhelming the connection
-                    await asyncio.sleep(0.01)
-                except Exception as e:
-                    logger.warning(f"⚠️ Failed to send historical event {idx+1}: {e}")
-                    break  # Stop sending if connection is broken
-            logger.info(f"✅ Sent {len(events_to_send)} historical events")
-        
-        # CRITICAL: After sending buffered events, drain any events that accumulated in the queue
-        # while disconnected. The queue might have events that were added after disconnect.
-        logger.info(f"📡 Checking queue for events accumulated during disconnect (qsize: {queue.qsize()})")
-        initial_queue_size = queue.qsize()
-        if initial_queue_size > 0:
-            logger.info(f"📡 Draining {initial_queue_size} events from queue that accumulated during disconnect")
-            # Drain queue non-blockingly - get all available events
-            drained_count = 0
-            while True:
-                try:
-                    # Try to get event without blocking
-                    event = queue.get_nowait()
-                    try:
-                        await websocket.send_json(event)
-                        logger.info(f"📤 Sent queued event: {event.get('type')}")
-                        drained_count += 1
-                    except Exception as e:
-                        logger.warning(f"⚠️ Failed to send queued event: {e}")
-                        # Put event back at front of queue if sending failed
-                        await queue.put(event)
-                        break
-                except asyncio.QueueEmpty:
-                    break
-            logger.info(f"✅ Drained {drained_count} events from queue")
+            logger.info(f"📡 Sending {len(progress_manager.event_history[session_id])} buffered events")
+            for event in progress_manager.event_history[session_id]:
+                await websocket.send_json(event)
 
         # Send ready signal
         await websocket.send_json({
@@ -530,52 +485,17 @@ async def websocket_progress(websocket: WebSocket, session_id: str):
         })
         logger.info(f"✅ Sent ready signal for session: {session_id[:8]}")
 
-        # Start proactive heartbeat task (every 20 seconds to prevent Fly.io timeout)
-        # Fly.io proxies have ~30s timeout, so we ping every 20s to stay alive
-        heartbeat_interval = 20.0  # Send ping every 20 seconds
-        heartbeat_task = None
-        
-        async def send_heartbeat():
-            """Background task to send WebSocket ping frames and JSON heartbeats"""
-            try:
-                while True:
-                    await asyncio.sleep(heartbeat_interval)
-                    try:
-                        # Send WebSocket ping frame (required by Fly.io proxy)
-                        # FastAPI WebSocket doesn't expose ping directly, but we can send text ping
-                        await websocket.send_text("ping")  # Simple ping message
-                        # Also send JSON heartbeat for client compatibility
-                        await websocket.send_json({'type': 'heartbeat'})
-                        logger.debug(f"💓 Sent WebSocket ping + heartbeat (session: {session_id[:8]})")
-                    except Exception as e:
-                        logger.debug(f"💓 Failed to send heartbeat, connection may be closed: {e}")
-                        break
-            except asyncio.CancelledError:
-                logger.debug(f"💓 Heartbeat task cancelled (session: {session_id[:8]})")
-        
-        heartbeat_task = asyncio.create_task(send_heartbeat())
-
         # Stream events as they arrive
-        logger.info(f"🔄 Entering event loop for session: {session_id[:8]} (queue size: {queue.qsize()})")
-        
-        # Track last event received to detect if workflow is stuck
-        last_event_time = asyncio.get_event_loop().time()
-        event_timeout = 300.0  # 5 minutes max between events
-        
+        logger.info(f"🔄 Entering event loop for session: {session_id[:8]}")
         while True:
             try:
                 # Wait for new event with timeout
                 import time
                 wait_start = time.time()
                 logger.debug(f"⏳ Waiting for event from queue (session: {session_id[:8]}, qsize: {queue.qsize()})")
-                
-                # Use shorter timeout - heartbeat will keep connection alive
-                event = await asyncio.wait_for(queue.get(), timeout=60.0)  # 60s timeout, heartbeat every 20s
+                event = await asyncio.wait_for(queue.get(), timeout=30.0)
                 wait_end = time.time()
-                wait_duration = wait_end - wait_start
-                
-                logger.info(f"📦 Retrieved event from queue: {event.get('type')} at {wait_end}, waited {wait_duration:.3f}s (session: {session_id[:8]})")
-                last_event_time = wait_end  # Update last event time
+                logger.info(f"📦 Retrieved event from queue: {event.get('type')} at {wait_end}, waited {wait_end - wait_start:.3f}s (session: {session_id[:8]})")
 
                 # Send event to client - explicitly catch connection errors
                 logger.info(f"🔜 About to send event: {event.get('type')} (session: {session_id[:8]})")
@@ -599,54 +519,29 @@ async def websocket_progress(websocket: WebSocket, session_id: str):
                     logger.info(f"⏸️  Sent complete event, waiting briefly before closing (session: {session_id[:8]})")
                     await asyncio.sleep(0.5)  # Wait 500ms to ensure client receives the event
                     logger.info(f"🎉 Workflow complete, closing WS for session: {session_id[:8]}")
-                    # Now it's safe to close the session since workflow is complete
-                    progress_manager.close_session(session_id, keep_history=True)  # Keep history for job_storage retrieval
+                    # Close session only when workflow completes
+                    progress_manager.close_session(session_id)
                     break
 
             except asyncio.TimeoutError:
-                # Queue timeout - check if workflow is still active
-                current_time = asyncio.get_event_loop().time()
-                time_since_last_event = current_time - last_event_time
-                
-                logger.debug(f"⏳ Queue timeout (session: {session_id[:8]}) - heartbeat keeps connection alive")
-                logger.debug(f"⏳ Time since last event: {time_since_last_event:.1f}s")
-                
-                # If no events for too long, check if workflow completed
-                if time_since_last_event > event_timeout:
-                    logger.warning(f"⚠️ No events for {time_since_last_event:.1f}s - workflow may have completed or stalled")
-                    # Check if there's a completion event in history
-                    if session_id in progress_manager.event_history:
-                        last_event = progress_manager.event_history[session_id][-1] if progress_manager.event_history[session_id] else None
-                        if last_event and last_event.get('type') in ['complete', 'error']:
-                            logger.info(f"✅ Found completion event in history - workflow already completed")
-                            # Send completion event to client
-                            try:
-                                await websocket.send_json(last_event)
-                                logger.info(f"📤 Sent completion event from history")
-                                progress_manager.close_session(session_id, keep_history=True)
-                                break
-                            except Exception as e:
-                                logger.warning(f"⚠️ Failed to send completion event: {e}")
-                
+                # Send heartbeat to keep connection alive
+                logger.debug(f"💓 Sending heartbeat (session: {session_id[:8]})")
+                try:
+                    await websocket.send_json({'type': 'heartbeat'})
+                except Exception as heartbeat_error:
+                    logger.warning(f"⚠️ Failed to send heartbeat, client may have disconnected: {heartbeat_error}")
+                    break  # Exit if we can't send heartbeat
                 continue
 
     except WebSocketDisconnect:
         logger.info(f"🔌 WebSocket client disconnected for session: {session_id[:8]}")
-        # CRITICAL: Don't close session on disconnect - keep it alive for reconnection
-        # The workflow might still be running and emitting events
-        # Only close when workflow completes (handled above) or on explicit cleanup
     except Exception as e:
         logger.error(f"❌ WebSocket error for session {session_id[:8]}: {e}")
     finally:
-        # Cancel heartbeat task
-        if heartbeat_task and not heartbeat_task.done():
-            heartbeat_task.cancel()
-            try:
-                await heartbeat_task
-            except asyncio.CancelledError:
-                pass
-        # DON'T close session here - it might reconnect!
-        # Session will be cleaned up when workflow completes or via TTL
+        # CRITICAL: Don't close session on disconnect - keep it alive for reconnection
+        # Only close when workflow completes (handled above)
+        # This allows reconnections to receive buffered events
+        logger.info(f"🔌 WebSocket handler exiting for session: {session_id[:8]} (keeping session alive)")
 
 
 @app.get("/api/strategy/progress/{session_id}")
@@ -683,7 +578,7 @@ async def progress_stream(session_id: str):
             while True:
                 try:
                     # Wait for new event with timeout to keep connection alive
-                    event = await asyncio.wait_for(queue.get(), timeout=300.0)  # 5 minutes for complex workflows
+                    event = await asyncio.wait_for(queue.get(), timeout=30.0)
 
                     # Check if it's a completion event
                     if event.get('type') == 'complete' or event.get('type') == 'error':
@@ -724,23 +619,17 @@ async def start_workflow(
 
     logger.info(f"📡 Starting workflow for session {session_id[:8]}")
 
-    # Verify session exists - if not, create it (handles reconnection case)
+    # Verify session exists
     if session_id not in progress_manager.sessions:
-        logger.warning(f"⚠️ Session {session_id[:8]} not found in active sessions, creating new session...")
-        progress_manager.create_session(session_id)
-    
-    logger.info(f"✅ Session {session_id[:8]} verified/created. Active sessions: {list(progress_manager.sessions.keys())}")
-    
+        raise HTTPException(status_code=404, detail="Session not found. Create session first.")
+
     # Start the actual workflow in background
-    logger.info(f"🚀 Launching workflow task for session {session_id[:8]}")
     asyncio.create_task(_run_multi_agent_workflow(
         session_id=session_id,
         strategy_description=request.strategy_description,
         fast_mode=fast_mode,
         user_id=user_id
     ))
-    
-    logger.info(f"✅ Workflow task launched for session {session_id[:8]}")
 
     return {"status": "started", "sessionId": session_id}
 
@@ -912,7 +801,7 @@ async def refine_strategy(request: RefineStrategyRequest):
 
         from agents.code_generator import CodeGeneratorAgent
         from agents.backtest_runner import BacktestRunnerAgent
-        from agents.strategy_analyst import StrategyAnalystAgent
+        from agents.analyst import StrategyAnalystAgent
 
         # Initialize agents
         code_gen = CodeGeneratorAgent()

@@ -9,27 +9,20 @@ from datetime import datetime
 class ProgressManager:
     """Manages progress events for real-time updates to clients"""
 
-    def __init__(self, max_event_history: int = 1000):
-        """
-        Initialize progress manager
-        
-        Args:
-            max_event_history: Maximum number of events to keep per session in history
-        """
+    def __init__(self):
         self.sessions: Dict[str, asyncio.Queue] = {}
         self.event_history: Dict[str, list] = {}
-        self.max_event_history = max_event_history
 
     def create_session(self, session_id: str) -> asyncio.Queue:
         """Create a new progress tracking session, or return existing one"""
-        # If session already exists, return existing queue (don't create new one!)
+        # If session already exists, return existing queue (preserve event_history)
         if session_id in self.sessions:
             import logging
             logger = logging.getLogger(__name__)
             logger.info(f"📡 Session {session_id[:8]} already exists, reusing existing queue (size: {self.sessions[session_id].qsize()})")
             return self.sessions[session_id]
         
-        # Create new session
+        # Create new session, but preserve event_history if it exists (for reconnection)
         queue = asyncio.Queue()
         self.sessions[session_id] = queue
         # Only initialize event_history if it doesn't exist (preserve history on reconnect)
@@ -37,27 +30,10 @@ class ProgressManager:
             self.event_history[session_id] = []
         return queue
 
-    def close_session(self, session_id: str, keep_history: bool = False):
-        """
-        Close and cleanup a progress session
-        
-        Args:
-            session_id: Session ID to close
-            keep_history: If True, keep event history for later retrieval (useful for job_storage).
-                         If False, delete history immediately to prevent memory leaks.
-        """
+    def close_session(self, session_id: str):
+        """Close and cleanup a progress session"""
         if session_id in self.sessions:
             del self.sessions[session_id]
-        
-        # Clean up event history if not keeping it
-        # Note: We keep it by default for job_storage retrieval, but limit size
-        if not keep_history and session_id in self.event_history:
-            del self.event_history[session_id]
-        elif session_id in self.event_history:
-            # Limit event history size to prevent memory growth
-            events = self.event_history[session_id]
-            if len(events) > self.max_event_history:
-                self.event_history[session_id] = events[-self.max_event_history:]
 
     async def emit_event(self, session_id: str, event: Dict[str, Any]):
         """Emit a progress event to a specific session"""
@@ -77,15 +53,10 @@ class ProgressManager:
             # Yield control to event loop so WebSocket can process the event immediately
             await asyncio.sleep(0)
 
-            # Also store in history for polling and late joiners
+            # Also store in history for polling
             if session_id not in self.event_history:
                 self.event_history[session_id] = []
             self.event_history[session_id].append(event)
-            
-            # Limit event history size to prevent memory growth
-            if len(self.event_history[session_id]) > self.max_event_history:
-                # Keep only the most recent events
-                self.event_history[session_id] = self.event_history[session_id][-self.max_event_history:]
 
             logger.info(f"✅ Event emitted: {event.get('type')} - {event.get('action')}")
         else:
@@ -99,16 +70,6 @@ class ProgressManager:
             'action': 'Reading your request',
             'message': f'Analyzing strategy query...',
             'icon': '🎯'
-        })
-
-    async def emit_supervisor_complete(self, session_id: str):
-        """Supervisor initial analysis complete"""
-        await self.emit_event(session_id, {
-            'type': 'agent_complete',
-            'agent': 'Supervisor',
-            'action': 'Query analyzed',
-            'message': 'Starting strategy generation workflow...',
-            'icon': '✅'
         })
 
     async def emit_insights_generation(self, session_id: str):
