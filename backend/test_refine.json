@@ -1,0 +1,15 @@
+{
+  "current_strategy": {
+    "name": "Test Strategy",
+    "asset": "AAPL",
+    "strategy_type": "rsi_mean_reversion",
+    "rsi_period": 14,
+    "rsi_oversold": 30,
+    "rsi_overbought": 70,
+    "entry_conditions": [{"type": "rsi", "params": {"threshold": 30, "condition": "below"}}],
+    "exit_conditions": [{"type": "rsi", "params": {"threshold": 70, "condition": "above"}}]
+  },
+  "current_code": "# test code",
+  "refinement_instructions": "Change RSI oversold from 30 to 40",
+  "session_id": "test-123"
+}

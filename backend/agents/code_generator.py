@@ -321,7 +321,9 @@ class CodeGeneratorAgent(BaseAgent):
             input_data: {
                 'current_strategy': dict,
                 'current_code': str,
-                'refinement_instructions': str
+                'refinement_instructions': str,
+                'iteration': int (optional),
+                'use_intelligent_analysis': bool (optional)
             }
 
         Returns:
@@ -335,8 +337,10 @@ class CodeGeneratorAgent(BaseAgent):
         current_strategy = input_data.get('current_strategy')
         current_code = input_data.get('current_code')
         refinement_instructions = input_data.get('refinement_instructions')
+        iteration = input_data.get('iteration', 1)
+        use_intelligent_analysis = input_data.get('use_intelligent_analysis', False)
 
-        logger.info(f"Refining existing code: {refinement_instructions[:100]}")
+        logger.info(f"Refining existing code (iteration {iteration}): {refinement_instructions[:100]}")
 
         try:
             # Use Claude to understand refinement instructions and apply them
@@ -346,8 +350,8 @@ class CodeGeneratorAgent(BaseAgent):
 
             client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
-            # Build prompt for code refinement
-            prompt = f"""You are a trading strategy code refinement expert. You need to modify existing trading strategy code based on user instructions.
+            # Build intelligent prompt for code refinement
+            prompt = f"""You are a trading strategy code refinement expert with deep understanding of market data and backtesting.
 
 CURRENT STRATEGY CONFIG:
 {json.dumps(current_strategy, indent=2)}
@@ -362,23 +366,38 @@ CURRENT STRATEGY DESCRIPTION:
 - Exit Conditions: {current_strategy.get('exit_conditions')}
 
 YOUR TASK:
-1. Analyze what the user wants to change
+1. Carefully analyze what the user wants to change
 2. Modify the strategy config JSON to implement those changes
-3. List all changes made
+3. Apply data-driven reasoning when adjusting thresholds
+4. List all specific changes made
 
-IMPORTANT RULES:
-- Only modify what the user requested
-- Preserve all other parameters
-- Make minimal changes to achieve the goal
-- If the user says "loosen RSI threshold", increase the threshold value
-- If the user says "lower sentiment requirement", decrease the threshold value
-- If the user says "use OR instead of AND", that means conditions should be less restrictive
+IMPORTANT RULES FOR PARAMETER CHANGES:
+- "loosen RSI threshold" → INCREASE the threshold value (e.g., 30 → 40 for oversold)
+- "tighten RSI threshold" → DECREASE the threshold value (e.g., 40 → 30 for oversold)
+- "lower sentiment requirement" → DECREASE absolute threshold value (e.g., 0.5 → 0.3)
+- "higher sentiment requirement" → INCREASE absolute threshold value (e.g., 0.3 → 0.5)
+- "more sensitive" → adjust thresholds to trigger more easily
+- "less sensitive" → adjust thresholds to trigger less frequently
+- "use OR instead of AND" → change condition_logic from "and" to "or"
+- "use AND instead of OR" → change condition_logic from "or" to "and"
+
+SMART THRESHOLD ADJUSTMENTS:
+- For RSI: typical ranges are 20-40 (oversold) and 60-80 (overbought)
+- For sentiment: typical ranges are -1.0 to +1.0, with |0.3| being moderate
+- For volume spikes: typical multipliers are 1.5x to 3.0x average volume
+- For moving averages: common periods are 20, 50, 100, 200 days
+
+WHEN MAKING CHANGES:
+- Only modify what the user explicitly requested
+- Preserve all other parameters exactly as they are
+- Make reasonable incremental changes (don't jump from 30 to 80)
+- Ensure thresholds stay within valid ranges for their indicator type
 
 Respond in this exact JSON format:
 {{
-  "updated_strategy": {{ ... the modified strategy config ... }},
-  "changes_made": ["change 1", "change 2", ...],
-  "explanation": "Brief explanation of what was modified"
+  "updated_strategy": {{ ... the modified strategy config with changes applied ... }},
+  "changes_made": ["Specific change 1 (e.g., 'Changed RSI oversold threshold from 30 to 40')", "Specific change 2", ...],
+  "explanation": "Brief explanation of the modifications and reasoning"
 }}"""
 
             response = client.messages.create(
@@ -402,8 +421,17 @@ Respond in this exact JSON format:
 
             updated_strategy = result_data.get('updated_strategy')
             changes_made = result_data.get('changes_made', [])
+            explanation = result_data.get('explanation', '')
 
             logger.info(f"✅ Refinement complete. Changes: {changes_made}")
+            if explanation:
+                logger.info(f"📝 Explanation: {explanation}")
+
+            # Validate that changes were actually made
+            if not changes_made or updated_strategy == current_strategy:
+                logger.warning("⚠️ No meaningful changes detected in refinement")
+                # Still return success but flag it
+                changes_made = ["No modifications needed - strategy already matches requirements"]
 
             # Regenerate code from updated strategy
             code_result = generate_trading_bot_code(updated_strategy)
@@ -417,7 +445,8 @@ Respond in this exact JSON format:
                 'success': True,
                 'strategy': updated_strategy,
                 'code': code_result.get('code'),
-                'changes_made': changes_made
+                'changes_made': changes_made,
+                'explanation': explanation
             }
 
         except Exception as e:

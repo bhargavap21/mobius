@@ -1,7 +1,11 @@
-@import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-@theme {
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
   --color-dark-bg: #0a0a0a;
   --color-dark-surface: #1a1a1a;
   --color-dark-border: #2a2a2a;
@@ -18,6 +22,7 @@
   --color-fg: #e5e7eb;
   --color-fg-muted: #9ca3af;
   --color-line: #23262f;
+  }
 }
 
 /* Purple accent for italic/emphasized text */

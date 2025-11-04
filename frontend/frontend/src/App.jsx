@@ -34,6 +34,7 @@ function AppContent() {
   const [loading, setLoading] = useState(false)
   const [backtesting, setBacktesting] = useState(false)
   const [error, setError] = useState(null)
+  const [refinementStatus, setRefinementStatus] = useState(null)  // 'refining', 'success', 'error', null
   const [progressSteps, setProgressSteps] = useState([])
   const [currentIteration, setCurrentIteration] = useState(0)
   const [backtestParams, setBacktestParams] = useState({
@@ -400,9 +401,10 @@ function AppContent() {
 
   const handleRefineStrategy = async (refinementPrompt) => {
     // Close the sidebar
-    setShowSidebar(false)
+    setSidebarOpen(false)
 
-    // Clear previous results but keep the old strategy visible
+    // Set refinement status to show loading overlay
+    setRefinementStatus('refining')
     setLoading(true)
     setError(null)
 
@@ -411,7 +413,10 @@ function AppContent() {
     setSessionId(newSessionId)
 
     try {
-      // Call the NEW refine endpoint instead of recreating from scratch
+      console.log('[Refinement] 🔧 Starting intelligent refinement...')
+      console.log('[Refinement] 📝 Request:', refinementPrompt)
+
+      // Call the enhanced refine endpoint with iterative improvement
       const response = await fetch('http://localhost:8000/api/strategy/refine', {
         method: 'POST',
         headers: {
@@ -420,30 +425,64 @@ function AppContent() {
         body: JSON.stringify({
           current_strategy: strategy,
           current_code: generatedCode,
+          current_backtest_results: backtestResults,
           refinement_instructions: refinementPrompt,
           session_id: newSessionId
         }),
       })
 
       if (!response.ok) {
-        throw new Error('Failed to refine strategy')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.detail || 'Failed to refine strategy')
       }
 
       const data = await response.json()
-      setStrategy(data.strategy)
+
+      // Update state with refined strategy - include final_analysis
+      const updatedStrategy = {
+        ...data.strategy,
+        final_analysis: data.final_analysis
+      }
+      setStrategy(updatedStrategy)
       setGeneratedCode(data.code)
       setBacktestResults(data.backtest_results)
       setInsightsConfig(data.insights_config)
 
-      console.log('Strategy refined successfully:', data.changes_made)
+      // Log refinement results
+      console.log('✅ Strategy refined successfully!')
+      console.log(`📊 Iterations performed: ${data.iterations_performed}`)
+      console.log(`🎯 Best performance score: ${data.best_score?.toFixed(2)}`)
+      console.log(`🔧 Changes made:`, data.changes_made)
+
+      if (data.iteration_history && data.iteration_history.length > 0) {
+        console.log('📈 Iteration history:')
+        data.iteration_history.forEach(hist => {
+          console.log(`  Iteration ${hist.iteration}: Return ${hist.total_return?.toFixed(1)}%, Win Rate ${hist.win_rate?.toFixed(1)}%, Trades ${hist.total_trades}`)
+        })
+      }
+
+      // Show success notification
+      setRefinementStatus('success')
+
+      // Hide success notification after 3 seconds
+      setTimeout(() => {
+        setRefinementStatus(null)
+      }, 3000)
+
       setLoading(false)
 
       // Auto-save after refinement
       setTimeout(() => handleSaveBot(true), 1000)
     } catch (err) {
-      console.error('Error during refinement:', err)
+      console.error('❌ Error during refinement:', err)
       setError(err.message || 'Refinement failed')
+      setRefinementStatus('error')
       setLoading(false)
+
+      // Hide error notification after 5 seconds
+      setTimeout(() => {
+        setRefinementStatus(null)
+      }, 5000)
     }
   }
 
@@ -648,6 +687,65 @@ function AppContent() {
           <div className="mb-6 p-4 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400">
             <p className="font-medium">Error</p>
             <p className="text-sm mt-1">{error}</p>
+          </div>
+        )}
+
+        {/* Refinement Status Notification */}
+        {refinementStatus === 'refining' && (
+          <div className="fixed top-20 right-6 z-50 max-w-md animate-fade-in-up">
+            <div className="bg-accent/20 border border-accent/50 rounded-lg p-4 shadow-xl backdrop-blur-sm">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0">
+                  <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin"></div>
+                </div>
+                <div className="flex-1">
+                  <p className="text-white font-medium text-sm">Refining Strategy...</p>
+                  <p className="text-white/70 text-xs mt-1">
+                    Running intelligent iterations with data analysis
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {refinementStatus === 'success' && (
+          <div className="fixed top-20 right-6 z-50 max-w-md animate-fade-in-up">
+            <div className="bg-green-500/20 border border-green-500/50 rounded-lg p-4 shadow-xl backdrop-blur-sm">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0">
+                  <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <p className="text-white font-medium text-sm">Strategy Refined Successfully!</p>
+                  <p className="text-white/70 text-xs mt-1">
+                    Check the console for detailed iteration results
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {refinementStatus === 'error' && (
+          <div className="fixed top-20 right-6 z-50 max-w-md animate-fade-in-up">
+            <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 shadow-xl backdrop-blur-sm">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0">
+                  <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <p className="text-white font-medium text-sm">Refinement Failed</p>
+                  <p className="text-white/70 text-xs mt-1">
+                    {error || 'Please try again'}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

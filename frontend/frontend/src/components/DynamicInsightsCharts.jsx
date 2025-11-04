@@ -237,6 +237,7 @@ function RenderVisualization({ visualization, data }) {
             {chart_config?.zones && chart_config.zones.map((zone, zoneIdx) => (
               <Area
                 key={`zone-${zoneIdx}`}
+                yAxisId="left"
                 dataKey={() => zone.end}
                 fill={zone.color === 'red' ? '#ef4444' : zone.color === 'green' ? '#22c55e' : '#3b82f6'}
                 fillOpacity={0.1}
@@ -255,6 +256,7 @@ function RenderVisualization({ visualization, data }) {
                 return (
                   <ReferenceLine
                     key={`ref-${refIdx}`}
+                    yAxisId="left"
                     y={thresholdValue}
                     stroke={refLine.color === 'green' ? '#22c55e' : refLine.color === 'red' ? '#ef4444' : '#3b82f6'}
                     strokeDasharray="5 5"

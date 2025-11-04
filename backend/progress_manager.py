@@ -204,6 +204,27 @@ class ProgressManager:
             'icon': '❌'
         })
 
+    async def update_progress(self, session_id: str, agent: str, status: str, **kwargs):
+        """Generic progress update - used for custom refinement messages"""
+        await self.emit_event(session_id, {
+            'type': 'agent_progress',
+            'agent': agent,
+            'action': status,
+            'message': status,
+            'icon': '🔄',
+            **kwargs
+        })
+
+    async def complete_session(self, session_id: str):
+        """Mark session as complete"""
+        await self.emit_event(session_id, {
+            'type': 'complete',
+            'agent': 'System',
+            'action': 'Complete',
+            'message': 'Refinement complete',
+            'icon': '✅'
+        })
+
 
 # Global progress manager instance
 progress_manager = ProgressManager()

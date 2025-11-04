@@ -777,36 +777,15 @@ async def refine_strategy(request: RefineStrategyRequest):
     """
     Refine an existing strategy by modifying the code directly
 
-    This is more efficient than regenerating from scratch because:
-    - Only modifies what needs to change
-    - Preserves working code and patterns
-    - Doesn't waste API credits on regenerating sentiment data
-    - Faster iteration cycle
-
-    Args:
-        request: Contains current strategy, code, and refinement instructions
-
-    Returns:
-        Refined strategy with updated code and backtest results
+    Simplified version that focuses on reliably applying user changes
     """
     try:
         session_id = request.session_id
-
         logger.info(f"🔧 Refining strategy: {request.refinement_instructions[:100]}")
-
-        # Pre-create progress session
-        if session_id:
-            from progress_manager import progress_manager
-            progress_manager.create_session(session_id)
-            progress_manager.update_progress(
-                session_id,
-                agent="CodeGenerator",
-                status="Analyzing refinement request..."
-            )
 
         from agents.code_generator import CodeGeneratorAgent
         from agents.backtest_runner import BacktestRunnerAgent
-        from agents.analyst import StrategyAnalystAgent
+        from agents.strategy_analyst import StrategyAnalystAgent
 
         # Initialize agents
         code_gen = CodeGeneratorAgent()
@@ -814,13 +793,7 @@ async def refine_strategy(request: RefineStrategyRequest):
         analyst = StrategyAnalystAgent()
 
         # Step 1: Refine the code
-        if session_id:
-            progress_manager.update_progress(
-                session_id,
-                agent="CodeGenerator",
-                status="Modifying strategy code..."
-            )
-
+        logger.info("Step 1: Refining code...")
         refine_result = await code_gen.refine_existing_code({
             'current_strategy': request.current_strategy,
             'current_code': request.current_code,
@@ -837,13 +810,7 @@ async def refine_strategy(request: RefineStrategyRequest):
         logger.info(f"✅ Code refined. Changes: {', '.join(changes_made)}")
 
         # Step 2: Run backtest on refined strategy
-        if session_id:
-            progress_manager.update_progress(
-                session_id,
-                agent="BacktestRunner",
-                status="Running backtest on refined strategy..."
-            )
-
+        logger.info("Step 2: Running backtest...")
         backtest_result = await backtest_runner.process({
             'strategy': refined_strategy,
             'days': 180,
@@ -854,15 +821,10 @@ async def refine_strategy(request: RefineStrategyRequest):
             raise HTTPException(status_code=400, detail="Backtest failed on refined strategy")
 
         backtest_results = backtest_result['results']
+        logger.info("✅ Backtest complete")
 
         # Step 3: Generate insights
-        if session_id:
-            progress_manager.update_progress(
-                session_id,
-                agent="StrategyAnalyst",
-                status="Generating insights..."
-            )
-
+        logger.info("Step 3: Generating insights...")
         analysis_result = await analyst.process({
             'strategy': refined_strategy,
             'backtest_results': backtest_results,
@@ -871,10 +833,48 @@ async def refine_strategy(request: RefineStrategyRequest):
         })
 
         insights_config = analysis_result.get('insights_config')
+        logger.info("✅ Insights generated")
 
-        # Mark workflow complete
-        if session_id:
-            progress_manager.complete_session(session_id)
+        # Step 4: Generate final analysis for Insights tab
+        logger.info("Step 4: Generating strategy analysis...")
+        summary = backtest_results.get('summary', {})
+
+        # Build analysis insights
+        analysis_text = f"Refined strategy shows {summary.get('total_return_pct', 0):.1f}% return with {summary.get('win_rate', 0):.1f}% win rate across {summary.get('total_trades', 0)} trades."
+
+        issues = []
+        suggestions = []
+
+        # Analyze performance
+        if summary.get('total_trades', 0) < 5:
+            issues.append("Low trade count - strategy may be too restrictive")
+            suggestions.append("Consider loosening entry conditions to capture more opportunities")
+
+        if summary.get('win_rate', 0) < 40:
+            issues.append("Low win rate - strategy needs better entry/exit signals")
+            suggestions.append("Review and tighten entry conditions or improve exit timing")
+
+        if summary.get('total_return_pct', 0) < 0:
+            issues.append("Negative returns - strategy is losing money")
+            suggestions.append("Consider adjusting risk parameters or reversing strategy logic")
+
+        # Add positive feedback if performing well
+        if summary.get('win_rate', 0) > 60 and summary.get('total_return_pct', 0) > 10:
+            suggestions.append("Strong performance - consider testing on live paper trading")
+
+        if summary.get('total_trades', 0) >= 10:
+            suggestions.append("Good sample size - results are statistically meaningful")
+
+        # Add change-specific insights
+        if changes_made:
+            analysis_text += f" Changes applied: {', '.join(changes_made)}."
+
+        final_analysis = {
+            'analysis': analysis_text,
+            'issues': issues if issues else ["No critical issues detected"],
+            'suggestions': suggestions if suggestions else ["Strategy is performing as expected"],
+            'changes_applied': changes_made
+        }
 
         response_data = {
             "success": True,
@@ -883,14 +883,11 @@ async def refine_strategy(request: RefineStrategyRequest):
             "code": refined_code,
             "backtest_results": backtest_results,
             "insights_config": insights_config,
+            "final_analysis": final_analysis,
             "changes_made": changes_made,
+            "iterations_performed": 1,
             "message": f"Strategy refined: {', '.join(changes_made)}"
         }
-
-        # Store result
-        if session_id:
-            from job_storage import job_storage
-            job_storage.store_result(session_id, response_data)
 
         return response_data
 

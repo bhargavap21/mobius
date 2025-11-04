@@ -16,10 +16,10 @@ const StrategySidebar = ({
   const handleRefine = async () => {
     if (!refinementRequest.trim()) return;
 
-    setLoading(true);
-    try {
-      // Build refinement prompt based on current strategy
-      const refinementPrompt = `Modify this trading strategy: ${currentStrategy?.name || 'Current strategy'}
+    console.log('[StrategySidebar] Starting refinement:', refinementRequest);
+
+    // Build refinement prompt based on current strategy
+    const refinementPrompt = `Modify this trading strategy: ${currentStrategy?.name || 'Current strategy'}
 
 Current conditions:
 - Asset: ${currentStrategy?.asset}
@@ -30,14 +30,11 @@ ${currentStrategy?.rsi_overbought ? `- RSI overbought: ${currentStrategy.rsi_ove
 
 Requested changes: ${refinementRequest}`;
 
-      onRefineStrategy(refinementPrompt);
-      setRefinementRequest('');
-      onClose();
-    } catch (error) {
-      console.error('Error refining strategy:', error);
-    } finally {
-      setLoading(false);
-    }
+    // Call the refinement handler (which will close sidebar and show loading)
+    onRefineStrategy(refinementPrompt);
+
+    // Clear the input
+    setRefinementRequest('');
   };
 
   const handleChat = async () => {
