@@ -783,6 +783,24 @@ async def refine_strategy(request: RefineStrategyRequest):
         session_id = request.session_id
         logger.info(f"🔧 Refining strategy: {request.refinement_instructions[:100]}")
 
+<<<<<<< Updated upstream
+=======
+        # Pre-create progress session
+        if session_id:
+            from progress_manager import progress_manager
+            progress_manager.create_session(session_id)
+            await progress_manager.emit_event(
+                session_id,
+                {
+                    "type": "agent_start",
+                    "data": {
+                        "agent": "CodeGenerator",
+                        "message": "Analyzing refinement request..."
+                    }
+                }
+            )
+
+>>>>>>> Stashed changes
         from agents.code_generator import CodeGeneratorAgent
         from agents.backtest_runner import BacktestRunnerAgent
         from agents.strategy_analyst import StrategyAnalystAgent
@@ -793,7 +811,22 @@ async def refine_strategy(request: RefineStrategyRequest):
         analyst = StrategyAnalystAgent()
 
         # Step 1: Refine the code
+<<<<<<< Updated upstream
         logger.info("Step 1: Refining code...")
+=======
+        if session_id:
+            await progress_manager.emit_event(
+                session_id,
+                {
+                    "type": "agent_start",
+                    "data": {
+                        "agent": "CodeGenerator",
+                        "message": "Modifying strategy code..."
+                    }
+                }
+            )
+
+>>>>>>> Stashed changes
         refine_result = await code_gen.refine_existing_code({
             'current_strategy': request.current_strategy,
             'current_code': request.current_code,
@@ -810,7 +843,17 @@ async def refine_strategy(request: RefineStrategyRequest):
         logger.info(f"✅ Code refined. Changes: {', '.join(changes_made)}")
 
         # Step 2: Run backtest on refined strategy
+<<<<<<< Updated upstream
         logger.info("Step 2: Running backtest...")
+=======
+        if session_id:
+            await progress_manager.emit_backtest_start(
+                session_id,
+                days=180,
+                capital=10000
+            )
+
+>>>>>>> Stashed changes
         backtest_result = await backtest_runner.process({
             'strategy': refined_strategy,
             'days': 180,
@@ -824,7 +867,13 @@ async def refine_strategy(request: RefineStrategyRequest):
         logger.info("✅ Backtest complete")
 
         # Step 3: Generate insights
+<<<<<<< Updated upstream
         logger.info("Step 3: Generating insights...")
+=======
+        if session_id:
+            await progress_manager.emit_analysis_start(session_id)
+
+>>>>>>> Stashed changes
         analysis_result = await analyst.process({
             'strategy': refined_strategy,
             'backtest_results': backtest_results,
@@ -835,6 +884,7 @@ async def refine_strategy(request: RefineStrategyRequest):
         insights_config = analysis_result.get('insights_config')
         logger.info("✅ Insights generated")
 
+<<<<<<< Updated upstream
         # Step 4: Generate final analysis for Insights tab
         logger.info("Step 4: Generating strategy analysis...")
         summary = backtest_results.get('summary', {})
@@ -875,6 +925,11 @@ async def refine_strategy(request: RefineStrategyRequest):
             'suggestions': suggestions if suggestions else ["Strategy is performing as expected"],
             'changes_applied': changes_made
         }
+=======
+        # Mark workflow complete
+        if session_id:
+            await progress_manager.emit_complete(session_id, iterations=1)
+>>>>>>> Stashed changes
 
         response_data = {
             "success": True,

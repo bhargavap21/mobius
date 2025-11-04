@@ -60,9 +60,12 @@ function AppContent() {
   const [showDeploymentMonitor, setShowDeploymentMonitor] = useState(false)
 
   // Load last viewed bot on mount (if authenticated)
+  // Only runs once on initial mount, not during workflow execution
+  const [hasLoadedInitialBot, setHasLoadedInitialBot] = useState(false)
+
   useEffect(() => {
     const loadLastBot = async () => {
-      if (!isAuthenticated) return
+      if (!isAuthenticated || hasLoadedInitialBot) return
 
       try {
         const response = await fetch('http://localhost:8000/bots?page=1&page_size=1', {
@@ -78,16 +81,20 @@ function AppContent() {
             setBacktestResults(lastBot.backtest_results)
             setInsightsConfig(lastBot.insights_config)
             setCurrentBotId(lastBot.id)
+            setShowLanding(false)
             console.log('Loaded last bot:', lastBot.name)
           }
         }
+        setHasLoadedInitialBot(true)
       } catch (err) {
         console.error('Failed to load last bot:', err)
+        setHasLoadedInitialBot(true)
       }
     }
 
     loadLastBot()
-  }, [isAuthenticated, getAuthHeaders])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated])
 
   // View state - show landing page by default
   const [showLanding, setShowLanding] = useState(true)
@@ -100,6 +107,7 @@ function AppContent() {
       return
     }
 
+    setShowLanding(false)
     setLoading(true)
     setError(null)
     setBacktestResults(null)
@@ -250,6 +258,7 @@ function AppContent() {
         setBacktestResults(data.backtest_results)
         setInsightsConfig(data.insights_config)
         setCurrentIteration(data.iterations)
+        setShowLanding(false)
 
         if (data.iteration_history) {
           const steps = data.iteration_history.map((iter, idx) => {
@@ -407,6 +416,8 @@ function AppContent() {
     setRefinementStatus('refining')
     setLoading(true)
     setError(null)
+    setBacktestResults(null)
+    setProgressSteps([])
 
     // Generate new session ID
     const newSessionId = crypto.randomUUID()
@@ -414,13 +425,12 @@ function AppContent() {
 
     try {
       console.log('[Refinement] 🔧 Starting intelligent refinement...')
-      console.log('[Refinement] 📝 Request:', refinementPrompt)
 
-      // Call the enhanced refine endpoint with iterative improvement
       const response = await fetch('http://localhost:8000/api/strategy/refine', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...getAuthHeaders()
         },
         body: JSON.stringify({
           current_strategy: strategy,
@@ -447,19 +457,6 @@ function AppContent() {
       setGeneratedCode(data.code)
       setBacktestResults(data.backtest_results)
       setInsightsConfig(data.insights_config)
-
-      // Log refinement results
-      console.log('✅ Strategy refined successfully!')
-      console.log(`📊 Iterations performed: ${data.iterations_performed}`)
-      console.log(`🎯 Best performance score: ${data.best_score?.toFixed(2)}`)
-      console.log(`🔧 Changes made:`, data.changes_made)
-
-      if (data.iteration_history && data.iteration_history.length > 0) {
-        console.log('📈 Iteration history:')
-        data.iteration_history.forEach(hist => {
-          console.log(`  Iteration ${hist.iteration}: Return ${hist.total_return?.toFixed(1)}%, Win Rate ${hist.win_rate?.toFixed(1)}%, Trades ${hist.total_trades}`)
-        })
-      }
 
       // Show success notification
       setRefinementStatus('success')
@@ -796,7 +793,26 @@ function AppContent() {
           />
         ) : !generatedCode ? (
           <div className="max-w-7xl mx-auto px-6 py-8 w-full">
-            <StrategyInput onGenerate={handleGenerateStrategy} fastMode={fastMode} onFastModeChange={setFastMode} />
+            {error ? (
+              <div className="max-w-2xl mx-auto">
+                <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-6 mb-6">
+                  <h3 className="text-red-400 font-semibold text-lg mb-2">Generation Failed</h3>
+                  <p className="text-red-300 text-sm mb-4">{error}</p>
+                  <button
+                    onClick={() => {
+                      setError(null)
+                      setShowLanding(false)
+                    }}
+                    className="btn btn-secondary"
+                  >
+                    Try Again
+                  </button>
+                </div>
+                <StrategyInput onGenerate={handleGenerateStrategy} fastMode={fastMode} onFastModeChange={setFastMode} />
+              </div>
+            ) : (
+              <StrategyInput onGenerate={handleGenerateStrategy} fastMode={fastMode} onFastModeChange={setFastMode} />
+            )}
           </div>
         ) : (
           <div className="flex flex-1 gap-0 overflow-hidden w-full">
