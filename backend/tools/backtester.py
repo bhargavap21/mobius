@@ -1038,66 +1038,19 @@ def backtest_strategy(
 
     backtester = Backtester()
 
-    # Try current year first, then fallback to previous years if no data
+    # Always use the most recent dates (no fallback to previous years)
     current_date = datetime.now()
-    current_year = current_date.year
-    years_to_try = [current_year, current_year - 1, current_year - 2, current_year - 3]  # Priority order
+    end_date = current_date
+    start_date = end_date - timedelta(days=days)
 
-    for year_offset, target_year in enumerate(years_to_try):
-        # Calculate dates for this year
-        if target_year == current_date.year:
-            # Use current date for current year
-            end_date = current_date
-        else:
-            # Use same month/day but different year
-            try:
-                end_date = datetime(target_year, current_date.month, min(current_date.day, 28))
-            except:
-                end_date = datetime(target_year, 12, 31)
+    logger.info(f"📅 Running backtest from {start_date.date()} to {end_date.date()} ({days} days)")
 
-        start_date = end_date - timedelta(days=days)
+    # Run backtest with current dates
+    result = backtester.run_backtest(
+        strategy=strategy,
+        start_date=start_date,
+        end_date=end_date,
+        initial_capital=initial_capital
+    )
 
-        logger.info(f"🔄 Attempting backtest with {target_year} data ({start_date.date()} to {end_date.date()})")
-
-        # Run a quick data availability check
-        result = backtester.run_backtest(
-            strategy=strategy,
-            start_date=start_date,
-            end_date=end_date,
-            initial_capital=initial_capital
-        )
-
-        # Check if we got meaningful data (trades executed or data found)
-        total_data_points = result.get('summary', {}).get('data_points_checked', 0)
-        external_data_found = result.get('summary', {}).get('external_data_found', 0)
-
-        # If we found external data or executed trades, use this result
-        if external_data_found > 0 or result.get('trades', []):
-            if year_offset > 0:
-                logger.info(f"✅ Using {target_year} data (fallback from {years_to_try[0]})")
-                result['date_fallback_info'] = {
-                    'requested_year': years_to_try[0],
-                    'actual_year': target_year,
-                    'reason': f'No external data found for {years_to_try[0]}, using {target_year} instead'
-                }
-            return result
-
-        # For strategies that require external data, check if we tried enough dates
-        requires_external = any(source in str(strategy).lower()
-                               for source in ['reddit', 'twitter', 'news', 'sentiment'])
-
-        if requires_external and total_data_points > 20 and external_data_found == 0:
-            logger.warning(f"⚠️ No external data found for {target_year}, trying earlier year...")
-            continue
-        elif not requires_external:
-            # Strategy doesn't need external data, return the result
-            return result
-
-    # If we've tried all years and found no data, return the last result with a warning
-    logger.warning(f"⚠️ No external data found in any year from {years_to_try}")
-    result['date_fallback_info'] = {
-        'requested_year': years_to_try[0],
-        'actual_year': None,
-        'reason': f'No external data found in years: {years_to_try}'
-    }
     return result

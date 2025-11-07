@@ -2,6 +2,7 @@
 Strategy Analyst Agent - Reviews backtest results and provides feedback
 """
 import logging
+import asyncio
 from typing import Dict, Any
 from agents.base_agent import BaseAgent
 from orchestrator import get_orchestrator
@@ -134,8 +135,54 @@ NEEDS_REFINEMENT: YES (if 0 trades or poor performance)
 SHOULD_CONTINUE: YES (unless iteration > 5)
 """
 
-        # Use orchestrator to analyze
-        result = self.orchestrator.chat(analysis_prompt)
+        # Use orchestrator to analyze (async to prevent blocking)
+        # Start a heartbeat task to keep WebSocket alive during long LLM call
+        session_id = input_data.get('session_id')
+        heartbeat_task = None
+
+        async def send_heartbeats():
+            """Send heartbeat events every 5 seconds to prevent WebSocket timeout"""
+            if not session_id:
+                logger.warning("⚠️ No session_id provided for heartbeat, skipping")
+                return
+            try:
+                from progress_manager import progress_manager
+                heartbeat_count = 0
+                logger.info(f"💓 Starting heartbeat task for session {session_id[:8]}")
+                while True:
+                    await asyncio.sleep(5)  # Changed from 10s to 5s for safety
+                    heartbeat_count += 1
+                    logger.info(f"💓 Sending heartbeat #{heartbeat_count} for session {session_id[:8]}")
+                    # Emit a heartbeat event to keep the connection alive
+                    await progress_manager.emit_event(session_id, {
+                        'type': 'heartbeat',
+                        'count': heartbeat_count
+                    })
+                    logger.info(f"✅ Heartbeat #{heartbeat_count} sent successfully")
+            except asyncio.CancelledError:
+                logger.info(f"🛑 Heartbeat task cancelled after {heartbeat_count} heartbeats")
+                pass
+
+        if session_id:
+            heartbeat_task = asyncio.create_task(send_heartbeats())
+            logger.info(f"✅ Heartbeat task created and running")
+        else:
+            logger.warning(f"⚠️ No session_id, heartbeat will NOT run!")
+
+        try:
+            import time
+            llm_start = time.time()
+            logger.info(f"🤖 Starting async LLM call to orchestrator (prompt length: {len(analysis_prompt)} chars)")
+            result = await self.orchestrator.chat(analysis_prompt)
+            llm_end = time.time()
+            logger.info(f"✅ LLM call completed in {llm_end - llm_start:.2f}s")
+        finally:
+            if heartbeat_task:
+                heartbeat_task.cancel()
+                try:
+                    await heartbeat_task
+                except asyncio.CancelledError:
+                    pass
 
         if not result.get('success'):
             return {

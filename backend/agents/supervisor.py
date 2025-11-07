@@ -68,7 +68,18 @@ class SupervisorAgent(BaseAgent):
             }
         """
         user_query = input_data.get('user_query', '')
-        days = input_data.get('days', 180)
+
+        # Determine default backtest timeframe based on strategy type
+        # Custom dataset strategies (Reddit, Twitter, etc.) default to 60 days (2 months)
+        # Regular market data strategies default to 180 days (6 months)
+        query_lower = user_query.lower()
+        uses_custom_data = any(keyword in query_lower for keyword in [
+            'reddit', 'wallstreetbets', 'wsb', 'twitter', 'tweet', 'social media',
+            'sentiment', 'news', 'article'
+        ])
+        default_days = 60 if uses_custom_data else 180
+
+        days = input_data.get('days', default_days)
         initial_capital = input_data.get('initial_capital', 10000)
         session_id = input_data.get('session_id')  # Optional session ID for progress updates
 
@@ -317,27 +328,61 @@ class SupervisorAgent(BaseAgent):
                         for rec in data_insights.get('recommendations', [])[:3]:
                             logger.info(f"   - {rec['condition']}: adjust to {rec['recommended_value']:.3f} "
                                       f"(confidence: {rec['confidence']:.2f})")
+                    logger.info(f"✅ Data analysis complete")
                 except Exception as e:
                     logger.warning(f"⚠️  Data analysis failed: {e}")
+                    import traceback
+                    logger.warning(f"⚠️  Traceback: {traceback.format_exc()}")
 
+            logger.info(f"📤 About to emit backtest_complete event...")
             if progress:
-                await progress.emit_backtest_complete(
-                    session_id,
-                    summary.get('total_trades', 0),
-                    summary.get('total_return', 0)
-                )
+                try:
+                    await progress.emit_backtest_complete(
+                        session_id,
+                        summary.get('total_trades', 0),
+                        summary.get('total_return', 0)
+                    )
+                    logger.info(f"✅ Backtest complete event emitted successfully")
+                    # CRITICAL FIX: Give WebSocket client 200ms to process the event before continuing
+                    # This prevents a race condition where we emit analysis_start before the client
+                    # has processed backtest_complete, which can cause the frontend to disconnect
+                    logger.info(f"⏸️  Pausing 200ms to ensure client receives backtest_complete event...")
+                    await asyncio.sleep(0.2)
+                    logger.info(f"✅ Pause complete, proceeding to analysis...")
+                except Exception as e:
+                    logger.error(f"❌ Failed to emit backtest_complete event: {e}")
+                    import traceback
+                    logger.error(f"Traceback: {traceback.format_exc()}")
 
             # STEP 3: Analysis
-            logger.info(f"\n🔍 Step 3: Strategy Analysis")
-            if progress:
-                await progress.emit_analysis_start(session_id)
+            logger.info(f"\n🔍 Step 3: Strategy Analysis (session: {session_id[:8]})")
+            logger.info(f"📊 About to start analysis with {summary.get('total_trades', 0)} trades")
 
-            analysis_result = await self.strategy_analyst.process({
-                'backtest_results': backtest_results,
-                'strategy': strategy,
-                'user_query': user_query,
-                'iteration': iteration
-            })
+            if progress:
+                try:
+                    logger.info(f"📤 Emitting analysis_start event...")
+                    await progress.emit_analysis_start(session_id)
+                    logger.info(f"✅ Analysis start event emitted successfully")
+                except Exception as e:
+                    logger.error(f"❌ Failed to emit analysis_start event: {e}")
+                    import traceback
+                    logger.error(f"Traceback: {traceback.format_exc()}")
+
+            logger.info(f"🚀 Calling strategy_analyst.process()...")
+            try:
+                analysis_result = await self.strategy_analyst.process({
+                    'backtest_results': backtest_results,
+                    'strategy': strategy,
+                    'user_query': user_query,
+                    'iteration': iteration,
+                    'session_id': session_id  # Pass session_id for heartbeat events
+                })
+                logger.info(f"✅ strategy_analyst.process() completed successfully")
+            except Exception as e:
+                logger.error(f"❌ strategy_analyst.process() failed: {e}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                raise
 
             if not analysis_result.get('success'):
                 logger.error(f"❌ Analysis failed: {analysis_result.get('error')}")

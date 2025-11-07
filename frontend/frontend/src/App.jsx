@@ -6,7 +6,7 @@ import CodeDisplay from './components/CodeDisplay'
 import LoadingSpinner from './components/LoadingSpinner'
 import BacktestResults from './components/BacktestResults'
 import ProgressIndicator from './components/ProgressIndicator'
-import AgentActivityLogWS from './components/AgentActivityLogWS'
+import ClarificationChat from './components/ClarificationChat'
 import Login from './components/Login'
 import Signup from './components/Signup'
 import BotLibrary from './components/BotLibrary'
@@ -100,23 +100,71 @@ function AppContent() {
   const [showLanding, setShowLanding] = useState(true)
   const [fastMode, setFastMode] = useState(false)
 
+  // Clarification flow state
+  const [showClarification, setShowClarification] = useState(false)
+  const [initialQuery, setInitialQuery] = useState('')
+  const [currentStep, setCurrentStep] = useState('') // 'clarifying', 'parsing', 'coding', 'backtesting', 'analyzing', 'complete'
+
   const handleGenerateStrategy = async (userInput, useMultiAgent = true, useFastMode = false) => {
+    console.log('[App] handleGenerateStrategy called with:', { userInput, useMultiAgent, useFastMode })
+    console.log('[App] isAuthenticated:', isAuthenticated, 'user:', user)
+
     // Check authentication first before starting generation
     if (!isAuthenticated || !user) {
+      console.log('[App] Not authenticated, showing login modal')
       handleTokenExpired()
       return
     }
 
     setShowLanding(false)
-    setLoading(true)
     setError(null)
     setBacktestResults(null)
-    setProgressSteps([])
-    setCurrentIteration(0)
+    setLoading(true)
 
     try {
-      // STEP 1: Create session (no work starts yet)
-      console.log('[App] Step 1: Creating session...')
+      console.log('[App] Checking if clarification is needed...')
+
+      // Call clarification API to check if we need to ask questions
+      const clarifyResponse = await fetch('http://localhost:8000/api/strategy/clarify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: userInput,
+          conversation_history: []
+        })
+      })
+
+      const clarifyData = await clarifyResponse.json()
+      console.log('[App] Clarification response:', clarifyData)
+
+      if (clarifyData.needs_clarification) {
+        // Show clarification UI
+        console.log('[App] Clarification needed, showing chat UI')
+        setInitialQuery(userInput)
+        setShowClarification(true)
+        setCurrentStep('clarifying')
+        // Keep loading=true so the clarification UI renders (it's inside the loading block)
+      } else {
+        // No clarification needed, proceed directly to workflow
+        console.log('[App] No clarification needed, starting workflow directly')
+        await handleClarificationComplete(clarifyData.enriched_query, clarifyData.parameters || {})
+      }
+    } catch (error) {
+      console.error('[App] Error during clarification check:', error)
+      setError('Failed to start strategy generation')
+      setLoading(false)
+    }
+  }
+
+  // Called when clarification is complete
+  const handleClarificationComplete = async (enrichedQuery, parameters) => {
+    setShowClarification(false)
+    setLoading(true)
+    setCurrentStep('parsing')
+
+    try {
+      // Create session
+      console.log('[App] Creating session...')
       const sessionResponse = await fetch('http://localhost:8000/api/sessions', {
         method: 'POST',
         headers: {
@@ -131,53 +179,22 @@ function AppContent() {
 
       const { sessionId: newSessionId } = await sessionResponse.json()
       console.log('[App] ✅ Session created:', newSessionId)
-
-      // STEP 2: Set sessionId to mount SSE component (which will open stream)
       setSessionId(newSessionId)
 
-      // STEP 3: Wait for SSE ready signal, then start workflow
-      // We'll use a Promise that resolves when the SSE component signals ready
-      await new Promise((resolve) => {
-        let resolved = false
-
-        window.wsStreamReady = (sid) => {
-          if (sid === newSessionId && !resolved) {
-            resolved = true
-            console.log('[App] ✅ WebSocket stream ready, starting workflow...')
-            resolve()
-          }
-        }
-
-        // Timeout after 5 seconds in case WebSocket doesn't connect
-        setTimeout(() => {
-          if (!resolved) {
-            resolved = true
-            console.warn('[App] ⚠️ WebSocket ready timeout, starting workflow anyway')
-            resolve()
-          }
-        }, 5000)
-      })
-
-      // STEP 3: Start the workflow (SSE stream is now open and waiting)
-      console.log('[App] Step 3: Starting workflow...')
-      const startUrl = useFastMode
-        ? `http://localhost:8000/api/sessions/${newSessionId}/start?fast_mode=true`
-        : `http://localhost:8000/api/sessions/${newSessionId}/start`
-
-      const startResponse = await fetch(startUrl, {
+      // Start the workflow
+      console.log('[App] Starting workflow with enriched query and parameters:', parameters)
+      const startResponse = await fetch(`http://localhost:8000/api/sessions/${newSessionId}/start${fastMode ? '?fast_mode=true' : ''}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...getAuthHeaders()
         },
         body: JSON.stringify({
-          strategy_description: userInput
+          strategy_description: enrichedQuery,
+          parameters: parameters  // Pass the parameters from clarification
         }),
       })
 
-      console.log(`[App] Workflow started: ${startResponse.status} ${startResponse.statusText}`)
-
-      // Check for 401/403 Unauthorized (expired token)
       if (startResponse.status === 401 || startResponse.status === 403) {
         setLoading(false)
         handleTokenExpired()
@@ -186,18 +203,61 @@ function AppContent() {
 
       if (!startResponse.ok) {
         const errorText = await startResponse.text()
-        console.error(`[App] Request failed:`, errorText)
         throw new Error(`Failed to start workflow (${startResponse.status}): ${errorText}`)
       }
 
-      console.log('[App] ✅ Workflow started successfully, waiting for WebSocket events...')
-      // Note: Results will be handled by onWorkflowComplete callback when WebSocket signals completion
+      console.log('[App] ✅ Workflow started, polling for status...')
+
+      // Poll for completion (no timeout - rely on backend error handling)
+      const pollInterval = setInterval(async () => {
+        try {
+          const statusResponse = await fetch(`http://localhost:8000/api/strategy/status/${newSessionId}`)
+          const statusData = await statusResponse.json()
+
+          // Update current step
+          if (statusData.step === 'CodeGenerator') {
+            setCurrentStep('coding')
+          } else if (statusData.step === 'BacktestRunner') {
+            setCurrentStep('backtesting')
+          } else if (statusData.step === 'StrategyAnalyst') {
+            setCurrentStep('analyzing')
+          }
+
+          // Check if complete
+          if (statusData.status === 'complete') {
+            clearInterval(pollInterval)
+            setCurrentStep('complete')
+            setLoading(false)
+
+            // Set results
+            if (statusData.strategy) setStrategy(statusData.strategy)
+            if (statusData.code) setGeneratedCode(statusData.code)
+            if (statusData.backtest_results) setBacktestResults(statusData.backtest_results)
+            if (statusData.insights_config) setInsightsConfig(statusData.insights_config)
+            if (statusData.bot_id) setCurrentBotId(statusData.bot_id)
+
+            console.log('[App] ✅ Strategy generation complete!')
+          } else if (statusData.status === 'not_found') {
+            clearInterval(pollInterval)
+            throw new Error('Session not found')
+          } else if (statusData.status === 'error') {
+            clearInterval(pollInterval)
+            throw new Error(statusData.message || 'Strategy generation failed')
+          }
+        } catch (pollError) {
+          console.error('Error polling status:', pollError)
+          clearInterval(pollInterval)
+          setError(pollError.message || 'Failed to check status')
+          setLoading(false)
+        }
+      }, 2000) // Poll every 2 seconds
 
     } catch (err) {
       console.error('❌ Error during strategy generation:', err)
       setError(err.message || 'Failed to generate strategy')
       setLoading(false)
       setSessionId(null)
+      setCurrentStep('')
     }
   }
 
@@ -759,16 +819,30 @@ function AppContent() {
                 </p>
               </div>
 
-              {/* Real-time Agent Activity Log (WebSocket-based) */}
-              {sessionId ? (
+              {/* Clarification Chat or Progress Indicator */}
+              {showClarification ? (
                 <div className="mt-6 w-full max-w-3xl">
-                  <AgentActivityLogWS
-                    sessionId={sessionId}
-                    onComplete={handleWorkflowComplete}
+                  <ClarificationChat
+                    initialQuery={initialQuery}
+                    onComplete={handleClarificationComplete}
                   />
                 </div>
+              ) : currentStep ? (
+                <div className="mt-6 w-full max-w-3xl">
+                  <div className="bg-dark-card p-6 rounded-lg border border-dark-border">
+                    <div className="text-center">
+                      <div className="text-lg font-semibold text-white mb-4">
+                        {currentStep === 'parsing' && '📝 Parsing your strategy...'}
+                        {currentStep === 'coding' && '💻 Generating code...'}
+                        {currentStep === 'backtesting' && '📊 Running backtest...'}
+                        {currentStep === 'analyzing' && '🔍 Analyzing results...'}
+                        {currentStep === 'complete' && '✅ Complete!'}
+                      </div>
+                      <ProgressIndicator />
+                    </div>
+                  </div>
+                </div>
               ) : (
-                /* Fallback animated indicator if no session ID */
                 <div className="flex justify-center w-full">
                   <ProgressIndicator />
                 </div>

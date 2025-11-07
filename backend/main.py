@@ -5,7 +5,7 @@ FastAPI Backend for AI Trading Bot Generator
 import logging
 import asyncio
 import json
-from fastapi import FastAPI, HTTPException, Query, Depends, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -142,6 +142,7 @@ async def startup_event():
 class StrategyRequest(BaseModel):
     strategy_description: str
     session_id: Optional[str] = None  # Optional session ID for progress tracking
+    parameters: Optional[dict] = None  # Parameters from clarification flow
 
 
 class StrategyResponse(BaseModel):
@@ -333,25 +334,37 @@ async def _run_multi_agent_workflow(
     """
     try:
         logger.info(f"🤖 Multi-Agent Workflow Starting: '{strategy_description[:100]}...' (Session: {session_id})")
+        logger.info(f"📋 Parameters: fast_mode={fast_mode}, user_id={user_id}")
 
         from agents.supervisor import SupervisorAgent
         from db.repositories.bot_repository import BotRepository
         from db.models import TradingBotCreate
         from job_storage import job_storage
 
+        logger.info(f"📦 Creating SupervisorAgent...")
         supervisor = SupervisorAgent()
+        logger.info(f"✅ SupervisorAgent created")
 
         # Adjust parameters based on fast mode
         days = 30 if fast_mode else 90
         initial_capital = 10000
 
-        result = await supervisor.process({
-            'user_query': strategy_description,
-            'days': days,
-            'initial_capital': initial_capital,
-            'session_id': session_id,
-            'fast_mode': fast_mode
-        })
+        logger.info(f"🚀 Calling supervisor.process() with days={days}, capital=${initial_capital}...")
+        try:
+            result = await supervisor.process({
+                'user_query': strategy_description,
+                'days': days,
+                'initial_capital': initial_capital,
+                'session_id': session_id,
+                'fast_mode': fast_mode
+            })
+            logger.info(f"✅ supervisor.process() completed successfully!")
+            logger.info(f"📊 Result keys: {list(result.keys()) if result else 'None'}")
+        except Exception as supervisor_error:
+            logger.error(f"❌❌❌ supervisor.process() FAILED with exception: {supervisor_error}")
+            import traceback
+            logger.error(f"Traceback:\n{traceback.format_exc()}")
+            raise
 
         if not result.get('success'):
             error_data = {
@@ -445,6 +458,54 @@ async def _run_multi_agent_workflow(
             logger.info(f"✅ Error event emitted for session {session_id[:8]}")
 
 
+class ClarificationRequest(BaseModel):
+    query: Optional[str] = None
+    conversation_history: Optional[list] = []
+
+
+@app.post("/api/strategy/clarify")
+async def clarify_strategy(request: ClarificationRequest):
+    """
+    Get clarifying questions before generating strategy
+    Asks ONE question at a time about parameters user hasn't specified
+    """
+    from agents.clarification_agent import ClarificationAgent
+    from anthropic import InternalServerError, APIError
+
+    agent = ClarificationAgent()
+
+    try:
+        result = await agent.get_next_question(
+            query=request.query,
+            conversation_history=request.conversation_history
+        )
+        return result
+    except InternalServerError as e:
+        # Anthropic API is overloaded (529) - skip clarification and proceed
+        logger.warning(f"⚠️ Anthropic API overloaded, skipping clarification: {e}")
+        return {
+            "needs_clarification": False,
+            "enriched_query": request.query or "Generate trading strategy based on conversation",
+            "parameters": {}
+        }
+    except APIError as e:
+        # Other Anthropic API errors - skip clarification
+        logger.error(f"❌ Anthropic API error during clarification: {e}")
+        return {
+            "needs_clarification": False,
+            "enriched_query": request.query or "Generate trading strategy based on conversation",
+            "parameters": {}
+        }
+    except Exception as e:
+        # Unexpected errors - skip clarification
+        logger.error(f"❌ Unexpected error during clarification: {e}")
+        return {
+            "needs_clarification": False,
+            "enriched_query": request.query or "Generate trading strategy based on conversation",
+            "parameters": {}
+        }
+
+
 @app.post("/api/sessions")
 async def create_session(user_id: UUID = Depends(get_current_user_id)):
     """
@@ -454,159 +515,100 @@ async def create_session(user_id: UUID = Depends(get_current_user_id)):
     from progress_manager import progress_manager
 
     session_id = str(uuid.uuid4())
+    logger.info(f"🆕 Creating new session {session_id[:8]} for user {user_id}")
+
     # Pre-create the session and event history
     progress_manager.create_session(session_id)
 
-    logger.info(f"📡 Created session {session_id[:8]} for user {user_id}")
+    logger.info(f"✅ Session {session_id[:8]} created successfully")
+    logger.info(f"📡 Active sessions after creation: {list(progress_manager.sessions.keys())}")
 
     return {"sessionId": session_id}
 
 
-@app.websocket("/ws/strategy/progress/{session_id}")
-async def websocket_progress(websocket: WebSocket, session_id: str):
+@app.get("/api/strategy/status/{session_id}")
+async def get_strategy_status(session_id: str):
     """
-    WebSocket endpoint for real-time progress updates
-    Step 2: Client connects to this BEFORE starting the workflow
+    Simple polling endpoint to check strategy generation status
+    Returns current step and completion status
     """
-    from progress_manager import progress_manager
+    logger.info(f"🔍 Status check for session {session_id[:8]}")
 
-    await websocket.accept()
-    logger.info(f"🔌 WebSocket client connected for session: {session_id[:8]}")
-
+    # PRIORITY 1: Check job_storage for completed result (fastest, most reliable)
     try:
-        # Get or create session queue
-        if session_id in progress_manager.sessions:
-            logger.info(f"📡 WS client connected to existing session: {session_id[:8]}")
-            queue = progress_manager.sessions[session_id]
-        else:
-            logger.info(f"📡 Creating new WS session: {session_id[:8]}")
-            queue = progress_manager.create_session(session_id)
-
-        # Send buffered events first (if any)
-        if session_id in progress_manager.event_history:
-            logger.info(f"📡 Sending {len(progress_manager.event_history[session_id])} buffered events")
-            for event in progress_manager.event_history[session_id]:
-                await websocket.send_json(event)
-
-        # Send ready signal
-        await websocket.send_json({
-            'type': 'ready',
-            'message': 'Stream ready, you can start the workflow'
-        })
-        logger.info(f"✅ Sent ready signal for session: {session_id[:8]}")
-
-        # Stream events as they arrive
-        logger.info(f"🔄 Entering event loop for session: {session_id[:8]}")
-        while True:
-            try:
-                # Wait for new event with timeout
-                import time
-                wait_start = time.time()
-                logger.debug(f"⏳ Waiting for event from queue (session: {session_id[:8]}, qsize: {queue.qsize()})")
-                event = await asyncio.wait_for(queue.get(), timeout=30.0)
-                wait_end = time.time()
-                logger.info(f"📦 Retrieved event from queue: {event.get('type')} at {wait_end}, waited {wait_end - wait_start:.3f}s (session: {session_id[:8]})")
-
-                # Send event to client - explicitly catch connection errors
-                logger.info(f"🔜 About to send event: {event.get('type')} (session: {session_id[:8]})")
-                try:
-                    await websocket.send_json(event)
-                    logger.info(f"📤 Sent event to WS client: {event.get('type')} - {event.get('message', '')} (session: {session_id[:8]})")
-                except WebSocketDisconnect as ws_disc:
-                    logger.warning(f"⚠️ Client disconnected while sending event: {event.get('type')} - {ws_disc} (session: {session_id[:8]})")
-                    raise  # Re-raise to exit the loop
-                except Exception as send_error:
-                    logger.error(f"❌ Error sending event to client: {type(send_error).__name__}: {send_error} (session: {session_id[:8]})")
-                    import traceback
-                    traceback.print_exc()
-                    raise
-
-                # Check if it's a completion event
-                if event.get('type') in ['complete', 'error']:
-                    # CRITICAL: Give the client time to receive the complete event before closing
-                    # Without this delay, we close the connection immediately after sending,
-                    # and the client may not receive the event due to network buffering
-                    logger.info(f"⏸️  Sent complete event, waiting briefly before closing (session: {session_id[:8]})")
-                    await asyncio.sleep(0.5)  # Wait 500ms to ensure client receives the event
-                    logger.info(f"🎉 Workflow complete, closing WS for session: {session_id[:8]}")
-                    break
-
-            except asyncio.TimeoutError:
-                # Send heartbeat to keep connection alive
-                logger.debug(f"💓 Sending heartbeat (session: {session_id[:8]})")
-                try:
-                    await websocket.send_json({'type': 'heartbeat'})
-                except Exception as heartbeat_error:
-                    logger.warning(f"⚠️ Failed to send heartbeat, client may have disconnected: {heartbeat_error}")
-                    break  # Exit if we can't send heartbeat
-                continue
-
-    except WebSocketDisconnect:
-        logger.info(f"🔌 WebSocket client disconnected for session: {session_id[:8]}")
+        from job_storage import job_storage
+        result = job_storage.get_result(session_id)
+        if result:
+            logger.info(f"✅ Found completed result in job_storage for session {session_id[:8]}")
+            if result.get('success'):
+                return {
+                    "status": "complete",
+                    "step": "complete",
+                    "strategy": result.get('strategy'),
+                    "code": result.get('code'),
+                    "backtest_results": result.get('backtest_results'),
+                    "insights_config": result.get('insights_config')
+                }
+            else:
+                # Workflow failed
+                return {
+                    "status": "error",
+                    "step": "error",
+                    "message": result.get('error', 'Unknown error')
+                }
     except Exception as e:
-        logger.error(f"❌ WebSocket error for session {session_id[:8]}: {e}")
-    finally:
-        progress_manager.close_session(session_id)
+        logger.error(f"Error checking job_storage: {e}")
 
-
-@app.get("/api/strategy/progress/{session_id}")
-async def progress_stream(session_id: str):
-    """
-    Step 2: Server-Sent Events endpoint for real-time progress updates
-    Client opens this BEFORE starting the workflow to ensure no events are missed
-    """
+    # PRIORITY 2: Check if session is still processing
     from progress_manager import progress_manager
+    logger.info(f"📡 Active sessions in progress_manager: {list(progress_manager.sessions.keys())}")
+    logger.info(f"📡 Checking if {session_id[:8]} in sessions: {session_id in progress_manager.sessions}")
 
-    async def event_generator() -> AsyncGenerator[str, None]:
-        # Get or create session queue
-        if session_id in progress_manager.sessions:
-            logger.info(f"📡 SSE client connected to existing session: {session_id[:8]}")
-            queue = progress_manager.sessions[session_id]
-        else:
-            logger.info(f"📡 Creating new SSE session: {session_id[:8]}")
-            queue = progress_manager.create_session(session_id)
-
-        # Send buffered events first (if any) so late joiners still see them
+    if session_id in progress_manager.sessions:
+        # Try to get the latest event from history
         if session_id in progress_manager.event_history:
-            logger.info(f"📡 Sending {len(progress_manager.event_history[session_id])} buffered events")
-            for event in progress_manager.event_history[session_id]:
-                yield f"data: {json.dumps(event)}\n\n"
+            events = progress_manager.event_history[session_id]
+            if events:
+                last_event = events[-1]
+                logger.info(f"📊 Latest event: {last_event.get('type')} - {last_event.get('agent')}")
+                return {
+                    "status": "processing",
+                    "step": last_event.get('agent', 'unknown'),
+                    "message": last_event.get('message', '')
+                }
 
-        # Send ready signal
-        yield f"data: {json.dumps({'type': 'ready', 'message': 'Stream ready, you can start the workflow'})}\n\n"
-
-        # CRITICAL: Yield control to event loop to ensure the ready signal is sent
-        # before we start blocking on queue.get()
-        await asyncio.sleep(0)
-
-        try:
-            while True:
-                try:
-                    # Wait for new event with timeout to keep connection alive
-                    event = await asyncio.wait_for(queue.get(), timeout=30.0)
-
-                    # Check if it's a completion event
-                    if event.get('type') == 'complete' or event.get('type') == 'error':
-                        yield f"data: {json.dumps(event)}\n\n"
-                        break
-
-                    yield f"data: {json.dumps(event)}\n\n"
-                except asyncio.TimeoutError:
-                    # Send heartbeat to keep connection alive
-                    yield f": keepalive\n\n"
-                    continue
-        finally:
-            progress_manager.close_session(session_id)
-
-    return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",  # Disable nginx buffering
+        logger.info(f"🔄 Session exists but no events yet")
+        return {
+            "status": "processing",
+            "step": "initializing",
+            "message": "Starting workflow..."
         }
-    )
+
+    # PRIORITY 3: Check database for saved bot (slowest, fallback)
+    try:
+        from db.repositories.bot_repository import BotRepository
+        bot_repo = BotRepository()
+        bot = await bot_repo.get_by_session_id(session_id)
+        if bot:
+            logger.info(f"✅ Found completed bot in database for session {session_id[:8]}")
+            return {
+                "status": "complete",
+                "step": "complete",
+                "bot_id": str(bot.id),
+                "strategy": bot.strategy_config,
+                "code": bot.generated_code,
+                "backtest_results": bot.backtest_results,
+                "insights_config": bot.insights_config
+            }
+    except Exception as e:
+        logger.error(f"Error checking bot status: {e}")
+
+    logger.warning(f"⚠️ Session {session_id[:8]} not found in job_storage, progress_manager, or database")
+    return {
+        "status": "not_found",
+        "step": "unknown",
+        "message": "Session not found"
+    }
 
 
 @app.post("/api/sessions/{session_id}/start")
@@ -622,11 +624,17 @@ async def start_workflow(
     """
     from progress_manager import progress_manager
 
-    logger.info(f"📡 Starting workflow for session {session_id[:8]}")
+    logger.info(f"🚀 START WORKFLOW called for session {session_id[:8]}")
+    logger.info(f"📝 Strategy description: {request.strategy_description[:100]}...")
+    logger.info(f"⚡ Fast mode: {fast_mode}")
+    logger.info(f"📡 Active sessions before start: {list(progress_manager.sessions.keys())}")
 
     # Verify session exists
     if session_id not in progress_manager.sessions:
+        logger.error(f"❌ Session {session_id[:8]} NOT FOUND in progress_manager!")
         raise HTTPException(status_code=404, detail="Session not found. Create session first.")
+
+    logger.info(f"✅ Session {session_id[:8]} found, starting background workflow...")
 
     # Start the actual workflow in background
     asyncio.create_task(_run_multi_agent_workflow(
@@ -635,6 +643,8 @@ async def start_workflow(
         fast_mode=fast_mode,
         user_id=user_id
     ))
+
+    logger.info(f"🔄 Background task created for session {session_id[:8]}")
 
     return {"status": "started", "sessionId": session_id}
 
@@ -674,10 +684,26 @@ async def create_strategy_multi_agent(
 
         supervisor = SupervisorAgent()
 
-        # Adjust parameters based on fast mode
-        days = 30 if fast_mode else 90  # Ultra-fast mode uses only 30 days
+        # Parse parameters from clarification flow
+        from utils.timeframe_parser import parse_timeframe_to_days
+
+        parameters = request.parameters or {}
+        backtest_timeframe = parameters.get('backtest_timeframe')
+
+        # Determine days:
+        # 1. Fast mode: 30 days (overrides everything)
+        # 2. User-specified timeframe from clarification: parse it
+        # 3. Otherwise: None (let supervisor use intelligent defaults)
+        if fast_mode:
+            days = 30
+        elif backtest_timeframe:
+            days = parse_timeframe_to_days(backtest_timeframe)
+            logger.info(f"📅 Parsed backtest timeframe '{backtest_timeframe}' -> {days} days")
+        else:
+            days = None  # Let supervisor decide based on strategy type
+
         initial_capital = 10000
-        
+
         result = await supervisor.process({
             'user_query': request.strategy_description,
             'days': days,

@@ -5,7 +5,7 @@ import logging
 from typing import Dict, Any, List, Optional
 import numpy as np
 import os
-from anthropic import Anthropic
+from anthropic import Anthropic, AsyncAnthropic
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +38,7 @@ class IntelligentOrchestrator:
         self.learning_history = []  # Track what we've learned
         self.registered_tools = {}  # Store registered tools
         self.client = Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
+        self.async_client = AsyncAnthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
         self.model = "claude-sonnet-4-20250514"
 
     def register_tool(self, name: str, description: str, input_schema: Dict, function: callable):
@@ -49,9 +50,9 @@ class IntelligentOrchestrator:
         }
         logger.debug(f"Registered tool: {name}")
 
-    def chat(self, prompt: str) -> Dict[str, Any]:
+    async def chat(self, prompt: str) -> Dict[str, Any]:
         """
-        Send a prompt to Claude and get a response
+        Send a prompt to Claude and get a response (async)
 
         Args:
             prompt: The prompt to send
@@ -60,7 +61,7 @@ class IntelligentOrchestrator:
             Dict with 'success' and 'response' keys
         """
         try:
-            response = self.client.messages.create(
+            response = await self.async_client.messages.create(
                 model=self.model,
                 max_tokens=4000,
                 messages=[{"role": "user", "content": prompt}]
