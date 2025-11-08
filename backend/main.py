@@ -587,9 +587,11 @@ async def get_strategy_status(session_id: str):
 
     # PRIORITY 3: Check database for saved bot (slowest, fallback)
     try:
+        import asyncio
         from db.repositories.bot_repository import BotRepository
         bot_repo = BotRepository()
-        bot = await bot_repo.get_by_session_id(session_id)
+        # Add timeout to prevent hanging
+        bot = await asyncio.wait_for(bot_repo.get_by_session_id(session_id), timeout=3.0)
         if bot:
             logger.info(f"✅ Found completed bot in database for session {session_id[:8]}")
             return {
@@ -601,6 +603,8 @@ async def get_strategy_status(session_id: str):
                 "backtest_results": bot.backtest_results,
                 "insights_config": bot.insights_config
             }
+    except asyncio.TimeoutError:
+        logger.warning(f"⏱️ Database query timed out for session {session_id[:8]}")
     except Exception as e:
         logger.error(f"Error checking bot status: {e}")
 
