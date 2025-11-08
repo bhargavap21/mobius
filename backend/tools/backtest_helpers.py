@@ -96,7 +96,10 @@ def get_social_sentiment_for_date(
     symbol: str,
     source: str,
     date: str,
-    cache: Dict[str, Any]
+    cache: Dict[str, Any],
+    dataset_manager=None,
+    session_id: Optional[str] = None,
+    sentiment_collector: Optional[Dict[str, Any]] = None
 ) -> Optional[float]:
     """
     Get social sentiment for a specific date using real historical data
@@ -109,15 +112,48 @@ def get_social_sentiment_for_date(
         source: 'twitter', 'reddit', or 'news'
         date: Date string (YYYY-MM-DD)
         cache: Cache dict to store results
+        dataset_manager: Optional DatasetManager instance for persistent caching
+        session_id: Optional session ID for dataset association
+        sentiment_collector: Optional dict to collect sentiments for batch storage
+                           Format: {data_source: {date: {sentiment, metadata}}}
 
     Returns:
         Sentiment score (-1 to 1) or None
     """
     cache_key = f"{symbol}_{source}_{date}"
 
-    # Check cache first
+    # Priority 1: Check in-memory cache first (fastest)
     if cache_key in cache:
         return cache[cache_key]
+
+    # Priority 2: Check database cache if DatasetManager provided
+    if dataset_manager and session_id:
+        try:
+            from datetime import datetime as dt
+            target_date = dt.strptime(date, "%Y-%m-%d").date()
+            cached_sentiment = dataset_manager.get_sentiment_for_date(
+                session_id=session_id,
+                ticker=symbol,
+                data_source=source,
+                target_date=target_date
+            )
+            if cached_sentiment is not None:
+                # Store in in-memory cache for faster subsequent access
+                cache[cache_key] = cached_sentiment
+                
+                # Also collect for batch storage (even if from cache, for consistency)
+                if sentiment_collector is not None:
+                    if source not in sentiment_collector:
+                        sentiment_collector[source] = {}
+                    sentiment_collector[source][date] = {
+                        'sentiment': cached_sentiment,
+                        'from_cache': True
+                    }
+                
+                logger.debug(f"✅ Retrieved {source} sentiment for {symbol} on {date} from database cache")
+                return cached_sentiment
+        except Exception as e:
+            logger.debug(f"⚠️ Error checking database cache: {e}, falling back to API")
 
     # Route to specific source handler - NO FALLBACKS
     if source == 'reddit':
@@ -281,6 +317,20 @@ def get_social_sentiment_for_date(
             else:
                 sentiment = round(sum(sentiments) / len(sentiments), 3)  # Fallback to simple average
             cache[cache_key] = sentiment
+            
+            # Collect sentiment for batch storage (instead of storing individually)
+            if sentiment_collector is not None:
+                if source not in sentiment_collector:
+                    sentiment_collector[source] = {}
+                metadata = {
+                    'post_count': len(posts_found),
+                    'avg_score': sum(max(p.score, 1) for p in posts_found) / len(posts_found) if posts_found else 0
+                }
+                sentiment_collector[source][date] = {
+                    'sentiment': sentiment,
+                    **metadata
+                }
+            
             logger.info(f"✅ Real Reddit sentiment for {symbol} on {date}: {sentiment:.2f} ({len(posts_found)} posts)")
             return sentiment
 

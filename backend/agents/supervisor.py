@@ -254,7 +254,8 @@ class SupervisorAgent(BaseAgent):
                 'iteration': iteration,
                 'days': days,
                 'initial_capital': initial_capital,
-                'insights_config': insights_config  # Pass insights config to backtester
+                'insights_config': insights_config,  # Pass insights config to backtester
+                'session_id': session_id  # Pass session_id for dataset persistence
             })
 
             if not backtest_result.get('success'):

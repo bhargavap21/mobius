@@ -18,13 +18,29 @@ logger = logging.getLogger(__name__)
 class Backtester:
     """Flexible backtesting engine for trading strategies"""
 
-    def __init__(self):
+    def __init__(self, session_id: Optional[str] = None):
+        """
+        Initialize Backtester
+        
+        Args:
+            session_id: Optional session ID for dataset persistence
+        """
         self.data_client = StockHistoricalDataClient(
             api_key=settings.alpaca_api_key,
             secret_key=settings.alpaca_secret_key
         )
         self.social_cache = {}  # Cache for social sentiment
         self.news_cache = {}  # Cache for news
+        self.session_id = session_id
+        
+        # Initialize DatasetManager if session_id provided
+        self.dataset_manager = None
+        if session_id:
+            try:
+                from services.dataset_manager import DatasetManager
+                self.dataset_manager = DatasetManager()
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to initialize DatasetManager: {e}")
 
     def evaluate_condition(
         self,
@@ -76,7 +92,12 @@ class Backtester:
             date_str = df.index[idx].strftime('%Y-%m-%d')
 
             # Get real social sentiment - no fallback
-            sentiment_score = get_social_sentiment_for_date(symbol, source, date_str, self.social_cache)
+            sentiment_score = get_social_sentiment_for_date(
+                symbol, source, date_str, self.social_cache,
+                dataset_manager=self.dataset_manager,
+                session_id=self.session_id,
+                sentiment_collector=collected_sentiments
+            )
 
             if sentiment_score is not None:
                 # Track that we found external data
@@ -283,6 +304,10 @@ class Backtester:
 
         # Initialize external data counter for evaluate_condition method
         self.external_data_counter = 0
+        
+        # Batch storage: Collect sentiments by data source for efficient storage
+        # Format: {data_source: {date_str: {sentiment: float, metadata: dict}}}
+        collected_sentiments = {}
 
         for i, (idx, row) in enumerate(df.iterrows()):
             price = row['close']
@@ -326,7 +351,12 @@ class Backtester:
                     date_str = idx.strftime('%Y-%m-%d')
 
                     # Get sentiment for this date
-                    sentiment_score = get_social_sentiment_for_date(symbol, source, date_str, self.social_cache)
+                    sentiment_score = get_social_sentiment_for_date(
+                        symbol, source, date_str, self.social_cache,
+                        dataset_manager=self.dataset_manager,
+                        session_id=self.session_id,
+                        sentiment_collector=collected_sentiments
+                    )
                     if sentiment_score is not None:
                         info_point[f'{source}_sentiment'] = round(sentiment_score, 3)
                         info_point[f'{source}_threshold'] = threshold
@@ -607,6 +637,48 @@ class Backtester:
             sharpe_ratio = (avg_daily_return / std_daily_return * (252 ** 0.5)) if std_daily_return > 0 else 0
         else:
             sharpe_ratio = 0
+
+        # Batch storage: Store all collected sentiments as datasets
+        if self.dataset_manager and self.session_id and collected_sentiments:
+            try:
+                from datetime import date as date_type
+                start_date_obj = start_date.date() if isinstance(start_date, datetime) else start_date
+                end_date_obj = end_date.date() if isinstance(end_date, datetime) else end_date
+                
+                # Store datasets for each data source
+                for data_source, sentiments_by_date in collected_sentiments.items():
+                    if sentiments_by_date:  # Only store if we have data
+                        # Calculate metadata
+                        sentiments_list = [v.get('sentiment', 0) for v in sentiments_by_date.values() if v.get('sentiment') is not None]
+                        avg_sentiment = sum(sentiments_list) / len(sentiments_list) if sentiments_list else 0
+                        total_posts = sum(v.get('post_count', 0) for v in sentiments_by_date.values())
+                        
+                        metadata = {
+                            'total_days': len(sentiments_by_date),
+                            'avg_sentiment': round(avg_sentiment, 3),
+                            'total_posts': total_posts,
+                            'days_with_data': len([v for v in sentiments_by_date.values() if v.get('sentiment') is not None])
+                        }
+                        
+                        # Store dataset
+                        success = self.dataset_manager.create_or_update_dataset(
+                            session_id=self.session_id,
+                            ticker=symbol,
+                            data_source=data_source,
+                            start_date=start_date_obj,
+                            end_date=end_date_obj,
+                            data=sentiments_by_date,
+                            metadata=metadata
+                        )
+                        
+                        if success:
+                            logger.info(f"✅ Stored batch dataset for {symbol} ({data_source}): {len(sentiments_by_date)} days")
+                        else:
+                            logger.warning(f"⚠️ Failed to store batch dataset for {symbol} ({data_source})")
+            except Exception as e:
+                logger.error(f"❌ Error storing batch datasets: {e}")
+                import traceback
+                logger.debug(traceback.format_exc())
 
         results = {
             'summary': {
@@ -1004,7 +1076,8 @@ def backtest_strategy(
     days: int = 180,
     initial_capital: float = 10000.0,
     take_profit: Optional[float] = None,
-    stop_loss: Optional[float] = None
+    stop_loss: Optional[float] = None,
+    session_id: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Main function to backtest a trading strategy with intelligent date fallback
@@ -1036,7 +1109,8 @@ def backtest_strategy(
         if stop_loss is not None:
             strategy['exit_conditions']['stop_loss'] = stop_loss
 
-    backtester = Backtester()
+    # Create backtester with session_id for dataset persistence
+    backtester = Backtester(session_id=session_id)
 
     # Always use the most recent dates (no fallback to previous years)
     current_date = datetime.now()

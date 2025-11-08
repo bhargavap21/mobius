@@ -51,6 +51,7 @@ class BacktestRunnerAgent(BaseAgent):
         iteration = input_data.get('iteration', 1)
         days = input_data.get('days') or self.default_days  # Use 'or' to handle None
         initial_capital = input_data.get('initial_capital') or self.default_capital  # Use 'or' to handle None
+        session_id = input_data.get('session_id')  # For dataset persistence
 
         warnings = []
 
@@ -81,7 +82,8 @@ class BacktestRunnerAgent(BaseAgent):
             results = backtest_strategy(
                 strategy=strategy,
                 days=days,
-                initial_capital=initial_capital
+                initial_capital=initial_capital,
+                session_id=session_id
             )
 
             if not results:
