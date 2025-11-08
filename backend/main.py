@@ -64,24 +64,14 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Enable CORS
-# Allow all Vercel preview deployments with regex pattern
-class CustomCORSMiddleware(CORSMiddleware):
-    def is_allowed_origin(self, origin: str) -> bool:
-        # Allow localhost
-        if origin in ["http://localhost:3000", "http://localhost:5173"]:
-            return True
-        # Allow production Vercel domain
-        if origin == "https://mobius-invest.vercel.app":
-            return True
-        # Allow all Vercel preview deployments (*.vercel.app)
-        if re.match(r"https://.*\.vercel\.app$", origin):
-            return True
-        return super().is_allowed_origin(origin)
-
+# Enable CORS - allow localhost and all Vercel deployments
 app.add_middleware(
-    CustomCORSMiddleware,
-    allow_origins=["*"],  # Will be filtered by is_allowed_origin
+    CORSMiddleware,
+    allow_origin_regex=r"https://.*\.vercel\.app",  # All Vercel preview/production domains
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
