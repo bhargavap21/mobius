@@ -43,7 +43,7 @@ const ChatHistorySidebar = ({ onClose, onLoadBot, onNewChat, currentBotId }) => 
 
   const loadBotDetails = async (botId) => {
     try {
-      const response = await fetch(`http://localhost:8000/bots/${botId}`, {
+      const response = await fetch(`${API_URL}/bots/${botId}`, {
         headers: getAuthHeaders(),
       });
 
@@ -75,7 +75,7 @@ const ChatHistorySidebar = ({ onClose, onLoadBot, onNewChat, currentBotId }) => 
     }
 
     try {
-      const response = await fetch(`http://localhost:8000/bots/${botId}`, {
+      const response = await fetch(`${API_URL}/bots/${botId}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
