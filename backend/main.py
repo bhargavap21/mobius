@@ -533,87 +533,100 @@ async def get_strategy_status(session_id: str):
     Simple polling endpoint to check strategy generation status
     Returns current step and completion status
     """
-    logger.info(f"🔍 Status check for session {session_id[:8]}")
-
-    # PRIORITY 1: Check job_storage for completed result (fastest, most reliable)
     try:
-        from job_storage import job_storage
-        result = job_storage.get_result(session_id)
-        if result:
-            logger.info(f"✅ Found completed result in job_storage for session {session_id[:8]}")
-            if result.get('success'):
+        logger.info(f"🔍 Status check for session {session_id[:8]}")
+
+        # PRIORITY 1: Check job_storage for completed result (fastest, most reliable)
+        try:
+            from job_storage import job_storage
+            result = job_storage.get_result(session_id)
+            if result:
+                logger.info(f"✅ Found completed result in job_storage for session {session_id[:8]}")
+                if result.get('success'):
+                    return {
+                        "status": "complete",
+                        "step": "complete",
+                        "strategy": result.get('strategy'),
+                        "code": result.get('code'),
+                        "backtest_results": result.get('backtest_results'),
+                        "insights_config": result.get('insights_config')
+                    }
+                else:
+                    # Workflow failed
+                    return {
+                        "status": "error",
+                        "step": "error",
+                        "message": result.get('error', 'Unknown error')
+                    }
+        except Exception as e:
+            logger.error(f"Error checking job_storage: {e}")
+
+        # PRIORITY 2: Check if session is still processing
+        try:
+            from progress_manager import progress_manager
+            logger.info(f"📡 Active sessions in progress_manager: {list(progress_manager.sessions.keys())}")
+            logger.info(f"📡 Checking if {session_id[:8]} in sessions: {session_id in progress_manager.sessions}")
+
+            if session_id in progress_manager.sessions:
+                # Try to get the latest event from history
+                if session_id in progress_manager.event_history:
+                    events = progress_manager.event_history[session_id]
+                    if events:
+                        last_event = events[-1]
+                        logger.info(f"📊 Latest event: {last_event.get('type')} - {last_event.get('agent')}")
+                        return {
+                            "status": "processing",
+                            "step": last_event.get('agent', 'unknown'),
+                            "message": last_event.get('message', '')
+                        }
+
+                logger.info(f"🔄 Session exists but no events yet")
+                return {
+                    "status": "processing",
+                    "step": "initializing",
+                    "message": "Starting workflow..."
+                }
+        except Exception as e:
+            logger.error(f"Error checking progress_manager: {e}")
+
+        # PRIORITY 3: Check database for saved bot (slowest, fallback)
+        try:
+            import asyncio
+            from db.repositories.bot_repository import BotRepository
+            bot_repo = BotRepository()
+            # Add timeout to prevent hanging
+            bot = await asyncio.wait_for(bot_repo.get_by_session_id(session_id), timeout=3.0)
+            if bot:
+                logger.info(f"✅ Found completed bot in database for session {session_id[:8]}")
                 return {
                     "status": "complete",
                     "step": "complete",
-                    "strategy": result.get('strategy'),
-                    "code": result.get('code'),
-                    "backtest_results": result.get('backtest_results'),
-                    "insights_config": result.get('insights_config')
+                    "bot_id": str(bot.id),
+                    "strategy": bot.strategy_config,
+                    "code": bot.generated_code,
+                    "backtest_results": bot.backtest_results,
+                    "insights_config": bot.insights_config
                 }
-            else:
-                # Workflow failed
-                return {
-                    "status": "error",
-                    "step": "error",
-                    "message": result.get('error', 'Unknown error')
-                }
-    except Exception as e:
-        logger.error(f"Error checking job_storage: {e}")
+        except asyncio.TimeoutError:
+            logger.warning(f"⏱️ Database query timed out for session {session_id[:8]}")
+        except Exception as e:
+            logger.error(f"Error checking bot status: {e}")
 
-    # PRIORITY 2: Check if session is still processing
-    from progress_manager import progress_manager
-    logger.info(f"📡 Active sessions in progress_manager: {list(progress_manager.sessions.keys())}")
-    logger.info(f"📡 Checking if {session_id[:8]} in sessions: {session_id in progress_manager.sessions}")
-
-    if session_id in progress_manager.sessions:
-        # Try to get the latest event from history
-        if session_id in progress_manager.event_history:
-            events = progress_manager.event_history[session_id]
-            if events:
-                last_event = events[-1]
-                logger.info(f"📊 Latest event: {last_event.get('type')} - {last_event.get('agent')}")
-                return {
-                    "status": "processing",
-                    "step": last_event.get('agent', 'unknown'),
-                    "message": last_event.get('message', '')
-                }
-
-        logger.info(f"🔄 Session exists but no events yet")
+        logger.warning(f"⚠️ Session {session_id[:8]} not found in job_storage, progress_manager, or database")
         return {
-            "status": "processing",
-            "step": "initializing",
-            "message": "Starting workflow..."
+            "status": "not_found",
+            "step": "unknown",
+            "message": "Session not found"
         }
-
-    # PRIORITY 3: Check database for saved bot (slowest, fallback)
-    try:
-        import asyncio
-        from db.repositories.bot_repository import BotRepository
-        bot_repo = BotRepository()
-        # Add timeout to prevent hanging
-        bot = await asyncio.wait_for(bot_repo.get_by_session_id(session_id), timeout=3.0)
-        if bot:
-            logger.info(f"✅ Found completed bot in database for session {session_id[:8]}")
-            return {
-                "status": "complete",
-                "step": "complete",
-                "bot_id": str(bot.id),
-                "strategy": bot.strategy_config,
-                "code": bot.generated_code,
-                "backtest_results": bot.backtest_results,
-                "insights_config": bot.insights_config
-            }
-    except asyncio.TimeoutError:
-        logger.warning(f"⏱️ Database query timed out for session {session_id[:8]}")
     except Exception as e:
-        logger.error(f"Error checking bot status: {e}")
-
-    logger.warning(f"⚠️ Session {session_id[:8]} not found in job_storage, progress_manager, or database")
-    return {
-        "status": "not_found",
-        "step": "unknown",
-        "message": "Session not found"
-    }
+        # Catch-all to prevent server crashes
+        logger.error(f"❌ Critical error in status endpoint for session {session_id[:8]}: {e}")
+        logger.exception(e)
+        return {
+            "status": "error",
+            "step": "error",
+            "message": "Internal server error"
+        }
 
 
 @app.post("/api/sessions/{session_id}/start")
