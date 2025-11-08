@@ -1,3 +1,4 @@
+import { API_URL } from '../config'
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import BotsGrid from './bots/BotsGrid';
@@ -19,7 +20,7 @@ const BotLibrary = ({ onClose, onLoadBot, user, onSignOut, onShowBotLibrary }) =
 
     try {
       // Always fetch all bots - filtering will be done client-side
-      const url = 'http://localhost:8000/bots?page=1&page_size=50';
+      const url = `${API_URL}/bots?page=1&page_size=50';
 
       const headers = getAuthHeaders();
       console.log('[BotLibrary] Auth headers:', headers);

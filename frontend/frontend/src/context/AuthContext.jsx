@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
+import { API_URL } from '../config';
 
 const AuthContext = createContext(null);
 
@@ -41,7 +42,7 @@ export const AuthProvider = ({ children }) => {
             window.history.replaceState(null, null, window.location.pathname);
             
             // Fetch user data using the access token
-            fetch('http://localhost:8000/auth/me', {
+            fetch(`${API_URL}/auth/me`, {
               headers: {
                 'Authorization': `Bearer ${accessToken}`
               }
@@ -83,7 +84,7 @@ export const AuthProvider = ({ children }) => {
 
   const signup = async (email, password, fullName) => {
     try {
-      const response = await fetch('http://localhost:8000/auth/signup', {
+      const response = await fetch(`${API_URL}/auth/signup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -116,7 +117,7 @@ export const AuthProvider = ({ children }) => {
 
   const signin = async (email, password) => {
     try {
-      const response = await fetch('http://localhost:8000/auth/signin', {
+      const response = await fetch(`${API_URL}/auth/signin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

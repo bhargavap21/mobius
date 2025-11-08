@@ -1,3 +1,4 @@
+import { API_URL } from '../config'
 import { StrictMode, useState, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
@@ -21,7 +22,7 @@ function CommunityPageWrapper() {
 
       setLoadingBots(true)
       try {
-        const response = await fetch('http://localhost:8000/bots?page=1&page_size=50', {
+        const response = await fetch(`${API_URL}/bots?page=1&page_size=50', {
           headers: getAuthHeaders()
         })
 

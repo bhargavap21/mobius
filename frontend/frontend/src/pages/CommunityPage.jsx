@@ -1,3 +1,4 @@
+import { API_URL } from '../config'
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
@@ -19,7 +20,7 @@ export default function CommunityPage({ userAgents = [], loadingBots = false }) 
   const fetchSharedAgents = async () => {
     setLoading(true)
     try {
-      const response = await fetch('http://localhost:8000/api/community/agents')
+      const response = await fetch(`${API_URL}/api/community/agents')
       if (response.ok) {
         const data = await response.json()
         setSharedAgents(data.agents)
@@ -46,7 +47,7 @@ export default function CommunityPage({ userAgents = [], loadingBots = false }) 
       }
       console.log('Request data:', requestData)
       
-      const response = await fetch('http://localhost:8000/api/community/share', {
+      const response = await fetch(`${API_URL}/api/community/share', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -170,7 +171,7 @@ export default function CommunityPage({ userAgents = [], loadingBots = false }) 
         const agentConfig = await response.json()
         
         // Save to user's bot collection
-          const saveResponse = await fetch('http://localhost:8000/api/bots', {
+          const saveResponse = await fetch(`${API_URL}/api/bots', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

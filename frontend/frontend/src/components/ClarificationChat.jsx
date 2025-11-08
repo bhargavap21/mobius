@@ -1,3 +1,4 @@
+import { API_URL } from '../config'
 import React, { useState, useEffect, useRef } from 'react'
 import PropTypes from 'prop-types'
 
@@ -29,7 +30,7 @@ const ClarificationChat = ({ initialQuery, onComplete }) => {
   const startClarification = async (query) => {
     setIsLoading(true)
     try {
-      const response = await fetch('http://localhost:8000/api/strategy/clarify', {
+      const response = await fetch(`${API_URL}/api/strategy/clarify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -75,7 +76,7 @@ const ClarificationChat = ({ initialQuery, onComplete }) => {
         ...newMessages
       ]
 
-      const response = await fetch('http://localhost:8000/api/strategy/clarify', {
+      const response = await fetch(`${API_URL}/api/strategy/clarify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1,3 +1,4 @@
+import { API_URL } from '../config'
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 
@@ -30,7 +31,7 @@ const EmailConfirmation = () => {
         localStorage.setItem('access_token', accessToken);
 
         // Fetch user data
-        const response = await fetch('http://localhost:8000/auth/me', {
+        const response = await fetch(`${API_URL}/auth/me', {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
           },

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
+import { API_URL } from './config'
 import StrategyInput from './components/StrategyInput'
 import CodeDisplay from './components/CodeDisplay'
 import LoadingSpinner from './components/LoadingSpinner'
@@ -68,7 +69,7 @@ function AppContent() {
       if (!isAuthenticated || hasLoadedInitialBot) return
 
       try {
-        const response = await fetch('http://localhost:8000/bots?page=1&page_size=1', {
+        const response = await fetch(`${API_URL}/bots?page=1&page_size=1`, {
           headers: getAuthHeaders()
         })
 
@@ -125,7 +126,7 @@ function AppContent() {
       console.log('[App] Checking if clarification is needed...')
 
       // Call clarification API to check if we need to ask questions
-      const clarifyResponse = await fetch('http://localhost:8000/api/strategy/clarify', {
+      const clarifyResponse = await fetch(`${API_URL}/api/strategy/clarify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -165,7 +166,7 @@ function AppContent() {
     try {
       // Create session
       console.log('[App] Creating session...')
-      const sessionResponse = await fetch('http://localhost:8000/api/sessions', {
+      const sessionResponse = await fetch(`${API_URL}/api/sessions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -183,7 +184,7 @@ function AppContent() {
 
       // Start the workflow
       console.log('[App] Starting workflow with enriched query and parameters:', parameters)
-      const startResponse = await fetch(`http://localhost:8000/api/sessions/${newSessionId}/start${fastMode ? '?fast_mode=true' : ''}`, {
+      const startResponse = await fetch(`${API_URL}/api/sessions/${newSessionId}/start${fastMode ? '?fast_mode=true' : ''}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -211,7 +212,7 @@ function AppContent() {
       // Poll for completion (no timeout - rely on backend error handling)
       const pollInterval = setInterval(async () => {
         try {
-          const statusResponse = await fetch(`http://localhost:8000/api/strategy/status/${newSessionId}`)
+          const statusResponse = await fetch(`${API_URL}/api/strategy/status/${newSessionId}`)
           const statusData = await statusResponse.json()
 
           // Update current step
@@ -268,7 +269,7 @@ function AppContent() {
     setError(null)
 
     try {
-      const response = await fetch('http://localhost:8000/api/strategy/backtest', {
+      const response = await fetch(`${API_URL}/api/strategy/backtest`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -306,7 +307,7 @@ function AppContent() {
 
     try {
       // Fetch the final results from the backend
-      const response = await fetch(`http://localhost:8000/api/strategy/result/${completedSessionId}`)
+      const response = await fetch(`${API_URL}/api/strategy/result/${completedSessionId}`)
 
       if (response.ok) {
         const data = await response.json()
@@ -372,7 +373,7 @@ function AppContent() {
     try {
       // If we have a current bot ID, update it instead of creating new
       if (currentBotId) {
-        const response = await fetch(`http://localhost:8000/bots/${currentBotId}`, {
+        const response = await fetch(`${API_URL}/bots/${currentBotId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -410,7 +411,7 @@ function AppContent() {
       console.log('  Strategy:', strategy)
       console.log('  Session ID:', sessionId)
 
-      const response = await fetch('http://localhost:8000/bots', {
+      const response = await fetch(`${API_URL}/bots`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -486,7 +487,7 @@ function AppContent() {
     try {
       console.log('[Refinement] 🔧 Starting intelligent refinement...')
 
-      const response = await fetch('http://localhost:8000/api/strategy/refine', {
+      const response = await fetch(`${API_URL}/api/strategy/refine`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
