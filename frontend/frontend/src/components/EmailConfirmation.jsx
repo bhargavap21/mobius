@@ -31,7 +31,7 @@ const EmailConfirmation = () => {
         localStorage.setItem('access_token', accessToken);
 
         // Fetch user data
-        const response = await fetch(`${API_URL}/auth/me', {
+        const response = await fetch(`${API_URL}/auth/me`, {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
           },

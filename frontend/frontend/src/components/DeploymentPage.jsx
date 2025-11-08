@@ -36,7 +36,7 @@ const DeploymentPage = ({
     setError(null)
 
     try {
-      const response = await fetch(`${API_URL}/deployments', {
+      const response = await fetch(`${API_URL}/deployments`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

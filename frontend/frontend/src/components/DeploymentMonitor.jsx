@@ -17,7 +17,7 @@ const DeploymentMonitor = ({ onBack }) => {
     if (!isAuthenticated) return
 
     try {
-      const response = await fetch(`${API_URL}/deployments', {
+      const response = await fetch(`${API_URL}/deployments`, {
         headers: getAuthHeaders()
       })
 

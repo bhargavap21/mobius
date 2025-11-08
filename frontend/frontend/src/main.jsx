@@ -1,4 +1,3 @@
-import { API_URL } from '../config'
 import { StrictMode, useState, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
@@ -7,6 +6,7 @@ import App from './App.jsx'
 import EmailConfirmation from './components/EmailConfirmation.jsx'
 import CommunityPage from './pages/CommunityPage.jsx'
 import { AuthProvider, useAuth } from './context/AuthContext.jsx'
+import { API_URL } from './config'
 
 function CommunityPageWrapper() {
   const { user, isAuthenticated, getAuthHeaders } = useAuth()
@@ -22,7 +22,7 @@ function CommunityPageWrapper() {
 
       setLoadingBots(true)
       try {
-        const response = await fetch(`${API_URL}/bots?page=1&page_size=50', {
+        const response = await fetch(`${API_URL}/bots?page=1&page_size=50`, {
           headers: getAuthHeaders()
         })
 

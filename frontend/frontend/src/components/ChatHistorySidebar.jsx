@@ -18,7 +18,7 @@ const ChatHistorySidebar = ({ onClose, onLoadBot, onNewChat, currentBotId }) => 
     setError('');
 
     try {
-      const response = await fetch(`${API_URL}/bots?page=1&page_size=100', {
+      const response = await fetch(`${API_URL}/bots?page=1&page_size=100`, {
         headers: getAuthHeaders(),
       });
 
