@@ -5,6 +5,7 @@ FastAPI Backend for AI Trading Bot Generator
 import logging
 import asyncio
 import json
+import re
 from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -64,13 +65,23 @@ app = FastAPI(
 )
 
 # Enable CORS
+# Allow all Vercel preview deployments with regex pattern
+class CustomCORSMiddleware(CORSMiddleware):
+    def is_allowed_origin(self, origin: str) -> bool:
+        # Allow localhost
+        if origin in ["http://localhost:3000", "http://localhost:5173"]:
+            return True
+        # Allow production Vercel domain
+        if origin == "https://mobius-invest.vercel.app":
+            return True
+        # Allow all Vercel preview deployments (*.vercel.app)
+        if re.match(r"https://.*\.vercel\.app$", origin):
+            return True
+        return super().is_allowed_origin(origin)
+
 app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "https://mobius-invest.vercel.app",
-    ],
+    CustomCORSMiddleware,
+    allow_origins=["*"],  # Will be filtered by is_allowed_origin
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
