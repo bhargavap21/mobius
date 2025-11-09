@@ -67,14 +67,16 @@ app = FastAPI(
 # Enable CORS - allow localhost and all Vercel deployments
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"https://.*vercel\.app",  # All Vercel preview/production domains (with or without subdomain)
+    allow_origin_regex=r"https://.*\.vercel\.app",  # All Vercel preview/production domains (with subdomain)
     allow_origins=[
         "http://localhost:3000",
         "http://localhost:5173",
+        "https://mobius-invest.vercel.app",  # Explicit production domain
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],  # Expose all headers for debugging
 )
 
 # Include routers
