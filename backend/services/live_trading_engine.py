@@ -91,7 +91,7 @@ class LiveTradingEngine:
                 return False
 
             # Get the bot's generated code
-            bot = await self.bot_repo.get_by_id(deployment.bot_id)
+            bot = await self.bot_repo.get_by_id(deployment.bot_id, deployment.user_id)
             if not bot:
                 logger.error(f"❌ Bot {deployment.bot_id} not found")
                 return False
@@ -255,22 +255,133 @@ class LiveTradingEngine:
             Signal dictionary with 'action': 'buy'/'sell'/'hold', 'symbol', 'quantity', etc.
         """
         try:
-            # This is a simplified version - in production you'd want to:
-            # 1. Run code in a sandbox
-            # 2. Set proper timeouts
-            # 3. Handle errors gracefully
+            symbol = strategy_config.get('asset', 'AAPL')
+            logger.debug(f"📝 Evaluating strategy for {symbol}")
 
-            # For now, we'll return a mock signal for testing
-            # In production, you'd exec() the strategy code safely
+            # Create a safe execution environment
+            import sys
+            import io
+            from contextlib import redirect_stdout, redirect_stderr
 
-            logger.debug(f"📝 Evaluating strategy for {strategy_config.get('asset', 'UNKNOWN')}")
+            # Prepare the execution namespace with necessary imports
+            namespace = {
+                '__builtins__': __builtins__,
+                'logging': logging,
+                'datetime': datetime,
+                'time': __import__('time'),
+                'alpaca_service': alpaca_service,  # Provide Alpaca service
+                'symbol': symbol,
+                'strategy_config': strategy_config,
+            }
 
-            # Mock signal (replace with actual code execution)
+            # Execute the generated code
+            # The code should define a TradingBot class
+            try:
+                exec(strategy_code, namespace)
+            except Exception as exec_error:
+                logger.error(f"❌ Error executing strategy code: {exec_error}")
+                return None
+
+            # Get the TradingBot class from namespace
+            TradingBot = namespace.get('TradingBot')
+            if not TradingBot:
+                logger.error("❌ TradingBot class not found in generated code")
+                return None
+
+            # Initialize the bot with dummy credentials (it will use alpaca_service instead)
+            bot = TradingBot(api_key='dummy', secret_key='dummy', paper=True)
+
+            # Check if we have an open position
+            position = await alpaca_service.get_position(symbol)
+
+            # If we have a position, check exit conditions
+            if position:
+                should_exit = False
+                if hasattr(bot, 'check_exit_conditions'):
+                    should_exit = bot.check_exit_conditions(position)
+
+                if should_exit:
+                    logger.info(f"🔴 Exit signal for {symbol}")
+                    return {
+                        'action': 'sell',
+                        'symbol': symbol,
+                        'quantity': abs(float(position['qty'])),
+                        'reason': 'exit_conditions_met'
+                    }
+
+            # Check entry conditions
+            if hasattr(bot, 'check_entry_conditions'):
+                should_enter = bot.check_entry_conditions()
+
+                if should_enter and not position:
+                    # Calculate position size based on strategy config
+                    quantity = self._calculate_position_size(
+                        symbol=symbol,
+                        deployment=deployment,
+                        strategy_config=strategy_config
+                    )
+
+                    if quantity > 0:
+                        logger.info(f"🟢 Entry signal for {symbol}")
+                        return {
+                            'action': 'buy',
+                            'symbol': symbol,
+                            'quantity': quantity,
+                            'reason': 'entry_conditions_met'
+                        }
+
             return None  # No signal = hold
 
         except Exception as e:
             logger.error(f"❌ Error running strategy code: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return None
+
+    def _calculate_position_size(
+        self,
+        symbol: str,
+        deployment: Any,
+        strategy_config: Dict[str, Any]
+    ) -> int:
+        """
+        Calculate position size based on available capital and risk management
+
+        Args:
+            symbol: Stock symbol
+            deployment: Deployment config
+            strategy_config: Strategy parameters
+
+        Returns:
+            Number of shares to trade
+        """
+        try:
+            # Get current account info
+            import asyncio
+            account = asyncio.run(alpaca_service.get_account())
+            cash = float(account['cash'])
+
+            # Get current price
+            current_price = asyncio.run(alpaca_service.get_latest_price(symbol))
+            if not current_price:
+                logger.warning(f"⚠️  Could not get price for {symbol}")
+                return 0
+
+            # Use max position size if set, otherwise use 10% of capital
+            if deployment.max_position_size:
+                position_value = min(deployment.max_position_size, cash)
+            else:
+                position_value = cash * 0.1  # 10% of available cash
+
+            # Calculate quantity
+            quantity = int(position_value / current_price)
+
+            logger.info(f"💰 Calculated position size: {quantity} shares of {symbol} at ${current_price}")
+            return quantity
+
+        except Exception as e:
+            logger.error(f"❌ Error calculating position size: {e}")
+            return 0
 
     async def _process_signal(self, deployment_id: str, signal: Dict[str, Any]):
         """

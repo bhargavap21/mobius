@@ -21,6 +21,10 @@ const DeploymentPage = ({
   const [deploymentId, setDeploymentId] = useState(null)
   const [error, setError] = useState(null)
 
+  useEffect(() => {
+    console.log('[DeploymentPage] currentBotId:', currentBotId)
+  }, [currentBotId])
+
   const handleDeploy = async () => {
     if (!isAuthenticated) {
       setError('Please sign in to deploy strategies')
@@ -36,7 +40,9 @@ const DeploymentPage = ({
     setError(null)
 
     try {
-      const response = await fetch(`${API_URL}/deployments`, {
+      // Step 1: Create deployment
+      console.log('Creating deployment for bot:', currentBotId)
+      const createResponse = await fetch(`${API_URL}/deployments`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -51,14 +57,33 @@ const DeploymentPage = ({
         })
       })
 
-      if (!response.ok) {
-        const errorData = await response.json()
+      if (!createResponse.ok) {
+        const errorData = await createResponse.json()
         throw new Error(errorData.detail || 'Failed to deploy strategy')
       }
 
-      const deployment = await response.json()
+      const deployment = await createResponse.json()
+      console.log('✅ Deployment created:', deployment)
+
+      // Step 2: Activate deployment (start live trading)
+      console.log('Activating deployment:', deployment.id)
+      const activateResponse = await fetch(`${API_URL}/deployments/${deployment.id}/activate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders()
+        }
+      })
+
+      if (!activateResponse.ok) {
+        const errorData = await activateResponse.json()
+        throw new Error(errorData.detail || 'Failed to activate deployment')
+      }
+
+      const activationResult = await activateResponse.json()
+      console.log('✅ Deployment activated:', activationResult)
+
       setDeploymentId(deployment.id)
-      console.log('Deployment created:', deployment)
 
     } catch (err) {
       console.error('Deployment error:', err)

@@ -164,6 +164,14 @@ function AppContent() {
     setCurrentStep('parsing')
 
     try {
+      // Validate enrichedQuery is not empty
+      if (!enrichedQuery || enrichedQuery.trim() === '') {
+        console.error('[App] ❌ enrichedQuery is empty!')
+        throw new Error('Strategy description is required. Please describe your trading strategy.')
+      }
+
+      console.log('[App] ✅ Validated enrichedQuery:', enrichedQuery.substring(0, 100))
+
       // Create session
       console.log('[App] Creating session...')
       const sessionResponse = await fetch(`${API_URL}/api/sessions`, {
@@ -235,7 +243,12 @@ function AppContent() {
             if (statusData.code) setGeneratedCode(statusData.code)
             if (statusData.backtest_results) setBacktestResults(statusData.backtest_results)
             if (statusData.insights_config) setInsightsConfig(statusData.insights_config)
-            if (statusData.bot_id) setCurrentBotId(statusData.bot_id)
+            if (statusData.bot_id) {
+              console.log('[App] ✅ Setting currentBotId from status:', statusData.bot_id)
+              setCurrentBotId(statusData.bot_id)
+            } else {
+              console.warn('[App] ⚠️ No bot_id in statusData:', statusData)
+            }
 
             console.log('[App] ✅ Strategy generation complete!')
           } else if (statusData.status === 'not_found') {

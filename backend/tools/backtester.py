@@ -213,10 +213,10 @@ class Backtester:
         else:
             # Single asset mode (original behavior)
             symbol = strategy.get('asset', 'SPY')
-        exit_conditions = strategy.get('exit_conditions', {})
-        take_profit = exit_conditions.get('take_profit') if exit_conditions else None
-        stop_loss = exit_conditions.get('stop_loss') if exit_conditions else None
-        custom_exit = exit_conditions.get('custom_exit', '') if exit_conditions else ''
+            exit_conditions = strategy.get('exit_conditions', {})
+            take_profit = exit_conditions.get('take_profit') if exit_conditions else None
+            stop_loss = exit_conditions.get('stop_loss') if exit_conditions else None
+            custom_exit = exit_conditions.get('custom_exit', '') if exit_conditions else ''
 
         # Only set defaults if NO custom exit is specified AND values are explicitly 0 (not None)
         # If user has custom exit (like RSI > 70), keep TP/SL as None unless they specified them

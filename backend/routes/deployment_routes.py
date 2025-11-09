@@ -382,3 +382,52 @@ async def get_deployment_positions(
     except Exception as e:
         logger.error(f"❌ Error fetching positions: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{deployment_id}/activate", response_model=MessageResponse)
+async def activate_deployment(
+    deployment_id: UUID,
+    user_id: UUID = Depends(get_current_user_id)
+):
+    """
+    Activate a deployment and start live trading
+
+    This endpoint:
+    1. Validates the deployment exists and is in 'running' status
+    2. Adds the deployment to the trading engine
+    3. Starts executing the strategy at the configured frequency
+    """
+    try:
+        deployment_repo = DeploymentRepository()
+        deployment = await deployment_repo.get_deployment(deployment_id)
+
+        if not deployment:
+            raise HTTPException(status_code=404, detail="Deployment not found")
+
+        if deployment.user_id != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized")
+
+        if deployment.status != 'running':
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot activate deployment with status: {deployment.status}"
+            )
+
+        # Add to trading engine
+        success = await trading_engine.add_deployment(deployment_id)
+
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to activate deployment")
+
+        logger.info(f"✅ Deployment {deployment_id} activated and added to trading engine")
+
+        return MessageResponse(
+            message=f"Deployment activated successfully. Strategy will execute every {deployment.execution_frequency}.",
+            success=True
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error activating deployment: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

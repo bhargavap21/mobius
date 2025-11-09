@@ -90,7 +90,7 @@ orchestrator = get_orchestrator()
 # Register all tools on startup
 @app.on_event("startup")
 async def startup_event():
-    """Register all tools with the orchestrator"""
+    """Register all tools with the orchestrator and start trading engine"""
     logger.info("🚀 Starting up AI Trading Bot API...")
 
     # Register market data tools
@@ -139,6 +139,28 @@ async def startup_event():
         )
 
     logger.info("✅ All tools registered successfully")
+
+    # Start the live trading engine
+    from services.live_trading_engine import trading_engine
+    try:
+        trading_engine.start()
+        logger.info("✅ Live trading engine started")
+    except Exception as e:
+        logger.error(f"❌ Failed to start trading engine: {e}")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown"""
+    logger.info("🛑 Shutting down AI Trading Bot API...")
+
+    # Stop the live trading engine
+    from services.live_trading_engine import trading_engine
+    try:
+        trading_engine.stop()
+        logger.info("✅ Live trading engine stopped")
+    except Exception as e:
+        logger.error(f"❌ Error stopping trading engine: {e}")
 
 
 # Request/Response models
@@ -416,29 +438,28 @@ async def _run_multi_agent_workflow(
             # Small yield to let WebSocket grab the event from queue
             await asyncio.sleep(0.05)
 
-        # NOW do slow database operations in background (don't block WebSocket)
-        async def save_to_database():
-            """Background task to save strategy to database"""
-            try:
-                bot_repo = BotRepository()
-                bot_data = TradingBotCreate(
-                    name=result['strategy'].get('name', 'Untitled Strategy'),
-                    description=strategy_description[:200] if len(strategy_description) > 200 else strategy_description,
-                    strategy_config=result['strategy'],
-                    generated_code=result['code'],
-                    backtest_results=result['backtest_results'],
-                    insights_config=result.get('insights_config'),
-                    session_id=session_id,
-                    is_saved=False
-                )
-                await bot_repo.create(user_id=user_id, bot_data=bot_data)
-                logger.info(f"✅ Auto-saved strategy to chat history for user {user_id}")
-            except Exception as save_error:
-                logger.error(f"⚠️ Failed to auto-save strategy: {save_error}")
+        # Save bot to database synchronously (we need the bot_id immediately)
+        try:
+            bot_repo = BotRepository()
+            bot_data = TradingBotCreate(
+                name=result['strategy'].get('name', 'Untitled Strategy'),
+                description=strategy_description[:200] if len(strategy_description) > 200 else strategy_description,
+                strategy_config=result['strategy'],
+                generated_code=result['code'],
+                backtest_results=result['backtest_results'],
+                insights_config=result.get('insights_config'),
+                session_id=session_id,
+                is_saved=False
+            )
+            saved_bot = await bot_repo.create(user_id=user_id, bot_data=bot_data)
+            logger.info(f"✅ Auto-saved strategy to chat history for user {user_id}, bot_id: {saved_bot.id}")
 
-        # Run database save in background - don't wait for it
-        asyncio.create_task(save_to_database())
-        logger.info(f"🔄 Database save running in background for session {session_id[:8]}")
+            # Update job_storage with bot_id IMMEDIATELY
+            response_data['bot_id'] = str(saved_bot.id)
+            job_storage.store_result(session_id, response_data)
+            logger.info(f"💾 Updated job_storage with bot_id: {saved_bot.id}")
+        except Exception as save_error:
+            logger.error(f"⚠️ Failed to auto-save strategy: {save_error}")
 
         logger.info(f"✅ Workflow complete for session {session_id[:8]}")
 
@@ -551,7 +572,8 @@ async def get_strategy_status(session_id: str):
                         "strategy": result.get('strategy'),
                         "code": result.get('code'),
                         "backtest_results": result.get('backtest_results'),
-                        "insights_config": result.get('insights_config')
+                        "insights_config": result.get('insights_config'),
+                        "bot_id": result.get('bot_id')
                     }
                 else:
                     # Workflow failed
@@ -645,7 +667,8 @@ async def start_workflow(
     from progress_manager import progress_manager
 
     logger.info(f"🚀 START WORKFLOW called for session {session_id[:8]}")
-    logger.info(f"📝 Strategy description: {request.strategy_description[:100]}...")
+    logger.info(f"📝 Full request body: {request}")
+    logger.info(f"📝 Strategy description: {request.strategy_description if request.strategy_description else 'EMPTY/NONE'}")
     logger.info(f"⚡ Fast mode: {fast_mode}")
     logger.info(f"📡 Active sessions before start: {list(progress_manager.sessions.keys())}")
 

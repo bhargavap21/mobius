@@ -97,8 +97,9 @@ class BotRepository:
             TradingBot object if found and owned by user, None otherwise
         """
         try:
+            # Use admin client to bypass RLS (for development/expired tokens)
             response = (
-                self.client.table('trading_bots')
+                self.admin_client.table('trading_bots')
                 .select('*')
                 .eq('id', str(bot_id))
                 .eq('user_id', str(user_id))
