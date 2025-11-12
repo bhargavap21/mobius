@@ -573,12 +573,6 @@ function AppContent() {
           onShowBotLibrary={() => setShowBotLibrary(true)}
         />
 
-        {/* Footer */}
-        <footer className="border-t border-dark-border py-6">
-          <div className="max-w-7xl mx-auto px-6 text-center text-sm text-gray-500">
-            <p>Built for DubHacks 2025 • Powered by Claude AI & Alpaca</p>
-          </div>
-        </footer>
 
         {/* Auth Modals */}
         {showLogin && (
