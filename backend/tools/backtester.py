@@ -48,7 +48,8 @@ class Backtester:
         row: pd.Series,
         df: pd.DataFrame,
         idx: int,
-        symbol: str
+        symbol: str,
+        sentiment_collector: Optional[Dict[str, Any]] = None
     ) -> tuple[bool, str]:
         """
         Evaluate any type of condition dynamically
@@ -96,7 +97,7 @@ class Backtester:
                 symbol, source, date_str, self.social_cache,
                 dataset_manager=self.dataset_manager,
                 session_id=self.session_id,
-                sentiment_collector=collected_sentiments
+                sentiment_collector=sentiment_collector
             )
 
             if sentiment_score is not None:
@@ -216,6 +217,10 @@ class Backtester:
             exit_conditions = strategy.get('exit_conditions', {})
             take_profit = exit_conditions.get('take_profit') if exit_conditions else None
             stop_loss = exit_conditions.get('stop_loss') if exit_conditions else None
+            take_profit_pct_shares = exit_conditions.get('take_profit_pct_shares') if exit_conditions else None
+            take_profit_pct_shares = take_profit_pct_shares if take_profit_pct_shares is not None else 1.0
+            stop_loss_pct_shares = exit_conditions.get('stop_loss_pct_shares') if exit_conditions else None
+            stop_loss_pct_shares = stop_loss_pct_shares if stop_loss_pct_shares is not None else 1.0
             custom_exit = exit_conditions.get('custom_exit', '') if exit_conditions else ''
 
         # Only set defaults if NO custom exit is specified AND values are explicitly 0 (not None)
@@ -232,9 +237,9 @@ class Backtester:
         if custom_exit:
             logger.info(f"Custom exit condition: {custom_exit}")
         if take_profit:
-            logger.info(f"Take profit: {take_profit*100:.1f}%")
+            logger.info(f"Take profit: {take_profit*100:.1f}% (sell {take_profit_pct_shares*100:.0f}% of position)")
         if stop_loss:
-            logger.info(f"Stop loss: {stop_loss*100:.1f}%")
+            logger.info(f"Stop loss: {stop_loss*100:.1f}% (sell {stop_loss_pct_shares*100:.0f}% of position)")
 
         # Fetch historical data with optimized caching
         df = self.get_historical_data(symbol, start_date, end_date)
@@ -298,6 +303,32 @@ class Backtester:
         external_data_found = 0  # Track days with external data
         data_points_checked = 0  # Track total days checked
         trade_number = 0
+
+        # Two-phase exit state tracking
+        original_shares = None  # Shares at entry (for calculating partial exit quantity)
+        partial_exit_done = False  # Flag to prevent multiple partial exits
+        trailing_stop_active = False  # Only True AFTER partial exit
+        highest_price_since_partial_exit = None  # For trailing stop calculation
+        trailing_stop_price = None  # Current trailing stop level
+
+        # Normalize stop_loss to positive decimal (user may specify -10% as -10.0 or -0.10)
+        if stop_loss is not None:
+            stop_loss = abs(stop_loss)
+            # Convert percentage to decimal if > 1 (e.g., 10.0 -> 0.10)
+            if stop_loss > 1:
+                stop_loss = stop_loss / 100.0
+                logger.info(f"Converted stop_loss from percentage to decimal: {stop_loss}")
+
+        # Normalize take_profit to decimal if > 1
+        if take_profit is not None and take_profit > 1:
+            take_profit = take_profit / 100.0
+            logger.info(f"Converted take_profit from percentage to decimal: {take_profit}")
+
+        # Check if this is a trailing stop strategy (stop_loss with partial exit)
+        has_trailing_stop = (stop_loss is not None and stop_loss > 0 and
+                            take_profit_pct_shares is not None and take_profit_pct_shares < 1.0)
+
+        logger.info(f"Two-phase exit mode: has_trailing_stop={has_trailing_stop} (stop_loss={stop_loss}, take_profit_pct_shares={take_profit_pct_shares})")
 
         # Collect actual data values for analysis
         collected_data = []
@@ -442,7 +473,8 @@ class Backtester:
 
                 for condition in entry_conditions_list:
                     condition_met, reason = self.evaluate_condition(
-                        condition, row, df, i, symbol
+                        condition, row, df, i, symbol,
+                        sentiment_collector=collected_sentiments
                     )
                     if condition_met:
                         entry_signal_met = True
@@ -461,45 +493,132 @@ class Backtester:
                             'entry_reason': entry_reason
                         }
                         capital -= shares * price
+
+                        # Initialize two-phase exit state
+                        original_shares = shares  # Store original for partial exit calculation
+                        partial_exit_done = False
+                        trailing_stop_active = False
+                        highest_price_since_partial_exit = None
+                        trailing_stop_price = None
+
                         logger.debug(f"BUY {shares} shares at ${price:.2f} on {idx}: {entry_reason}")
 
-            # Exit logic - evaluate custom exit conditions first, then stop/profit
+            # Exit logic - TWO-PHASE EXIT for partial exits with trailing stops
             elif position is not None:
-                current_value = shares * price
-                entry_value = position['shares'] * position['entry_price']
-                pnl_pct = (current_value - entry_value) / entry_value
+                # Ensure we have valid entry_price
+                entry_price = position.get('entry_price', price)
+                if entry_price is None:
+                    entry_price = price
+                    logger.warning(f"Missing entry_price for position, using current price {price}")
 
                 exit_signal_met = False
                 exit_reason = ""
+                shares_to_sell = 0
 
-                # Check custom exit conditions first
-                for condition in exit_conditions_list:
-                    condition_met, reason = self.evaluate_condition(
-                        condition, row, df, i, symbol
-                    )
-                    if condition_met:
+                # ============================================================
+                # TWO-PHASE EXIT LOGIC for strategies with partial exits + trailing stops
+                # ============================================================
+                if has_trailing_stop:
+                    # ----------------------------------------------------------
+                    # PHASE 1: Wait for RSI/custom exit signal, then do ONE partial exit
+                    # NO stop loss in this phase - only indicator-based exit
+                    # ----------------------------------------------------------
+                    if not partial_exit_done:
+                        # Only check custom exit conditions (RSI > 70, etc.)
+                        # Do NOT check stop loss or take profit percentage
+                        for condition in exit_conditions_list:
+                            condition_met, reason = self.evaluate_condition(
+                                condition, row, df, i, symbol,
+                                sentiment_collector=collected_sentiments
+                            )
+                            if condition_met:
+                                exit_signal_met = True
+                                exit_reason = reason
+
+                                # Calculate shares from ORIGINAL position size
+                                # This ensures exactly 50% (or configured %) is sold
+                                shares_to_sell = int(original_shares * take_profit_pct_shares)
+                                shares_to_sell = min(shares_to_sell, shares)  # Safety check
+                                if shares_to_sell == 0 and take_profit_pct_shares > 0:
+                                    shares_to_sell = 1
+
+                                # CRITICAL: Mark partial exit as done IMMEDIATELY
+                                # This prevents re-evaluation on subsequent bars
+                                partial_exit_done = True
+
+                                logger.debug(f"PHASE 1: Partial exit triggered - selling {shares_to_sell} of {original_shares} shares")
+                                break
+
+                    # ----------------------------------------------------------
+                    # PHASE 2: Trailing stop on remaining position
+                    # Only active AFTER partial exit is complete
+                    # ----------------------------------------------------------
+                    elif trailing_stop_active:
+                        # Update highest price tracker (only tracks price AFTER partial exit)
+                        if highest_price_since_partial_exit is None:
+                            highest_price_since_partial_exit = price
+                        elif price > highest_price_since_partial_exit:
+                            highest_price_since_partial_exit = price
+
+                        # Calculate trailing stop price from highest price since partial exit
+                        trailing_stop_price = highest_price_since_partial_exit * (1 - stop_loss)
+
+                        # Check if trailing stop is breached
+                        if price <= trailing_stop_price:
+                            exit_signal_met = True
+                            shares_to_sell = shares  # Exit ALL remaining shares
+                            exit_reason = f"Trailing stop hit (${price:.2f} <= ${trailing_stop_price:.2f}, high was ${highest_price_since_partial_exit:.2f})"
+                            logger.debug(f"PHASE 2: Trailing stop triggered - selling all {shares} remaining shares")
+
+                # ============================================================
+                # STANDARD EXIT LOGIC (no two-phase, no trailing stop)
+                # ============================================================
+                else:
+                    current_value = shares * price
+                    entry_value = position['shares'] * position['entry_price']
+                    pnl_pct = (current_value - entry_value) / entry_value
+                    exit_pct_shares = 1.0
+
+                    # Check custom exit conditions first
+                    for condition in exit_conditions_list:
+                        condition_met, reason = self.evaluate_condition(
+                            condition, row, df, i, symbol,
+                            sentiment_collector=collected_sentiments
+                        )
+                        if condition_met:
+                            exit_signal_met = True
+                            exit_reason = reason
+                            exit_pct_shares = take_profit_pct_shares
+                            break
+
+                    # Check stop loss (only if specified and not triggered yet)
+                    if not exit_signal_met and stop_loss and pnl_pct <= -stop_loss:
                         exit_signal_met = True
-                        exit_reason = reason
-                        break
+                        exit_pct_shares = stop_loss_pct_shares
+                        exit_reason = f"Stop loss hit (-{stop_loss*100:.1f}%)"
 
-                # Check stop loss (only if specified)
-                if not exit_signal_met and stop_loss and pnl_pct <= -stop_loss:
-                    exit_signal_met = True
-                    exit_reason = f"Stop loss hit (-{stop_loss*100:.1f}%)"
+                    # Check take profit (only if specified)
+                    if not exit_signal_met and take_profit and pnl_pct >= take_profit:
+                        exit_signal_met = True
+                        exit_pct_shares = take_profit_pct_shares
+                        exit_reason = f"Take profit hit (+{take_profit*100:.1f}%)"
 
-                # Check take profit (only if specified)
-                if not exit_signal_met and take_profit and pnl_pct >= take_profit:
-                    exit_signal_met = True
-                    exit_reason = f"Take profit hit (+{take_profit*100:.1f}%)"
+                    if exit_signal_met:
+                        shares_to_sell = int(shares * exit_pct_shares)
+                        if shares_to_sell == 0 and exit_pct_shares > 0:
+                            shares_to_sell = 1
 
-                if exit_signal_met:
-                    capital += shares * price
-                    
-                    # Ensure we have valid values for calculations
-                    entry_price = position.get('entry_price', price)
-                    if entry_price is None:
-                        entry_price = price
-                        logger.warning(f"Missing entry_price for position, using current price {price}")
+                # ============================================================
+                # EXECUTE THE EXIT (common for both two-phase and standard)
+                # ============================================================
+                if exit_signal_met and shares_to_sell > 0:
+                    capital += shares_to_sell * price
+
+                    # Calculate PnL for shares sold
+                    shares_pnl = shares_to_sell * (price - entry_price)
+                    shares_pnl_pct = ((price - entry_price) / entry_price) * 100
+
+                    is_partial_exit = shares_to_sell < shares
 
                     trade = {
                         'trade_number': position.get('trade_number', 0),
@@ -507,27 +626,57 @@ class Backtester:
                         'exit_date': idx,
                         'entry_price': entry_price,
                         'exit_price': price,
-                        'shares': shares,
-                        'pnl': shares * (price - entry_price),
-                        'pnl_pct': pnl_pct * 100,
-                        'exit_reason': exit_reason,
+                        'shares': shares_to_sell,
+                        'pnl': shares_pnl,
+                        'pnl_pct': shares_pnl_pct,
+                        'exit_reason': exit_reason + (f" (sold {shares_to_sell}/{original_shares} shares)" if is_partial_exit else ""),
                         'entry_reason': position.get('entry_reason', 'unknown'),
                         'days_held': (idx - position['entry_date']).days if position.get('entry_date') else 0,
-                        'capital_before': round(capital - shares * price, 2),
-                        'capital_after': round(capital, 2)
+                        'capital_before': round(capital - shares_to_sell * price, 2),
+                        'capital_after': round(capital, 2),
+                        'partial_exit': is_partial_exit
                     }
                     trades.append(trade)
 
-                    logger.debug(f"SELL {shares} shares at ${price:.2f} on {idx}: {exit_reason}")
+                    logger.debug(f"SELL {shares_to_sell} shares at ${price:.2f} on {idx}: {exit_reason}")
 
-                    position = None
-                    shares = 0
+                    # Update remaining shares
+                    shares -= shares_to_sell
+
+                    # --------------------------------------------------------
+                    # STATE UPDATE after exit execution
+                    # --------------------------------------------------------
+                    if shares <= 0:
+                        # FULL EXIT - Reset ALL state for next trade
+                        position = None
+                        shares = 0
+                        original_shares = None
+                        partial_exit_done = False
+                        trailing_stop_active = False
+                        highest_price_since_partial_exit = None
+                        trailing_stop_price = None
+                        logger.debug(f"Position fully closed - all state reset")
+                    else:
+                        # PARTIAL EXIT - Keep position, update state for phase 2
+                        position['shares'] = shares
+
+                        # Activate trailing stop for two-phase strategies
+                        if has_trailing_stop and is_partial_exit:
+                            # partial_exit_done was already set to True above
+                            trailing_stop_active = True
+                            # Initialize trailing stop tracking from CURRENT price (not entry)
+                            highest_price_since_partial_exit = price
+                            trailing_stop_price = price * (1 - stop_loss)
+                            logger.debug(f"PHASE 2 ACTIVATED: Trailing stop at ${trailing_stop_price:.2f} ({stop_loss*100:.0f}% below ${price:.2f})")
+                            logger.debug(f"Remaining position: {shares} shares (will exit on trailing stop only)")
+
+                        logger.debug(f"Position remains open with {shares} shares")
 
         # Close any open position at end
         if position is not None:
             final_price = df.iloc[-1]['close']
             capital += shares * final_price
-            
+
             # Ensure we have valid values for calculations
             entry_price = position.get('entry_price', final_price)
             if entry_price is None or entry_price == 0:
@@ -553,6 +702,13 @@ class Backtester:
                 'capital_after': round(capital, 2)
             }
             trades.append(trade)
+
+            # Reset two-phase exit state
+            original_shares = None
+            partial_exit_done = False
+            trailing_stop_active = False
+            highest_price_since_partial_exit = None
+            trailing_stop_price = None
 
         # Calculate metrics
         final_capital = capital
@@ -720,7 +876,8 @@ class Backtester:
                     'entry_reason': t['entry_reason'],
                     'days_held': t['days_held'],
                     'capital_before': t['capital_before'],
-                    'capital_after': t['capital_after']
+                    'capital_after': t['capital_after'],
+                    'partial_exit': t.get('partial_exit', False)
                 }
                 for t in trades
             ],

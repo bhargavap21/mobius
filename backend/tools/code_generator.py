@@ -56,6 +56,8 @@ Extract and return JSON with this structure:
     "exit_conditions": {{
         "take_profit": 0.02,
         "stop_loss": 0.01,
+        "take_profit_pct_shares": 1.0,  // Percentage of position to sell when take profit hit (0.0-1.0, default 1.0 = 100%)
+        "stop_loss_pct_shares": 1.0,  // Percentage of position to sell when stop loss hit (0.0-1.0, default 1.0 = 100%)
         "custom_exit": "description of custom exit condition if specified"
     }},
     "risk_management": {{
@@ -87,11 +89,18 @@ CRITICAL PARSING RULES:
    - If user specifies custom exit indicator (e.g., "sell when RSI > 70", "sell when MACD crosses"), set custom_exit and DO NOT include take_profit/stop_loss
    - ONLY include take_profit/stop_loss if user explicitly mentions percentages (e.g., "+2% profit", "-1% stop loss")
    - If user only mentions custom exit without TP/SL, set take_profit: null, stop_loss: null
+   - ALWAYS extract partial exit percentages: "sell 50% at profit" → take_profit_pct_shares: 0.5
+   - If user doesn't specify percentage of shares to sell, default to 1.0 (100%)
+   - CRITICAL: For RSI mean-reversion with "sell half" or "partial exit" AND trailing stop, ALWAYS set take_profit_pct_shares: 0.5
+   - CRITICAL: stop_loss values must be DECIMALS (0.10 for 10%), NOT percentages (10.0)
 
 4. Examples:
    - "Sell when RSI > 70" → custom_exit: "RSI above 70", take_profit: null, stop_loss: null
    - "Sell at +2% profit or -1% stop loss" → take_profit: 0.02, stop_loss: 0.01, custom_exit: null
    - "Sell when RSI > 70 or at -1% stop loss" → custom_exit: "RSI above 70", stop_loss: 0.01, take_profit: null
+   - "Sell 50% at +10% profit" → take_profit: 0.10, take_profit_pct_shares: 0.5
+   - "Sell half when profit target hit" → take_profit_pct_shares: 0.5
+   - "Buy RSI < 30, sell 50% when RSI > 70, use 10% trailing stop" → custom_exit: "RSI above 70", take_profit_pct_shares: 0.5, stop_loss: 0.10, stop_loss_pct_shares: 1.0
 
 5. Portfolio Examples:
    - "Trade TSLA, AAPL, NVDA based on RSI" → portfolio_mode: true, assets: ["TSLA", "AAPL", "NVDA"], max_positions: 3, allocation: "equal"
@@ -197,6 +206,118 @@ Requirements:
 12. Use patterns like: `if rsi is not None and rsi < 30:` instead of `if rsi < 30:`
 13. Handle missing data gracefully with continue statements
 14. Never compare None with numbers - this will crash the backtest
+
+**CRITICAL - TWO-PHASE EXIT LOGIC FOR PARTIAL EXITS AND TRAILING STOPS:**
+
+When a strategy involves partial exits (e.g., "sell 50% when RSI > 70") combined with trailing stops, you MUST implement the following two-phase exit flow:
+
+PHASE 1 - Full Position (before partial exit):
+- NO trailing stop is active yet
+- Only exit trigger is the RSI threshold (or other indicator-based exit)
+- When RSI crosses above threshold, sell EXACTLY the specified percentage (e.g., 50%)
+- Store the ORIGINAL position size at entry to calculate exact exit quantity
+- Mark partial_exit_done = True to prevent repeated partial exits
+
+PHASE 2 - Remaining Position (after partial exit):
+- Trailing stop is NOW activated
+- Initialize trailing stop based on current price AFTER partial exit, NOT entry price
+- Track highest_price_since_partial_exit (reset when partial exit happens)
+- Trailing stop price = highest_price_since_partial_exit * (1 - trailing_stop_pct)
+- Only the trailing stop can trigger exit in this phase
+- When trailing stop hits, exit ALL remaining shares
+
+STATE VARIABLES REQUIRED:
+```python
+self.entry_price = None              # Original entry price
+self.original_shares = None          # Shares at entry (for calculating 50%)
+self.partial_exit_done = False       # Flag to prevent multiple partial exits
+self.trailing_stop_active = False    # Only True AFTER partial exit
+self.highest_price_since_partial_exit = None  # For trailing stop calculation
+self.trailing_stop_price = None      # Current trailing stop level
+```
+
+CRITICAL RULES:
+1. partial_exit_done prevents repeated 50% exits (50 -> 25 -> 12 is WRONG)
+2. Calculate exit_qty from ORIGINAL position: `exit_qty = int(self.original_shares * 0.5)`
+3. Trailing stop ONLY activates after partial exit happens
+4. After partial exit, reset highest price tracker to current price
+5. Never use position_qty // 2 repeatedly - that causes cascading exits
+
+CORRECT check_exit_conditions() LOGIC:
+```python
+def check_exit_conditions(self, position) -> dict:
+    result = {{'should_exit': False, 'quantity': 0, 'reason': None}}
+
+    if position is None:
+        return result
+
+    current_price = self.get_current_price()
+    current_rsi = self.get_current_rsi()
+    position_qty = int(float(position.qty))
+
+    if current_price is None or current_rsi is None:
+        return result
+
+    # Initialize tracking on first check
+    if self.original_shares is None:
+        self.original_shares = position_qty
+        self.entry_price = float(position.avg_entry_price)
+
+    # PHASE 1: Partial exit on RSI signal (only once!)
+    if not self.partial_exit_done and current_rsi > self.rsi_sell_threshold:
+        exit_qty = int(self.original_shares * 0.5)  # Use ORIGINAL, not current
+        exit_qty = min(exit_qty, position_qty)  # Safety check
+
+        result['should_exit'] = True
+        result['quantity'] = exit_qty
+        result['reason'] = f"Partial exit: RSI ({{current_rsi:.2f}}) > {{self.rsi_sell_threshold}}"
+        return result
+
+    # PHASE 2: Trailing stop (only after partial exit)
+    if self.partial_exit_done and self.trailing_stop_active:
+        # Update highest price and trailing stop
+        if current_price > self.highest_price_since_partial_exit:
+            self.highest_price_since_partial_exit = current_price
+            self.trailing_stop_price = current_price * (1 - self.trailing_stop_pct)
+
+        # Check if trailing stop hit
+        if current_price <= self.trailing_stop_price:
+            result['should_exit'] = True
+            result['quantity'] = position_qty  # All remaining shares
+            result['reason'] = f"Trailing stop: ${{current_price:.2f}} <= ${{self.trailing_stop_price:.2f}}"
+            return result
+
+    return result
+```
+
+CORRECT execute_sell() STATE UPDATE:
+```python
+def execute_sell(self, quantity: int, reason: str):
+    # ... order execution code ...
+
+    # Update state after successful sell
+    remaining_position = self.get_position()
+
+    if remaining_position is None or int(float(remaining_position.qty)) == 0:
+        # Fully exited - reset all state
+        self._reset_position_state()
+    elif "Partial exit" in reason and not self.partial_exit_done:
+        # First partial exit just happened - activate trailing stop
+        self.partial_exit_done = True
+        self.trailing_stop_active = True
+        current_price = self.get_current_price()
+        self.highest_price_since_partial_exit = current_price
+        self.trailing_stop_price = current_price * (1 - self.trailing_stop_pct)
+        logger.info(f"🎯 Trailing stop activated at ${{self.trailing_stop_price:.2f}}")
+
+def _reset_position_state(self):
+    self.entry_price = None
+    self.original_shares = None
+    self.partial_exit_done = False
+    self.trailing_stop_active = False
+    self.highest_price_since_partial_exit = None
+    self.trailing_stop_price = None
+```
 
 Structure:
 ```python
