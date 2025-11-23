@@ -1,5 +1,7 @@
 # 🤖 AI Trading Bot - Self-Learning Trading Strategies
 
+[![CI - Tests & Deploy](https://github.com/bhargavap21/mobius/actions/workflows/ci.yml/badge.svg)](https://github.com/bhargavap21/mobius/actions/workflows/ci.yml)
+
 > Transform plain English into professional trading bots that backtest, deploy, and improve themselves.
 
 ## 🚀 Quick Start

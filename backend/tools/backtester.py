@@ -11,6 +11,8 @@ from alpaca.data.requests import StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 from config import settings
 from tools.backtest_helpers import get_social_sentiment_for_date, get_news_for_date
+from pydantic import ValidationError
+from schemas.strategy import validate_strategy
 
 logger = logging.getLogger(__name__)
 
@@ -202,6 +204,17 @@ class Backtester:
             start_date = datetime.now() - timedelta(days=180)
         if not end_date:
             end_date = datetime.now()
+
+        # Validate and normalize strategy through schema
+        try:
+            validated = validate_strategy(strategy)
+            strategy = validated.to_dict()
+            logger.info(f"✅ Strategy validated: {validated.get_summary()}")
+            if validated.is_two_phase_exit:
+                logger.info(f"   Two-phase exit mode: partial exit + trailing stop")
+        except ValidationError as e:
+            logger.warning(f"⚠️ Strategy validation failed: {e}")
+            logger.warning("   Proceeding with raw strategy dict")
 
         # Check if portfolio mode (multiple stocks)
         portfolio_mode = strategy.get('portfolio_mode', False)

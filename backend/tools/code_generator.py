@@ -9,7 +9,9 @@ import json
 import ast
 from typing import Dict, List, Any, Optional
 from anthropic import Anthropic
+from pydantic import ValidationError
 from config import settings
+from schemas.strategy import StrategySchema, validate_strategy
 
 logger = logging.getLogger(__name__)
 
@@ -138,9 +140,32 @@ Return ONLY valid JSON, no other text."""
             json_str = content[json_start:json_end]
             parsed = json.loads(json_str)
 
-            logger.info(f"✅ Parsed strategy: {parsed['name']}")
+            logger.info(f"✅ Parsed strategy: {parsed.get('name', 'Unknown')}")
             logger.info(f"   Asset: {parsed.get('asset')}")
             logger.info(f"   Data sources: {parsed.get('data_sources')}")
+
+            # Validate and normalize through schema
+            try:
+                validated_strategy = validate_strategy(parsed)
+                logger.info(f"✅ Schema validation passed")
+                logger.info(f"   {validated_strategy.get_summary()}")
+
+                # Log normalization details for debugging
+                if validated_strategy.exit_conditions.stop_loss is not None:
+                    logger.info(f"   Stop Loss (normalized): {validated_strategy.exit_conditions.stop_loss:.4f} ({validated_strategy.exit_conditions.stop_loss*100:.1f}%)")
+                if validated_strategy.exit_conditions.take_profit is not None:
+                    logger.info(f"   Take Profit (normalized): {validated_strategy.exit_conditions.take_profit:.4f} ({validated_strategy.exit_conditions.take_profit*100:.1f}%)")
+                if validated_strategy.exit_conditions.take_profit_pct_shares < 1.0:
+                    logger.info(f"   Partial Exit: {validated_strategy.exit_conditions.take_profit_pct_shares*100:.0f}% at take profit")
+                if validated_strategy.is_two_phase_exit:
+                    logger.info(f"   ✅ Two-phase exit mode detected (partial exit + trailing stop)")
+
+                # Convert back to dict for compatibility
+                parsed = validated_strategy.to_dict()
+
+            except ValidationError as e:
+                logger.warning(f"⚠️  Schema validation failed: {e}")
+                logger.warning("   Proceeding with raw parsed strategy")
 
             # Check if strategy requires dynamic selection without specific assets
             if parsed.get('dynamic_selection') and not parsed.get('asset') and not parsed.get('assets'):
