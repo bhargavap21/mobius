@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest, StockLatestQuoteRequest
+from alpaca.data.enums import Adjustment
 from alpaca.data.timeframe import TimeFrame
 from config import settings
 
@@ -60,12 +61,13 @@ def get_stock_price(
         else:
             start = datetime.now() - timedelta(days=bars * 2)
 
-        # Request data
+        # Request data (with split/dividend adjustment)
         request = StockBarsRequest(
             symbol_or_symbols=symbol,
             timeframe=tf,
             start=start,
             limit=bars,
+            adjustment=Adjustment.ALL,  # Adjust for splits and dividends
         )
 
         bars_data = data_client.get_stock_bars(request)

@@ -10,6 +10,14 @@ from agents.strategy_analyst import StrategyAnalystAgent
 from agents.insights_generator import InsightsGeneratorAgent
 from agents.intelligent_orchestrator import IntelligentOrchestrator
 
+# Import evaluation pipeline (optional - gracefully handle if not available)
+try:
+    from services.eval_pipeline import run_evaluations
+    EVALS_AVAILABLE = True
+except ImportError:
+    EVALS_AVAILABLE = False
+    run_evaluations = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -459,6 +467,26 @@ class SupervisorAgent(BaseAgent):
         logger.info(f"   - Buy & Hold: {final_summary.get('buy_hold_return', 0)}%")
         logger.info(f"   - Sharpe Ratio: {final_summary.get('sharpe_ratio', 0)}")
 
+        # STEP 4: Run deterministic evaluators
+        evaluation_results = None
+        if EVALS_AVAILABLE:
+            try:
+                logger.info(f"\n🔍 Step 4: Running Evaluations")
+                evaluation_results = run_evaluations(
+                    user_input=user_query,
+                    strategy=strategy,
+                    backtest_results=backtest_results,
+                )
+                if evaluation_results.get('all_passed'):
+                    logger.info(f"✅ All evaluations PASSED (score: {evaluation_results.get('average_score', 0):.2f})")
+                else:
+                    logger.warning(f"⚠️ Evaluations FAILED: {evaluation_results.get('failed_evaluators', [])}")
+                    for error in evaluation_results.get('errors', [])[:3]:
+                        logger.warning(f"   - {error}")
+            except Exception as e:
+                logger.warning(f"⚠️ Evaluation pipeline failed: {e}")
+                evaluation_results = {"error": str(e), "all_passed": None}
+
         return {
             'success': True,
             'strategy': strategy,
@@ -467,7 +495,8 @@ class SupervisorAgent(BaseAgent):
             'iterations': iteration,
             'iteration_history': iteration_history,
             'final_analysis': feedback,
-            'insights_config': insights_config  # Include insights configuration
+            'insights_config': insights_config,  # Include insights configuration
+            'evaluation_results': evaluation_results  # Include evaluation results
         }
 
     def get_workflow_summary(self, iteration_history: List[Dict[str, Any]]) -> str:

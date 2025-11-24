@@ -8,6 +8,7 @@ import pandas as pd
 import talib as ta
 from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockBarsRequest
+from alpaca.data.enums import Adjustment
 from alpaca.data.timeframe import TimeFrame
 from config import settings
 from tools.backtest_helpers import get_social_sentiment_for_date, get_news_for_date
@@ -172,7 +173,8 @@ class Backtester:
                 symbol_or_symbols=symbol,
                 timeframe=timeframe,
                 start=start_date,
-                end=end_date
+                end=end_date,
+                adjustment=Adjustment.ALL  # Adjust for splits and dividends
             )
 
             bars = self.data_client.get_stock_bars(request_params)
