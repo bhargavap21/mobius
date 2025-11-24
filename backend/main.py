@@ -48,6 +48,9 @@ from tools.politician_trades import (
     POLITICIAN_TRADING_TOOLS,
 )
 
+# Import tracing service
+from services.tracing import init_tracing, shutdown_tracing
+
 # Import routes
 from routes.auth_routes import router as auth_router
 from routes.bot_routes import router as bot_router
@@ -92,6 +95,20 @@ orchestrator = get_orchestrator()
 async def startup_event():
     """Register all tools with the orchestrator and start trading engine"""
     logger.info("🚀 Starting up AI Trading Bot API...")
+
+    # Initialize tracing (Phoenix)
+    import os
+    enable_phoenix = os.getenv("ENABLE_PHOENIX", "true").lower() == "true"
+    if enable_phoenix:
+        try:
+            # Only start Phoenix server in development (not production)
+            is_production = os.getenv("ENVIRONMENT", "development") == "production"
+            init_tracing(
+                project_name="mobius-trading-bot",
+                enable_phoenix_server=not is_production
+            )
+        except Exception as e:
+            logger.warning(f"⚠️ Tracing initialization failed: {e}")
 
     # Register market data tools
     for tool in MARKET_DATA_TOOLS:
@@ -154,6 +171,13 @@ async def shutdown_event():
     """Cleanup on shutdown"""
     logger.info("🛑 Shutting down AI Trading Bot API...")
 
+    # Shutdown tracing
+    try:
+        shutdown_tracing()
+        logger.info("✅ Tracing shutdown complete")
+    except Exception as e:
+        logger.warning(f"⚠️ Error shutting down tracing: {e}")
+
     # Stop the live trading engine
     from services.live_trading_engine import trading_engine
     try:
@@ -214,6 +238,23 @@ async def root():
 async def health():
     """Health check"""
     return {"status": "healthy"}
+
+
+@app.get("/api/debug/deployments")
+async def debug_deployments(user_id: UUID = Depends(get_optional_user_id)):
+    """
+    Debug endpoint to check deployment status
+    Shows which deployments are active in the trading engine
+    """
+    from services.live_trading_engine import trading_engine
+    
+    return {
+        "trading_engine_running": trading_engine.scheduler.running,
+        "active_deployments_count": len(trading_engine.active_deployments),
+        "active_deployment_ids": list(trading_engine.active_deployments.keys()),
+        "scheduled_jobs": [{"id": job.id, "next_run": str(job.next_run_time)} for job in trading_engine.scheduler.get_jobs()],
+        "scheduler_running": trading_engine.scheduler.running
+    }
 
 
 @app.post("/api/strategy/create", response_model=StrategyResponse)
@@ -351,7 +392,8 @@ async def _run_multi_agent_workflow(
     session_id: str,
     strategy_description: str,
     fast_mode: bool,
-    user_id: UUID
+    user_id: UUID,
+    parameters: Optional[dict] = None
 ):
     """
     Helper function to run the multi-agent workflow
@@ -359,19 +401,42 @@ async def _run_multi_agent_workflow(
     """
     try:
         logger.info(f"🤖 Multi-Agent Workflow Starting: '{strategy_description[:100]}...' (Session: {session_id})")
-        logger.info(f"📋 Parameters: fast_mode={fast_mode}, user_id={user_id}")
+        logger.info(f"📋 Parameters: fast_mode={fast_mode}, user_id={user_id}, parameters={parameters}")
 
         from agents.supervisor import SupervisorAgent
         from db.repositories.bot_repository import BotRepository
         from db.models import TradingBotCreate
         from job_storage import job_storage
+        from utils.timeframe_parser import parse_timeframe_to_days
 
         logger.info(f"📦 Creating SupervisorAgent...")
         supervisor = SupervisorAgent()
         logger.info(f"✅ SupervisorAgent created")
 
-        # Adjust parameters based on fast mode
-        days = 30 if fast_mode else 90
+        # Parse parameters from clarification flow
+        parameters = parameters or {}
+        
+        # Handle both 'backtest_period' and 'backtest_timeframe' keys
+        backtest_timeframe = parameters.get('backtest_period') or parameters.get('backtest_timeframe')
+        
+        # Determine days:
+        # 1. Fast mode: 30 days (overrides everything)
+        # 2. User-specified timeframe from clarification: parse it
+        # 3. Otherwise: None (let supervisor use intelligent defaults)
+        if fast_mode:
+            days = 30
+            logger.info(f"⚡ Fast mode: using {days} days")
+        elif backtest_timeframe:
+            days = parse_timeframe_to_days(backtest_timeframe)
+            if days:
+                logger.info(f"📅 Parsed backtest timeframe '{backtest_timeframe}' -> {days} days")
+            else:
+                logger.warning(f"⚠️ Could not parse timeframe '{backtest_timeframe}', using supervisor defaults")
+                days = None
+        else:
+            days = None  # Let supervisor decide based on strategy type
+            logger.info(f"📅 No timeframe specified, supervisor will use intelligent defaults")
+        
         initial_capital = 10000
 
         logger.info(f"🚀 Calling supervisor.process() with days={days}, capital=${initial_capital}...")
@@ -551,7 +616,10 @@ async def create_session(user_id: UUID = Depends(get_current_user_id)):
 
 
 @app.get("/api/strategy/status/{session_id}")
-async def get_strategy_status(session_id: str):
+async def get_strategy_status(
+    session_id: str,
+    user_id: Optional[UUID] = Depends(get_optional_user_id)
+):
     """
     Simple polling endpoint to check strategy generation status
     Returns current step and completion status
@@ -583,7 +651,7 @@ async def get_strategy_status(session_id: str):
                         "message": result.get('error', 'Unknown error')
                     }
         except Exception as e:
-            logger.error(f"Error checking job_storage: {e}")
+            logger.debug(f"Error checking job_storage: {e}")
 
         # PRIORITY 2: Check if session is still processing
         try:
@@ -610,31 +678,56 @@ async def get_strategy_status(session_id: str):
                     "step": "initializing",
                     "message": "Starting workflow..."
                 }
+            
+            # Session not in active sessions, but check event_history for recent activity
+            if session_id in progress_manager.event_history:
+                events = progress_manager.event_history[session_id]
+                if events:
+                    last_event = events[-1]
+                    # If last event was completion or error, return that status
+                    if last_event.get('type') in ['complete', 'error']:
+                        return {
+                            "status": "complete" if last_event.get('type') == 'complete' else "error",
+                            "step": last_event.get('agent', 'unknown'),
+                            "message": last_event.get('message', '')
+                        }
+                    # Otherwise, workflow might have crashed but we have events
+                    logger.info(f"📊 Found events in history but session not active: {len(events)} events")
+                    return {
+                        "status": "processing",
+                        "step": last_event.get('agent', 'unknown'),
+                        "message": last_event.get('message', 'Workflow in progress...')
+                    }
         except Exception as e:
-            logger.error(f"Error checking progress_manager: {e}")
+            logger.debug(f"Error checking progress_manager: {e}")
 
         # PRIORITY 3: Check database for saved bot (slowest, fallback)
-        try:
-            import asyncio
-            from db.repositories.bot_repository import BotRepository
-            bot_repo = BotRepository()
-            # Add timeout to prevent hanging
-            bot = await asyncio.wait_for(bot_repo.get_by_session_id(session_id), timeout=3.0)
-            if bot:
-                logger.info(f"✅ Found completed bot in database for session {session_id[:8]}")
-                return {
-                    "status": "complete",
-                    "step": "complete",
-                    "bot_id": str(bot.id),
-                    "strategy": bot.strategy_config,
-                    "code": bot.generated_code,
-                    "backtest_results": bot.backtest_results,
-                    "insights_config": bot.insights_config
-                }
-        except asyncio.TimeoutError:
-            logger.warning(f"⏱️ Database query timed out for session {session_id[:8]}")
-        except Exception as e:
-            logger.error(f"Error checking bot status: {e}")
+        # Only check if user_id is available (for authorization)
+        if user_id:
+            try:
+                import asyncio
+                from db.repositories.bot_repository import BotRepository
+                bot_repo = BotRepository()
+                # Add timeout to prevent hanging
+                bot = await asyncio.wait_for(
+                    bot_repo.get_by_session_id(session_id, user_id),
+                    timeout=3.0
+                )
+                if bot:
+                    logger.info(f"✅ Found completed bot in database for session {session_id[:8]}")
+                    return {
+                        "status": "complete",
+                        "step": "complete",
+                        "bot_id": str(bot.id),
+                        "strategy": bot.strategy_config,
+                        "code": bot.generated_code,
+                        "backtest_results": bot.backtest_results,
+                        "insights_config": bot.insights_config
+                    }
+            except asyncio.TimeoutError:
+                logger.warning(f"⏱️ Database query timed out for session {session_id[:8]}")
+            except Exception as e:
+                logger.debug(f"Error checking bot status: {e}")
 
         logger.warning(f"⚠️ Session {session_id[:8]} not found in job_storage, progress_manager, or database")
         return {
@@ -678,13 +771,15 @@ async def start_workflow(
         raise HTTPException(status_code=404, detail="Session not found. Create session first.")
 
     logger.info(f"✅ Session {session_id[:8]} found, starting background workflow...")
+    logger.info(f"📝 Clarification parameters: {request.parameters}")
 
     # Start the actual workflow in background
     asyncio.create_task(_run_multi_agent_workflow(
         session_id=session_id,
         strategy_description=request.strategy_description,
         fast_mode=fast_mode,
-        user_id=user_id
+        user_id=user_id,
+        parameters=request.parameters  # Pass clarification parameters
     ))
 
     logger.info(f"🔄 Background task created for session {session_id[:8]}")

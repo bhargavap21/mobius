@@ -50,3 +50,9 @@ apscheduler>=3.10.4
 # Visualization
 matplotlib>=3.9.2
 plotly>=5.24.1
+
+# Tracing & Observability (Arize Phoenix)
+arize-phoenix>=12.0.0
+openinference-instrumentation-anthropic>=0.1.0
+opentelemetry-sdk>=1.0.0
+opentelemetry-exporter-otlp>=1.0.0

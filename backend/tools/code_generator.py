@@ -7,11 +7,19 @@ Uses Claude to generate clean, production-ready trading bot code
 import logging
 import json
 import ast
+import time
 from typing import Dict, List, Any, Optional
 from anthropic import Anthropic
 from pydantic import ValidationError
 from config import settings
 from schemas.strategy import StrategySchema, validate_strategy
+
+# Import tracing (gracefully handle if not available)
+try:
+    from services.tracing import log_strategy_generation, add_span_attributes
+    TRACING_AVAILABLE = True
+except ImportError:
+    TRACING_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +37,8 @@ def parse_strategy(strategy_description: str) -> Dict[str, Any]:
     Returns:
         Structured strategy parameters
     """
+    start_time = time.time()
+
     try:
         logger.info(f"📋 Parsing strategy: '{strategy_description[:100]}...'")
 
@@ -175,6 +185,21 @@ Return ONLY valid JSON, no other text."""
                     "error": "This strategy requires real-time trending stock data from Reddit. Backtesting is not available for dynamic trending strategies because historical trending data is not accessible. For backtesting, please specify exact stock symbols (e.g., 'Trade GME and AMC based on Reddit sentiment'). For live trading with trending stocks, deploy the bot directly.",
                     "strategy": parsed
                 }
+
+            # Log to tracing system
+            generation_time_ms = (time.time() - start_time) * 1000
+            if TRACING_AVAILABLE:
+                try:
+                    log_strategy_generation(
+                        user_input=strategy_description,
+                        parsed_strategy=parsed,
+                        validation_passed=True,
+                        generation_time_ms=generation_time_ms
+                    )
+                except Exception as trace_err:
+                    logger.debug(f"Tracing log failed: {trace_err}")
+
+            logger.info(f"⏱️ Strategy parsed in {generation_time_ms:.0f}ms")
 
             return {
                 "success": True,

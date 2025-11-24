@@ -14,6 +14,13 @@ from tools.backtest_helpers import get_social_sentiment_for_date, get_news_for_d
 from pydantic import ValidationError
 from schemas.strategy import validate_strategy
 
+# Import tracing (gracefully handle if not available)
+try:
+    from services.tracing import log_backtest_result, add_span_attributes
+    TRACING_AVAILABLE = True
+except ImportError:
+    TRACING_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -902,6 +909,19 @@ class Backtester:
             f"Backtest complete: {len(trades)} trades, "
             f"{total_return:.2f}% return vs {buy_hold_return:.2f}% buy-hold"
         )
+
+        # Log to tracing system
+        if TRACING_AVAILABLE:
+            try:
+                log_backtest_result(
+                    strategy_name=strategy.get('name', 'unknown'),
+                    total_return=total_return,
+                    total_trades=len(trades),
+                    win_rate=win_rate,
+                    execution_time_ms=0  # Would need to add timing
+                )
+            except Exception as trace_err:
+                logger.debug(f"Tracing log failed: {trace_err}")
 
         return results
 
