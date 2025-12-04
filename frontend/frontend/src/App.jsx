@@ -482,7 +482,30 @@ function AppContent() {
     console.log('Loaded bot:', botData.name)
   }
 
-  const handleRefineStrategy = async (refinementPrompt) => {
+  const handleRefineStrategy = async (refinementPrompt, directData = null) => {
+    // If directData is provided (from apply-suggestion), use it directly
+    if (directData) {
+      console.log('[Refinement] 📝 Applying suggestion data directly')
+
+      const updatedStrategy = {
+        ...directData.strategy,
+        final_analysis: directData.final_analysis
+      }
+      setStrategy(updatedStrategy)
+      setGeneratedCode(directData.code)
+      setBacktestResults(directData.backtest_results)
+      setInsightsConfig(directData.insights_config)
+
+      // Show success notification
+      setRefinementStatus('success')
+      setTimeout(() => setRefinementStatus(null), 3000)
+
+      // Auto-save after applying suggestion
+      setTimeout(() => handleSaveBot(true), 1000)
+      return
+    }
+
+    // Original text-based refinement flow
     // Close the sidebar
     setSidebarOpen(false)
 
@@ -981,7 +1004,12 @@ function AppContent() {
             {/* Refine Sidebar - fixed right-side panel with vertical handle */}
             {strategy && (
               <RefineSidebar
-                currentStrategy={strategy}
+                currentStrategy={{
+                  ...strategy,
+                  backtest_results: backtestResults,
+                  code: generatedCode,
+                  insights_config: insightsConfig
+                }}
                 onRefineStrategy={handleRefineStrategy}
                 onRunBacktest={handleRunBacktest}
                 onOpenChange={setSidebarOpen}

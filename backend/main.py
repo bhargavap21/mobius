@@ -195,8 +195,17 @@ class BacktestResponse(BaseModel):
 class RefineStrategyRequest(BaseModel):
     current_strategy: dict
     current_code: str
+    current_backtest_results: Optional[dict] = None
     refinement_instructions: str
     session_id: Optional[str] = None
+
+
+class ApplySuggestionRequest(BaseModel):
+    strategy: dict
+    suggestion: dict
+    current_backtest_results: Optional[dict] = None
+    session_id: Optional[str] = None
+    initial_capital: Optional[float] = 10000
 
 
 # Routes
@@ -880,9 +889,25 @@ async def refine_strategy(request: RefineStrategyRequest):
 
         # Step 2: Run backtest on refined strategy
         logger.info("Step 2: Running backtest...")
+
+        # Extract backtest period from refined strategy or previous results
+        # Priority: refined_strategy.backtest_days > current_backtest_results.days_used > default (180)
+        backtest_days = 180  # default
+
+        # Check if strategy has backtest_days field (set by code generator during refinement)
+        if refined_strategy.get('backtest_days'):
+            backtest_days = refined_strategy['backtest_days']
+            logger.info(f"📅 Using backtest period from refined strategy: {backtest_days} days")
+        # Otherwise check if we have previous backtest results with days_used
+        elif request.current_backtest_results and request.current_backtest_results.get('days_used'):
+            backtest_days = request.current_backtest_results['days_used']
+            logger.info(f"📅 Using backtest period from previous results: {backtest_days} days")
+        else:
+            logger.info(f"📅 Using default backtest period: {backtest_days} days")
+
         backtest_result = await backtest_runner.process({
             'strategy': refined_strategy,
-            'days': 180,
+            'days': backtest_days,
             'initial_capital': 10000
         })
 
@@ -965,6 +990,201 @@ async def refine_strategy(request: RefineStrategyRequest):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class SuggestionsRequest(BaseModel):
+    backtest_results: dict
+    strategy: dict
+    user_query: Optional[str] = None
+    current_code: Optional[str] = None
+
+
+class SuggestionsResponse(BaseModel):
+    success: bool
+    suggestions: Optional[list] = None
+    summary: Optional[str] = None
+    metrics_analysis: Optional[dict] = None
+    data_distributions: Optional[dict] = None
+    error: Optional[str] = None
+
+
+@app.post("/api/strategy/suggestions", response_model=SuggestionsResponse)
+async def get_ai_suggestions(request: SuggestionsRequest):
+    """
+    Generate AI-powered suggestions for strategy improvement
+
+    This endpoint:
+    1. Analyzes backtest results in detail
+    2. Generates specific, actionable recommendations
+    3. Provides data-driven threshold suggestions
+    4. Returns one-click applicable changes
+    """
+    try:
+        logger.info(f"🤖 Generating AI suggestions for strategy")
+
+        from agents.suggestion_analyzer import SuggestionAnalyzerAgent
+
+        # Initialize the suggestion analyzer
+        suggestion_agent = SuggestionAnalyzerAgent()
+
+        # Process the request
+        result = await suggestion_agent.process({
+            'backtest_results': request.backtest_results,
+            'strategy': request.strategy,
+            'user_query': request.user_query,
+            'current_code': request.current_code
+        })
+
+        if not result.get('success'):
+            return SuggestionsResponse(
+                success=False,
+                error=result.get('error', 'Failed to generate suggestions')
+            )
+
+        logger.info(f"✅ Generated {len(result.get('suggestions', []))} suggestions")
+
+        return SuggestionsResponse(
+            success=True,
+            suggestions=result.get('suggestions', []),
+            summary=result.get('summary'),
+            metrics_analysis=result.get('metrics_analysis'),
+            data_distributions=result.get('data_distributions')
+        )
+
+    except Exception as e:
+        logger.error(f"❌ Error generating suggestions: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/strategy/apply-suggestion")
+async def apply_suggestion(request: ApplySuggestionRequest):
+    """
+    Apply a specific suggestion to strategy and run backtest
+
+    This endpoint:
+    1. Modifies strategy JSON based on suggestion's parameter_path
+    2. Regenerates code from modified strategy
+    3. Runs backtest with updated parameters
+    4. Returns updated strategy + backtest results
+    """
+    try:
+        suggestion = request.suggestion
+
+        logger.info(f"📝 Applying suggestion: {suggestion.get('title', 'Unknown')}")
+
+        # Extract suggestion changes
+        changes = suggestion.get('changes', {})
+        parameter_path = changes.get('parameter_path')
+        new_value = changes.get('suggested_value')
+        parameter_name = changes.get('parameter')
+
+        if not parameter_path:
+            raise HTTPException(status_code=400, detail="Suggestion missing parameter_path")
+
+        # Clone the strategy
+        import copy
+        modified_strategy = copy.deepcopy(request.strategy)
+
+        # Apply the parameter change using path
+        def apply_parameter_path(obj: dict, path: str, value: any) -> None:
+            """Apply a value to a nested dict using dot-notation path"""
+            parts = path.split('.')
+            current = obj
+            for key in parts[:-1]:
+                if key not in current or not isinstance(current.get(key), dict):
+                    current[key] = {}
+                current = current[key]
+            current[parts[-1]] = value
+
+        apply_parameter_path(modified_strategy, parameter_path, new_value)
+
+        logger.info(f"✅ Applied {parameter_name}: {changes.get('current_value')} → {new_value}")
+        logger.info(f"   Path: {parameter_path}")
+
+        # Regenerate code from modified strategy
+        from tools.code_generator import generate_trading_bot_code
+        from agents.backtest_runner import BacktestRunnerAgent
+        from agents.strategy_analyst import StrategyAnalystAgent
+
+        code_result = generate_trading_bot_code(modified_strategy)
+        if not code_result.get('success'):
+            error_msg = code_result.get('error', 'Unknown error')
+            logger.error(f"❌ Code generation failed: {error_msg}")
+            raise HTTPException(status_code=400, detail=f"Failed to generate code from modified strategy: {error_msg}")
+
+        modified_code = code_result.get('code')
+
+        # Determine backtest days
+        backtest_days = 180
+        if modified_strategy.get('backtest_days'):
+            backtest_days = modified_strategy['backtest_days']
+        elif request.current_backtest_results and request.current_backtest_results.get('days_used'):
+            backtest_days = request.current_backtest_results['days_used']
+
+        logger.info(f"📊 Running backtest with {backtest_days} days...")
+
+        # Run backtest with modified strategy
+        backtest_runner = BacktestRunnerAgent()
+        backtest_result = await backtest_runner.process({
+            'strategy': modified_strategy,
+            'days': backtest_days,
+            'initial_capital': request.initial_capital
+        })
+
+        if not backtest_result.get('success'):
+            raise HTTPException(status_code=400, detail=f"Backtest failed: {backtest_result.get('error')}")
+
+        backtest_results = backtest_result['results']
+        days_used = backtest_result.get('days_used', backtest_days)
+
+        logger.info(f"✅ Backtest complete: {backtest_results.get('summary', {}).get('total_trades', 0)} trades")
+
+        # Generate insights
+        analyst = StrategyAnalystAgent()
+        analysis_result = await analyst.process({
+            'strategy': modified_strategy,
+            'backtest_results': backtest_results,
+            'previous_results': None,
+            'iteration': 1
+        })
+
+        insights_config = analysis_result.get('insights_config')
+
+        # Build final analysis
+        summary = backtest_results.get('summary', {})
+        final_analysis = {
+            'overview': f"Applied suggestion: {suggestion.get('title')}",
+            'performance': f"{summary.get('total_return_pct', 0):.1f}% return with {summary.get('win_rate', 0):.1f}% win rate",
+            'trades': f"{summary.get('total_trades', 0)} trades executed",
+            'insights': insights_config
+        }
+
+        return {
+            'success': True,
+            'strategy': modified_strategy,
+            'code': modified_code,
+            'backtest_results': backtest_results,
+            'days_used': days_used,
+            'insights_config': insights_config,
+            'final_analysis': final_analysis,
+            'applied_suggestion': {
+                'parameter': parameter_name,
+                'old_value': changes.get('current_value'),
+                'new_value': new_value,
+                'path': parameter_path
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error applying suggestion: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 @app.post("/api/chat")

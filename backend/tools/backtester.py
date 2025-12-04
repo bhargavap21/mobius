@@ -96,7 +96,7 @@ class Backtester:
                 symbol, source, date_str, self.social_cache,
                 dataset_manager=self.dataset_manager,
                 session_id=self.session_id,
-                sentiment_collector=collected_sentiments
+                sentiment_collector=self.collected_sentiments
             )
 
             if sentiment_score is not None:
@@ -304,10 +304,10 @@ class Backtester:
 
         # Initialize external data counter for evaluate_condition method
         self.external_data_counter = 0
-        
+
         # Batch storage: Collect sentiments by data source for efficient storage
         # Format: {data_source: {date_str: {sentiment: float, metadata: dict}}}
-        collected_sentiments = {}
+        self.collected_sentiments = {}
 
         for i, (idx, row) in enumerate(df.iterrows()):
             price = row['close']
@@ -355,7 +355,7 @@ class Backtester:
                         symbol, source, date_str, self.social_cache,
                         dataset_manager=self.dataset_manager,
                         session_id=self.session_id,
-                        sentiment_collector=collected_sentiments
+                        sentiment_collector=self.collected_sentiments
                     )
                     if sentiment_score is not None:
                         info_point[f'{source}_sentiment'] = round(sentiment_score, 3)
@@ -639,14 +639,14 @@ class Backtester:
             sharpe_ratio = 0
 
         # Batch storage: Store all collected sentiments as datasets
-        if self.dataset_manager and self.session_id and collected_sentiments:
+        if self.dataset_manager and self.session_id and self.collected_sentiments:
             try:
                 from datetime import date as date_type
                 start_date_obj = start_date.date() if isinstance(start_date, datetime) else start_date
                 end_date_obj = end_date.date() if isinstance(end_date, datetime) else end_date
-                
+
                 # Store datasets for each data source
-                for data_source, sentiments_by_date in collected_sentiments.items():
+                for data_source, sentiments_by_date in self.collected_sentiments.items():
                     if sentiments_by_date:  # Only store if we have data
                         # Calculate metadata
                         sentiments_list = [v.get('sentiment', 0) for v in sentiments_by_date.values() if v.get('sentiment') is not None]

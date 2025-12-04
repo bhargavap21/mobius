@@ -13,6 +13,15 @@ const StrategySidebar = ({
   const [chatMessage, setChatMessage] = useState('');
   const [chatHistory, setChatHistory] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState(null);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [suggestionsSummary, setSuggestionsSummary] = useState('');
+
+  // Debug: Log currentStrategy whenever it changes
+  React.useEffect(() => {
+    console.log('[StrategySidebar] currentStrategy changed:', currentStrategy);
+    console.log('[StrategySidebar] Has backtest_results?', !!currentStrategy?.backtest_results);
+  }, [currentStrategy]);
 
   const handleRefine = async () => {
     if (!refinementRequest.trim()) return;
@@ -94,6 +103,162 @@ Requested changes: ${refinementRequest}`;
     }
   };
 
+  const fetchAISuggestions = async () => {
+    console.log('[StrategySidebar] fetchAISuggestions called');
+    console.log('[StrategySidebar] currentStrategy:', currentStrategy);
+    console.log('[StrategySidebar] backtest_results:', currentStrategy?.backtest_results);
+
+    if (!currentStrategy?.backtest_results) {
+      console.log('[StrategySidebar] No backtest results available');
+      return;
+    }
+
+    setLoadingSuggestions(true);
+    setAiSuggestions(null); // Clear previous suggestions
+    setSuggestionsSummary('');
+
+    try {
+      console.log('[StrategySidebar] Calling /api/strategy/suggestions...');
+      const response = await fetch(`${API_URL}/api/strategy/suggestions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          backtest_results: currentStrategy.backtest_results,
+          strategy: {
+            asset: currentStrategy.asset,
+            strategy_type: currentStrategy.strategy_type,
+            entry_conditions: currentStrategy.entry_conditions,
+            exit_conditions: currentStrategy.exit_conditions,
+            rsi_period: currentStrategy.rsi_period,
+            rsi_oversold: currentStrategy.rsi_oversold,
+            rsi_overbought: currentStrategy.rsi_overbought,
+            sentiment_threshold: currentStrategy.sentiment_threshold,
+          },
+          user_query: currentStrategy.description || '',
+          current_code: currentStrategy.code
+        }),
+      });
+
+      const data = await response.json();
+      console.log('[StrategySidebar] Suggestions response:', data);
+
+      if (data.success) {
+        setAiSuggestions(data.suggestions || []);
+        setSuggestionsSummary(data.summary || '');
+        console.log('[StrategySidebar] AI suggestions loaded:', data.suggestions?.length);
+      } else {
+        console.error('[StrategySidebar] Failed to fetch suggestions:', data.error);
+      }
+    } catch (error) {
+      console.error('[StrategySidebar] Error fetching AI suggestions:', error);
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  };
+
+  const applySuggestion = async (suggestion) => {
+    if (!suggestion.applicable || !suggestion.changes) {
+      console.log('[StrategySidebar] Suggestion not applicable');
+      return;
+    }
+
+    const { parameter, current_value, suggested_value, parameter_path } = suggestion.changes;
+
+    if (!parameter_path) {
+      console.error('[StrategySidebar] Suggestion missing parameter_path');
+      return;
+    }
+
+    console.log('[StrategySidebar] Applying suggestion:', {
+      parameter,
+      path: parameter_path,
+      old: current_value,
+      new: suggested_value
+    });
+
+    setLoadingSuggestions(true);
+
+    try {
+      const response = await fetch(`${API_URL}/api/strategy/apply-suggestion`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          strategy: currentStrategy,
+          suggestion: suggestion,
+          current_backtest_results: currentStrategy.backtest_results,
+          session_id: crypto.randomUUID()
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || 'Failed to apply suggestion');
+      }
+
+      const data = await response.json();
+
+      console.log('[StrategySidebar] Suggestion applied successfully:', data);
+
+      // Track the application
+      const appliedSuggestion = {
+        id: suggestion.id,
+        title: suggestion.title,
+        category: suggestion.category,
+        impact: suggestion.impact,
+        parameter: parameter,
+        old_value: current_value,
+        new_value: suggested_value,
+        applied_at: new Date().toISOString(),
+        strategy_id: currentStrategy?.id,
+        result_trades: data.backtest_results?.summary?.total_trades,
+        result_return: data.backtest_results?.summary?.total_return_pct
+      };
+
+      // Store in localStorage for tracking
+      const appliedSuggestions = JSON.parse(localStorage.getItem('appliedSuggestions') || '[]');
+      appliedSuggestions.push(appliedSuggestion);
+      localStorage.setItem('appliedSuggestions', JSON.stringify(appliedSuggestions));
+
+      // Call the parent callback to update the strategy, code, and backtest results
+      // This will trigger a full UI refresh with the new data
+      if (onRefineStrategy) {
+        // Pass the complete updated data to the parent
+        onRefineStrategy(null, {
+          strategy: data.strategy,
+          code: data.code,
+          backtest_results: data.backtest_results,
+          insights_config: data.insights_config,
+          final_analysis: data.final_analysis
+        });
+      }
+
+      // Clear suggestions so they refresh with new context
+      setAiSuggestions(null);
+      setSuggestionsSummary('');
+
+    } catch (error) {
+      console.error('[StrategySidebar] Error applying suggestion:', error);
+      alert(`Failed to apply suggestion: ${error.message}`);
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  };
+
+  // Fetch AI suggestions when tab opens and backtest results are available
+  React.useEffect(() => {
+    if (activeTab === 'refine' && currentStrategy?.backtest_results && !loadingSuggestions) {
+      console.log('[StrategySidebar] Fetching AI suggestions for strategy:', currentStrategy?.id);
+      fetchAISuggestions();
+    } else if (activeTab !== 'refine') {
+      // Clear suggestions when leaving the refine tab
+      setAiSuggestions(null);
+      setSuggestionsSummary('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, currentStrategy?.id, currentStrategy?.backtest_results]);
+
   if (!isOpen) return null;
 
   return (
@@ -163,38 +328,98 @@ Requested changes: ${refinementRequest}`;
             </div>
 
             <div>
-              <h3 className="text-sm font-light text-white mb-3">Suggest Improvements</h3>
-              <p className="text-xs text-white/50 mb-3">
-                Describe how you'd like to modify this strategy
-              </p>
+              <h3 className="text-sm font-light text-white mb-3">AI-Powered Suggestions</h3>
 
-              {/* Quick suggestions */}
-              <div className="space-y-2 mb-4">
+              {/* AI Summary */}
+              {suggestionsSummary && (
+                <div className="mb-3 p-3 bg-accent/10 border border-accent/20 rounded-lg">
+                  <p className="text-xs text-white/80">{suggestionsSummary}</p>
+                </div>
+              )}
+
+              {/* Loading State */}
+              {loadingSuggestions && (
+                <div className="mb-4 p-4 bg-white/5 rounded-lg border border-white/10">
+                  <div className="flex items-center gap-2 text-white/50 text-sm">
+                    <div className="animate-spin h-4 w-4 border-2 border-accent border-t-transparent rounded-full"></div>
+                    Analyzing strategy with AI...
+                  </div>
+                </div>
+              )}
+
+              {/* AI Suggestions */}
+              {aiSuggestions && aiSuggestions.length > 0 && (
+                <div className="space-y-2 mb-4 max-h-96 overflow-y-auto">
+                  {aiSuggestions.map((suggestion) => (
+                    <div
+                      key={suggestion.id}
+                      className={`p-3 rounded-lg border transition-all ${
+                        suggestion.impact === 'high'
+                          ? 'bg-red-500/10 border-red-500/30'
+                          : suggestion.impact === 'medium'
+                          ? 'bg-yellow-500/10 border-yellow-500/30'
+                          : 'bg-blue-500/10 border-blue-500/30'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                              suggestion.impact === 'high'
+                                ? 'bg-red-500/20 text-red-300'
+                                : suggestion.impact === 'medium'
+                                ? 'bg-yellow-500/20 text-yellow-300'
+                                : 'bg-blue-500/20 text-blue-300'
+                            }`}>
+                              {suggestion.impact} impact
+                            </span>
+                            <span className="text-xs text-white/40">
+                              {suggestion.category}
+                            </span>
+                          </div>
+                          <h4 className="text-sm font-medium text-white mb-1">
+                            {suggestion.title}
+                          </h4>
+                          <p className="text-xs text-white/60 mb-2">
+                            {suggestion.description}
+                          </p>
+                          {suggestion.rationale && (
+                            <p className="text-xs text-white/50 italic">
+                              💡 {suggestion.rationale}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {suggestion.applicable && suggestion.changes && (
+                        <button
+                          onClick={() => {
+                            // Auto-fill the custom modification textarea
+                            const modificationText = `${suggestion.title}: Change ${suggestion.changes.parameter} from ${JSON.stringify(suggestion.changes.current_value)} to ${JSON.stringify(suggestion.changes.suggested_value)}`;
+                            setRefinementRequest(modificationText);
+                          }}
+                          className="mt-2 w-full text-xs px-3 py-1.5 bg-accent hover:bg-accent/90 text-white rounded transition-colors"
+                        >
+                          Apply: {suggestion.changes.parameter} = {JSON.stringify(suggestion.changes.suggested_value)}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Refresh Button */}
+              {currentStrategy?.backtest_results && !loadingSuggestions && (
                 <button
-                  onClick={() => setRefinementRequest('Make the entry conditions less restrictive - increase RSI threshold to 40')}
-                  className="w-full text-left px-3 py-2 bg-white/5 hover:bg-white/10 rounded-lg border border-white/10 text-xs text-white/80 transition-colors"
+                  onClick={fetchAISuggestions}
+                  className="mb-3 w-full text-xs px-3 py-2 bg-white/5 hover:bg-white/10 rounded-lg border border-white/10 text-white/80 transition-colors"
                 >
-                  Loosen RSI threshold (30 → 40)
+                  🔄 Refresh AI Suggestions
                 </button>
-                <button
-                  onClick={() => setRefinementRequest('Lower the sentiment requirement to 0.1 instead of 0.2')}
-                  className="w-full text-left px-3 py-2 bg-white/5 hover:bg-white/10 rounded-lg border border-white/10 text-xs text-white/80 transition-colors"
-                >
-                  Lower sentiment threshold
-                </button>
-                <button
-                  onClick={() => setRefinementRequest('Change logic to use OR instead of AND for conditions')}
-                  className="w-full text-left px-3 py-2 bg-white/5 hover:bg-white/10 rounded-lg border border-white/10 text-xs text-white/80 transition-colors"
-                >
-                  Use OR instead of AND
-                </button>
-                <button
-                  onClick={() => setRefinementRequest('Remove sentiment requirement entirely, use only RSI')}
-                  className="w-full text-left px-3 py-2 bg-white/5 hover:bg-white/10 rounded-lg border border-white/10 text-xs text-white/80 transition-colors"
-                >
-                  Remove sentiment filter
-                </button>
-              </div>
+              )}
+
+              <p className="text-xs text-white/50 mb-3">
+                Or describe your own custom modification:
+              </p>
 
               <textarea
                 value={refinementRequest}

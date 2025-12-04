@@ -380,12 +380,20 @@ IMPORTANT RULES FOR PARAMETER CHANGES:
 - "less sensitive" → adjust thresholds to trigger less frequently
 - "use OR instead of AND" → change condition_logic from "and" to "or"
 - "use AND instead of OR" → change condition_logic from "or" to "and"
+- "change backtest period" → add/update TOP-LEVEL field "backtest_days" with integer value (e.g., 180 → 360)
+- "increase backtest timeframe" → add/update TOP-LEVEL field "backtest_days" to larger value
+
+CRITICAL: Backtest period changes
+- When user requests to change backtest period (e.g., "180 to 360 days"), you MUST add or update the "backtest_days" field at the TOP LEVEL of the strategy object
+- Example: If user says "change from 180 to 360 days", add: "backtest_days": 360
+- This is NOT in parameters, NOT in entry_conditions - it's a top-level field in the strategy JSON
 
 SMART THRESHOLD ADJUSTMENTS:
 - For RSI: typical ranges are 20-40 (oversold) and 60-80 (overbought)
 - For sentiment: typical ranges are -1.0 to +1.0, with |0.3| being moderate
 - For volume spikes: typical multipliers are 1.5x to 3.0x average volume
 - For moving averages: common periods are 20, 50, 100, 200 days
+- For backtest period: use integer days like 30, 90, 180, 360, 720 in TOP-LEVEL "backtest_days" field
 
 WHEN MAKING CHANGES:
 - Only modify what the user explicitly requested
@@ -426,6 +434,10 @@ Respond in this exact JSON format:
             logger.info(f"✅ Refinement complete. Changes: {changes_made}")
             if explanation:
                 logger.info(f"📝 Explanation: {explanation}")
+
+            # Log what actually changed in the strategy
+            logger.info(f"🔍 Strategy before: {json.dumps(current_strategy, indent=2)[:200]}...")
+            logger.info(f"🔍 Strategy after: {json.dumps(updated_strategy, indent=2)[:200]}...")
 
             # Validate that changes were actually made
             if not changes_made or updated_strategy == current_strategy:
