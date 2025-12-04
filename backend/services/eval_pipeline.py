@@ -3,16 +3,27 @@ Production Evaluation Pipeline
 
 Automatically runs evaluators after strategy generation
 and logs results to Phoenix tracing.
+
+Phase 2: Deterministic evaluators (fast, rule-based)
+Phase 3: LLM-as-a-Judge evaluators (thorough, AI-based)
 """
 
 import logging
+import os
 from typing import Any, Dict, Optional
 
 from evals import (
+    # Phase 2: Deterministic
     StrategyParameterEvaluator,
     BacktestCorrectnessEvaluator,
     OutputSchemaEvaluator,
+    # Phase 3: LLM-as-a-Judge
+    TradeExecutionValidatorEvaluator,
+    UserIntentMatchEvaluator,
+    StrategyCoherenceEvaluator,
 )
+from evals.code_validation_evaluator import CodeValidationEvaluator
+from evals.execution_divergence_evaluator import ExecutionDivergenceEvaluator
 from evals.base import EvaluatorRunner, EvaluationSuite
 
 # Import tracing (optional)
@@ -25,6 +36,9 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+# Environment flag to enable/disable LLM evaluators (they cost money)
+LLM_EVALS_ENABLED = os.getenv("LLM_EVALS_ENABLED", "true").lower() == "true"
+
 
 class ProductionEvalPipeline:
     """
@@ -33,16 +47,38 @@ class ProductionEvalPipeline:
     Integrates with:
     - Phoenix tracing for observability
     - Supervisor workflow for automatic evaluation
+
+    Two evaluation modes:
+    - Deterministic only: Fast, rule-based checks (always runs)
+    - Full (with LLM): Includes LLM-as-a-Judge evaluators (controlled by LLM_EVALS_ENABLED)
     """
 
-    def __init__(self):
-        """Initialize evaluators."""
-        self.runner = EvaluatorRunner()
-        self.runner.add_evaluator(OutputSchemaEvaluator())
-        self.runner.add_evaluator(StrategyParameterEvaluator())
-        self.runner.add_evaluator(BacktestCorrectnessEvaluator())
+    def __init__(self, enable_llm_evals: Optional[bool] = None):
+        """
+        Initialize evaluators.
 
-        logger.info("✅ Evaluation pipeline initialized with 3 evaluators")
+        Args:
+            enable_llm_evals: Override for LLM evaluator flag (None = use env var)
+        """
+        self.llm_evals_enabled = enable_llm_evals if enable_llm_evals is not None else LLM_EVALS_ENABLED
+
+        # Deterministic evaluators (Phase 2) - always run
+        self.deterministic_runner = EvaluatorRunner()
+        self.deterministic_runner.add_evaluator(OutputSchemaEvaluator())
+        self.deterministic_runner.add_evaluator(StrategyParameterEvaluator())
+        self.deterministic_runner.add_evaluator(BacktestCorrectnessEvaluator())
+        self.deterministic_runner.add_evaluator(CodeValidationEvaluator())  # Phase 3: Code validation
+        self.deterministic_runner.add_evaluator(ExecutionDivergenceEvaluator())  # Phase 4: Execution validation
+
+        # LLM-as-a-Judge evaluators (Phase 3) - optional
+        self.llm_runner = EvaluatorRunner()
+        if self.llm_evals_enabled:
+            self.llm_runner.add_evaluator(UserIntentMatchEvaluator())
+            self.llm_runner.add_evaluator(StrategyCoherenceEvaluator())
+            self.llm_runner.add_evaluator(TradeExecutionValidatorEvaluator())
+            logger.info("✅ Evaluation pipeline initialized with 5 deterministic + 3 LLM evaluators")
+        else:
+            logger.info("✅ Evaluation pipeline initialized with 5 deterministic evaluators (LLM evals disabled)")
 
     def evaluate(
         self,
@@ -50,15 +86,23 @@ class ProductionEvalPipeline:
         strategy: Dict[str, Any],
         backtest_results: Optional[Dict[str, Any]] = None,
         trades: Optional[list] = None,
+        indicator_data: Optional[Dict[str, Any]] = None,
+        generated_code: Optional[str] = None,
+        enriched_query: Optional[str] = None,
+        insights_config: Optional[Dict[str, Any]] = None,
     ) -> EvaluationSuite:
         """
         Run all evaluators on the strategy.
 
         Args:
             user_input: Original user query
+            enriched_query: Enriched query from clarification agent (optional)
             strategy: Parsed strategy config
             backtest_results: Backtest results (optional)
             trades: List of trades (optional, extracted from backtest_results if not provided)
+            indicator_data: Indicator time series for trade validation (optional)
+            generated_code: Generated strategy code (optional)
+            insights_config: Visualization configuration showing what charts were displayed (optional)
 
         Returns:
             EvaluationSuite with all results
@@ -69,20 +113,56 @@ class ProductionEvalPipeline:
         if trades is None and backtest_results:
             trades = backtest_results.get('trades', [])
 
+        # Extract indicator data from backtest results if not provided
+        if indicator_data is None and backtest_results:
+            indicator_data = backtest_results.get('indicator_data', {})
+            # Also check insights_data which may contain indicator values
+            if not indicator_data:
+                indicator_data = backtest_results.get('insights_data', {})
+
+        # Extract insights_data (visualization chart data) from backtest results
+        insights_data = None
+        if backtest_results:
+            insights_data = backtest_results.get('insights_data', {})
+
         # Build kwargs for evaluators
         kwargs = {
             "user_input": user_input,
+            "enriched_query": enriched_query or user_input,  # Fallback to user_input if no enriched
             "parsed_strategy": strategy,
+            "strategy": strategy,
         }
 
         # Add backtest data if available
         if backtest_results:
-            kwargs["strategy"] = strategy
             kwargs["backtest_result"] = backtest_results
             kwargs["trades"] = trades
 
-        # Run all evaluators
-        suite = self.runner.run_all(**kwargs)
+        # Add indicator data for trade execution validation
+        if indicator_data:
+            kwargs["indicator_data"] = indicator_data
+
+        # Add generated code for code quality evaluation
+        if generated_code:
+            kwargs["generated_code"] = generated_code
+
+        # Add visualization data for visual validation
+        if insights_config:
+            kwargs["insights_config"] = insights_config  # What charts were configured to show
+        if insights_data:
+            kwargs["insights_data"] = insights_data  # Actual chart data points
+
+        # Run deterministic evaluators first (fast)
+        logger.info("  📋 Running deterministic evaluators...")
+        suite = self.deterministic_runner.run_all(**kwargs)
+
+        # Run LLM evaluators if enabled (slower, costs money)
+        if self.llm_evals_enabled and self.llm_runner.evaluators:
+            logger.info("  🤖 Running LLM-as-a-Judge evaluators...")
+            llm_suite = self.llm_runner.run_all(**kwargs)
+            # Merge results
+            for result in llm_suite.results:
+                suite.add(result)
 
         # Log to Phoenix tracing
         self._log_to_tracing(suite)
@@ -155,21 +235,30 @@ def run_evaluations(
     user_input: str,
     strategy: Dict[str, Any],
     backtest_results: Optional[Dict[str, Any]] = None,
+    generated_code: Optional[str] = None,
+    enriched_query: Optional[str] = None,
+    insights_config: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Convenience function to run evaluations and get summary.
 
     Args:
         user_input: Original user query
+        enriched_query: Enriched query from clarification agent
         strategy: Parsed strategy config
         backtest_results: Backtest results
+        generated_code: Generated strategy code
+        insights_config: Visualization configuration
 
     Returns:
         Evaluation summary dict
     """
     suite = eval_pipeline.evaluate(
         user_input=user_input,
+        enriched_query=enriched_query,
         strategy=strategy,
         backtest_results=backtest_results,
+        generated_code=generated_code,
+        insights_config=insights_config,
     )
     return eval_pipeline.get_summary(suite)

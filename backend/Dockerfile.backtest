@@ -1,0 +1,46 @@
+# Dockerfile for Backtest Execution Container
+# Provides isolated, secure environment for running generated trading strategy code
+
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install additional packages needed for backtesting
+RUN pip install --no-cache-dir \
+    yfinance \
+    pandas \
+    numpy \
+    alpaca-py
+
+# Copy backend code
+COPY . /app/
+
+# Set Python path
+ENV PYTHONPATH=/app
+
+# Create non-root user for security
+RUN useradd -m -u 1000 backtest && \
+    chown -R backtest:backtest /app
+
+# Switch to non-root user
+USER backtest
+
+# Set resource limits (will be overridden by Docker run flags)
+ENV MAX_MEMORY=512m
+ENV MAX_CPU=1.0
+
+# Default command (will be overridden)
+CMD ["python", "-c", "print('Backtest container ready')"]

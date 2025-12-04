@@ -156,8 +156,23 @@ class OutputSchemaEvaluator(BaseEvaluator):
 
         missing = []
         for field in self.REQUIRED_FIELDS:
-            if field not in strategy or strategy[field] is None:
-                missing.append(field)
+            # Special handling for 'asset' field - allow either 'asset' or 'assets' for portfolio mode
+            if field == "asset":
+                has_asset = (field in strategy and strategy[field] is not None)
+                has_assets = ("assets" in strategy and strategy.get("assets"))
+                portfolio_mode = strategy.get("portfolio_mode", False)
+
+                # For portfolio mode, require 'assets' list
+                if portfolio_mode:
+                    if not has_assets:
+                        missing.append("assets")
+                # For single-asset mode, require 'asset'
+                else:
+                    if not has_asset:
+                        missing.append(field)
+            else:
+                if field not in strategy or strategy[field] is None:
+                    missing.append(field)
 
         result["details"]["missing_fields"] = missing
 

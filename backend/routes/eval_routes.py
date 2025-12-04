@@ -272,3 +272,82 @@ async def eval_health():
         ],
         "tracing_enabled": TRACING_AVAILABLE,
     }
+
+
+# ==================== ANALYTICS ENDPOINTS ====================
+# These help developers identify bugs in the system by analyzing
+# patterns in evaluation failures.
+
+try:
+    from services.eval_analytics import (
+        get_failure_statistics,
+        get_recent_failures,
+    )
+    ANALYTICS_AVAILABLE = True
+except ImportError:
+    ANALYTICS_AVAILABLE = False
+    get_failure_statistics = None
+    get_recent_failures = None
+
+
+@router.get("/analytics/stats")
+async def get_eval_statistics():
+    """
+    Get evaluation failure statistics to identify system bugs.
+
+    Returns:
+    - Overall pass rate
+    - Failure rate by evaluator (which evaluator fails most?)
+    - Failure rate by strategy type (RSI strategies fail more?)
+    - Top error messages (repeated bugs)
+    - AI-generated insights about what to fix
+
+    Use this to identify patterns like:
+    - "TradeExecutionValidator fails 40% of the time" → fix code generator templates
+    - "partial_position keyword correlates with failures" → fix partial exit logic
+    """
+    if not ANALYTICS_AVAILABLE:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="Analytics module not available"
+        )
+
+    try:
+        stats = get_failure_statistics()
+        return stats
+    except Exception as e:
+        logger.error(f"Failed to get analytics: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Analytics failed: {str(e)}"
+        )
+
+
+@router.get("/analytics/failures")
+async def get_recent_eval_failures(limit: int = 20):
+    """
+    Get recent evaluation failures for debugging.
+
+    Returns detailed records of failed evaluations including:
+    - User input that caused the failure
+    - Strategy configuration
+    - Specific evaluator errors
+    - Backtest metrics
+
+    Use this to investigate specific bugs.
+    """
+    if not ANALYTICS_AVAILABLE:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="Analytics module not available"
+        )
+
+    try:
+        failures = get_recent_failures(limit=limit)
+        return {"failures": failures, "count": len(failures)}
+    except Exception as e:
+        logger.error(f"Failed to get failures: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get failures: {str(e)}"
+        )

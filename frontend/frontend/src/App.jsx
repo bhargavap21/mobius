@@ -17,6 +17,7 @@ import DeploymentPage from './components/DeploymentPage'
 import DeploymentMonitor from './components/DeploymentMonitor'
 import ChatHistorySidebar from './components/ChatHistorySidebar'
 import SessionExpiredModal from './components/SessionExpiredModal'
+import EvaluationResults from './components/EvaluationResults'
 import './index.css'
 
 function AppContent() {
@@ -31,6 +32,7 @@ function AppContent() {
   const [generatedCode, setGeneratedCode] = useState(null)
   const [backtestResults, setBacktestResults] = useState(null)
   const [insightsConfig, setInsightsConfig] = useState(null)  // LLM-generated insights config
+  const [evaluationResults, setEvaluationResults] = useState(null)  // Evaluation results from eval pipeline
   const [sessionId, setSessionId] = useState(null)  // Session ID for progress tracking
   const [loading, setLoading] = useState(false)
   const [backtesting, setBacktesting] = useState(false)
@@ -131,7 +133,8 @@ function AppContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query: userInput,
-          conversation_history: []
+          conversation_history: [],
+          fast_mode: fastMode  // Respect user's fast mode setting
         })
       })
 
@@ -241,8 +244,19 @@ function AppContent() {
             // Set results
             if (statusData.strategy) setStrategy(statusData.strategy)
             if (statusData.code) setGeneratedCode(statusData.code)
-            if (statusData.backtest_results) setBacktestResults(statusData.backtest_results)
+
+            // Handle backtest results - unwrap if needed (Phase 4 returns nested structure)
+            if (statusData.backtest_results) {
+              const results = statusData.backtest_results.results
+                ? statusData.backtest_results.results
+                : statusData.backtest_results
+              console.log('[App] 📊 Backtest results:', results)
+              setBacktestResults(results)
+            }
+
             if (statusData.insights_config) setInsightsConfig(statusData.insights_config)
+            console.log('[App] 🔍 evaluation_results from API:', statusData.evaluation_results)
+            if (statusData.evaluation_results) setEvaluationResults(statusData.evaluation_results)
             if (statusData.bot_id) {
               console.log('[App] ✅ Setting currentBotId from status:', statusData.bot_id)
               setCurrentBotId(statusData.bot_id)
@@ -918,8 +932,14 @@ function AppContent() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <p className="text-xs text-white/50">Asset</p>
-                    <p className="mt-1 text-base font-semibold text-white">{strategy.asset}</p>
+                    <p className="text-xs text-white/50">
+                      {strategy.portfolio_mode && strategy.assets?.length > 0 ? 'Assets' : 'Asset'}
+                    </p>
+                    <p className="mt-1 text-base font-semibold text-white">
+                      {strategy.portfolio_mode && strategy.assets?.length > 0
+                        ? strategy.assets.join(', ')
+                        : strategy.asset || 'Unknown'}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-white/50">Take Profit</p>
@@ -958,6 +978,11 @@ function AppContent() {
                 </div>
                 <BacktestResults results={backtestResults} insightsConfig={insightsConfig} />
               </div>
+            )}
+
+            {/* Evaluation Results */}
+            {evaluationResults && (
+              <EvaluationResults evaluationResults={evaluationResults} />
             )}
 
             {/* Generated Code */}

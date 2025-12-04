@@ -211,9 +211,16 @@ class StrategyParameterEvaluator(BaseEvaluator):
         """Check if correct asset was extracted."""
         result = {"error": None, "warning": None, "actual": None, "expected": None}
 
-        # Get asset from strategy
-        actual_asset = strategy.get("asset")
-        result["actual"] = actual_asset
+        # Check for portfolio mode
+        portfolio_mode = strategy.get("portfolio_mode", False)
+
+        # Get asset(s) from strategy
+        if portfolio_mode:
+            actual_assets = strategy.get("assets", [])
+            result["actual"] = actual_assets if actual_assets else None
+        else:
+            actual_asset = strategy.get("asset")
+            result["actual"] = actual_asset
 
         # Extract expected tickers from input
         tickers = re.findall(r'\b([A-Z]{1,5})\b', user_input)
@@ -221,10 +228,20 @@ class StrategyParameterEvaluator(BaseEvaluator):
         tickers = [t for t in tickers if t not in common_words]
         result["expected"] = tickers
 
-        if not actual_asset:
-            result["error"] = "No asset/ticker found in parsed strategy"
-        elif tickers and actual_asset not in tickers:
-            result["warning"] = f"Asset '{actual_asset}' not found in user input. Expected one of: {tickers}"
+        # Validate based on mode
+        if portfolio_mode:
+            if not actual_assets:
+                result["error"] = "No assets list found in portfolio strategy"
+            elif tickers:
+                # Check if all expected tickers are in the assets list
+                missing_tickers = [t for t in tickers if t not in actual_assets]
+                if missing_tickers:
+                    result["warning"] = f"Some tickers missing from assets list: {missing_tickers}"
+        else:
+            if not result["actual"]:
+                result["error"] = "No asset/ticker found in parsed strategy"
+            elif tickers and result["actual"] not in tickers:
+                result["warning"] = f"Asset '{result['actual']}' not found in user input. Expected one of: {tickers}"
 
         return result
 

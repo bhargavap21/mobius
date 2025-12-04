@@ -152,6 +152,33 @@ class DeploymentRepository:
             logger.error(f"❌ Error fetching user deployments: {e}")
             return []
 
+    async def get_all_running_deployments(self, limit: int = 1000) -> List[Deployment]:
+        """
+        Get all running deployments across all users
+        Used by trading engine to sync active deployments
+
+        Args:
+            limit: Maximum number of results
+
+        Returns:
+            List of Deployment objects with status 'running'
+        """
+        try:
+            response = self.admin_client.table('deployments')\
+                .select('*')\
+                .eq('status', 'running')\
+                .order('deployed_at', desc=True)\
+                .limit(limit)\
+                .execute()
+
+            if response.data:
+                return [Deployment(**item) for item in response.data]
+            return []
+
+        except Exception as e:
+            logger.error(f"❌ Error fetching all running deployments: {e}")
+            return []
+
     async def update_deployment(
         self,
         deployment_id: UUID,

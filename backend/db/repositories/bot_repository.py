@@ -57,6 +57,7 @@ class BotRepository:
                 'generated_code': bot_data.generated_code,
                 'backtest_results': bot_data.backtest_results,
                 'insights_config': bot_data.insights_config,
+                'evaluation_results': bot_data.evaluation_results if hasattr(bot_data, 'evaluation_results') else None,
                 'session_id': bot_data.session_id,
                 'is_saved': bot_data.is_saved if hasattr(bot_data, 'is_saved') else False,
             }
@@ -239,6 +240,8 @@ class BotRepository:
                 update_dict['backtest_results'] = update_data.backtest_results
             if update_data.insights_config is not None:
                 update_dict['insights_config'] = update_data.insights_config
+            if update_data.evaluation_results is not None:
+                update_dict['evaluation_results'] = update_data.evaluation_results
 
             if not update_dict:
                 # Nothing to update, just return current bot

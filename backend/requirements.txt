@@ -47,6 +47,9 @@ pytz>=2024.2
 aiohttp>=3.11.2
 apscheduler>=3.10.4
 
+# Code Execution (Phase 2-4)
+docker>=7.1.0
+
 # Visualization
 matplotlib>=3.9.2
 plotly>=5.24.1

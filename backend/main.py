@@ -194,6 +194,8 @@ class StrategyRequest(BaseModel):
     strategy_description: str
     session_id: Optional[str] = None  # Optional session ID for progress tracking
     parameters: Optional[dict] = None  # Parameters from clarification flow
+    enriched_query: Optional[str] = None  # Enriched query from clarification agent
+    results_screenshot: Optional[str] = None  # Base64 encoded screenshot of results page (for evaluators)
 
 
 class StrategyResponse(BaseModel):
@@ -395,7 +397,8 @@ async def _run_multi_agent_workflow(
     strategy_description: str,
     fast_mode: bool,
     user_id: UUID,
-    parameters: Optional[dict] = None
+    parameters: Optional[dict] = None,
+    enriched_query: Optional[str] = None
 ):
     """
     Helper function to run the multi-agent workflow
@@ -445,6 +448,7 @@ async def _run_multi_agent_workflow(
         try:
             result = await supervisor.process({
                 'user_query': strategy_description,
+                'enriched_query': enriched_query or strategy_description,  # Use enriched if available
                 'days': days,
                 'initial_capital': initial_capital,
                 'session_id': session_id,
@@ -487,6 +491,7 @@ async def _run_multi_agent_workflow(
             "iteration_history": result['iteration_history'],
             "final_analysis": result['final_analysis'],
             "insights_config": result.get('insights_config'),
+            "evaluation_results": result.get('evaluation_results'),  # Include evaluation results
             "message": f"Strategy optimized through {result['iterations']} iterations"
         }
 
@@ -515,6 +520,7 @@ async def _run_multi_agent_workflow(
                 generated_code=result['code'],
                 backtest_results=result['backtest_results'],
                 insights_config=result.get('insights_config'),
+                evaluation_results=result.get('evaluation_results'),
                 session_id=session_id,
                 is_saved=False
             )
@@ -552,6 +558,7 @@ async def _run_multi_agent_workflow(
 class ClarificationRequest(BaseModel):
     query: Optional[str] = None
     conversation_history: Optional[list] = []
+    fast_mode: Optional[bool] = False  # Skip clarification questions
 
 
 @app.post("/api/strategy/clarify")
@@ -562,6 +569,15 @@ async def clarify_strategy(request: ClarificationRequest):
     """
     from agents.clarification_agent import ClarificationAgent
     from anthropic import InternalServerError, APIError
+
+    # Fast mode: skip clarification entirely
+    if request.fast_mode:
+        logger.info("⚡ Fast mode enabled - skipping clarification")
+        return {
+            "needs_clarification": False,
+            "enriched_query": request.query or "Generate trading strategy based on conversation",
+            "parameters": {}
+        }
 
     agent = ClarificationAgent()
 
@@ -643,6 +659,7 @@ async def get_strategy_status(
                         "code": result.get('code'),
                         "backtest_results": result.get('backtest_results'),
                         "insights_config": result.get('insights_config'),
+                        "evaluation_results": result.get('evaluation_results'),
                         "bot_id": result.get('bot_id')
                     }
                 else:
@@ -724,7 +741,8 @@ async def get_strategy_status(
                         "strategy": bot.strategy_config,
                         "code": bot.generated_code,
                         "backtest_results": bot.backtest_results,
-                        "insights_config": bot.insights_config
+                        "insights_config": bot.insights_config,
+                        "evaluation_results": bot.evaluation_results
                     }
             except asyncio.TimeoutError:
                 logger.warning(f"⏱️ Database query timed out for session {session_id[:8]}")
@@ -781,7 +799,8 @@ async def start_workflow(
         strategy_description=request.strategy_description,
         fast_mode=fast_mode,
         user_id=user_id,
-        parameters=request.parameters  # Pass clarification parameters
+        parameters=request.parameters,  # Pass clarification parameters
+        enriched_query=request.enriched_query  # Pass enriched query from clarification
     ))
 
     logger.info(f"🔄 Background task created for session {session_id[:8]}")
@@ -883,6 +902,7 @@ async def create_strategy_multi_agent(
                 generated_code=result['code'],
                 backtest_results=result['backtest_results'],
                 insights_config=result.get('insights_config'),
+                evaluation_results=result.get('evaluation_results'),
                 session_id=session_id,
                 is_saved=False  # Auto-saved, not manually saved
             )

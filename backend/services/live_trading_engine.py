@@ -42,6 +42,16 @@ class LiveTradingEngine:
                 id='sync_deployments',
                 replace_existing=True
             )
+            
+            # Initial sync to load existing running deployments
+            # This will run immediately when the engine starts
+            import asyncio
+            try:
+                # Schedule initial sync
+                asyncio.create_task(self._sync_deployments())
+                logger.info("📋 Scheduled initial deployment sync")
+            except Exception as e:
+                logger.warning(f"⚠️  Could not schedule initial sync: {e}, will sync on next scheduled run")
 
     def stop(self):
         """Stop the trading engine"""
@@ -53,21 +63,42 @@ class LiveTradingEngine:
         """
         Sync active deployments from database
         Runs every minute to check for new/updated/stopped deployments
+        
+        This function:
+        1. Loads all 'running' deployments from database
+        2. Adds any new ones to active_deployments
+        3. Removes stopped/error deployments
         """
         try:
-            # Get all running deployments from database
-            # Note: This would need to query all users' deployments
-            # For now, we'll just log that sync is happening
             logger.debug("🔄 Syncing deployments from database...")
 
-            # Remove stopped deployments
+            # Get all running deployments from database
+            running_deployments = await self.deployment_repo.get_all_running_deployments()
+            logger.debug(f"📊 Found {len(running_deployments)} running deployments in database")
+
+            # Add new running deployments to active list
+            for deployment in running_deployments:
+                deployment_id_str = str(deployment.id)
+                if deployment_id_str not in self.active_deployments:
+                    # Try to add this deployment
+                    logger.info(f"🔄 Found new running deployment {deployment.id}, adding to trading engine...")
+                    success = await self.add_deployment(deployment.id)
+                    if success:
+                        logger.info(f"✅ Auto-loaded deployment {deployment.id} into trading engine")
+                    else:
+                        logger.warning(f"⚠️  Failed to auto-load deployment {deployment.id}")
+
+            # Remove stopped/error/paused deployments from active list
             for deployment_id in list(self.active_deployments.keys()):
                 deployment = await self.deployment_repo.get_deployment(UUID(deployment_id))
-                if not deployment or deployment.status in ['stopped', 'error']:
+                if not deployment or deployment.status in ['stopped', 'error', 'paused']:
                     await self.remove_deployment(deployment_id)
-
+                    logger.info(f"🗑️  Removed {deployment.status if deployment else 'missing'} deployment {deployment_id} from active list")
+            
         except Exception as e:
             logger.error(f"❌ Error syncing deployments: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
 
     async def add_deployment(self, deployment_id: UUID) -> bool:
         """
@@ -421,6 +452,10 @@ class LiveTradingEngine:
                 side=action
             )
 
+            filled_qty = order.get('filled_qty', 0)
+            filled_avg_price = order.get('filled_avg_price')
+            total_value = float(filled_avg_price * filled_qty) if filled_avg_price and filled_qty else None
+
             # Log the trade
             await self.deployment_repo.log_trade(
                 UUID(deployment_id),
@@ -431,46 +466,97 @@ class LiveTradingEngine:
                     'side': action,
                     'order_type': 'market',
                     'quantity': quantity,
-                    'filled_qty': order.get('filled_qty'),
-                    'filled_avg_price': order.get('filled_avg_price'),
-                    'total_value': order.get('filled_avg_price', 0) * quantity if order.get('filled_avg_price') else None,
-                    'signal_metadata': signal
+                    'filled_qty': filled_qty,
+                    'filled_avg_price': filled_avg_price,
+                    'total_value': total_value,
+                    'signal_metadata': signal,
+                    'submitted_at': datetime.utcnow().isoformat()
                 }
             )
 
             logger.info(f"✅ {action.upper()} order placed: {quantity} {symbol}, Order ID: {order['order_id']}")
 
+            # Update deployment-specific position tracking
+            if filled_qty and filled_qty > 0 and filled_avg_price:
+                await self._update_deployment_position(deployment_id, symbol, action, filled_qty, filled_avg_price)
+
         except Exception as e:
             logger.error(f"❌ Error processing signal: {e}")
 
     async def _update_metrics(self, deployment_id: str):
-        """Update deployment metrics from Alpaca account"""
+        """
+        Update deployment metrics using deployment-specific trades and positions
+        
+        This calculates virtual portfolio performance per deployment, independent of
+        other deployments sharing the same Alpaca account.
+        """
         try:
-            # Get current account status
-            account = await alpaca_service.get_account()
-            positions = await alpaca_service.get_positions()
-
             config = self.active_deployments[deployment_id]
             deployment = config['deployment']
-
-            # Calculate metrics
-            portfolio_value = float(account['portfolio_value'])
-            cash = float(account['cash'])
-            positions_value = portfolio_value - cash
-
             initial_capital = deployment.initial_capital
-            total_return_pct = ((portfolio_value - initial_capital) / initial_capital) * 100
+
+            # Get deployment-specific trades
+            trades = await self.deployment_repo.get_deployment_trades(UUID(deployment_id), limit=10000)
+            
+            # Get deployment-specific positions
+            positions = await self.deployment_repo.get_deployment_positions(UUID(deployment_id))
+
+            # Calculate virtual cash (initial capital minus all buy trades)
+            total_buy_value = sum(
+                float(trade.total_value or 0) 
+                for trade in trades 
+                if trade.side == 'buy' and trade.filled_qty and trade.filled_qty > 0
+            )
+            total_sell_value = sum(
+                float(trade.total_value or 0)
+                for trade in trades
+                if trade.side == 'sell' and trade.filled_qty and trade.filled_qty > 0
+            )
+            
+            # Virtual cash = initial capital - net buy value + net sell value
+            virtual_cash = initial_capital - total_buy_value + total_sell_value
+            
+            # Calculate virtual positions value
+            virtual_positions_value = sum(float(pos.market_value or 0) for pos in positions)
+            
+            # Virtual portfolio value
+            virtual_portfolio_value = virtual_cash + virtual_positions_value
+
+            # Calculate realized P&L from closed trades
+            realized_pnl = sum(
+                float(trade.realized_pnl or 0) 
+                for trade in trades 
+                if trade.realized_pnl is not None
+            )
+
+            # Calculate unrealized P&L from open positions
+            unrealized_pnl = sum(float(pos.unrealized_pnl or 0) for pos in positions)
+
+            # Total P&L
+            total_pnl = realized_pnl + unrealized_pnl
+            
+            # Total return percentage
+            total_return_pct = (total_pnl / initial_capital * 100) if initial_capital > 0 else 0.0
+
+            # Count trades
+            total_trades = len([t for t in trades if t.filled_qty and t.filled_qty > 0])
+            winning_trades = len([t for t in trades if t.realized_pnl and t.realized_pnl > 0])
+            losing_trades = len([t for t in trades if t.realized_pnl and t.realized_pnl < 0])
 
             # Log metrics
             await self.deployment_repo.log_metrics(
                 UUID(deployment_id),
                 {
-                    'portfolio_value': portfolio_value,
-                    'cash': cash,
-                    'positions_value': positions_value,
+                    'portfolio_value': virtual_portfolio_value,
+                    'cash': virtual_cash,
+                    'positions_value': virtual_positions_value,
                     'total_return_pct': total_return_pct,
-                    'unrealized_pnl': sum(float(p.get('unrealized_pl', 0)) for p in positions),
-                    'open_positions_count': len(positions)
+                    'realized_pnl': realized_pnl,
+                    'unrealized_pnl': unrealized_pnl,
+                    'open_positions_count': len(positions),
+                    'total_trades_count': total_trades,
+                    'winning_trades_count': winning_trades,
+                    'losing_trades_count': losing_trades
                 }
             )
 
@@ -478,32 +564,134 @@ class LiveTradingEngine:
             await self.deployment_repo.update_deployment(
                 UUID(deployment_id),
                 DeploymentUpdate(
-                    current_capital=portfolio_value,
-                    total_pnl=portfolio_value - initial_capital,
+                    current_capital=virtual_portfolio_value,
+                    total_pnl=total_pnl,
                     total_return_pct=total_return_pct
                 )
             )
 
-            # Sync positions
-            for pos in positions:
-                await self.deployment_repo.upsert_position(
-                    UUID(deployment_id),
-                    {
-                        'symbol': pos['symbol'],
-                        'quantity': float(pos['qty']),
-                        'average_entry_price': float(pos['avg_entry_price']),
-                        'current_price': float(pos['current_price']),
-                        'market_value': float(pos['market_value']),
-                        'cost_basis': float(pos['cost_basis']),
-                        'unrealized_pnl': float(pos['unrealized_pl']),
-                        'unrealized_pnl_pct': float(pos['unrealized_plpc']) * 100
-                    }
-                )
-
-            logger.debug(f"📊 Updated metrics for {deployment_id}: ${portfolio_value:,.2f} ({total_return_pct:+.2f}%)")
+            logger.debug(f"📊 Updated metrics for {deployment_id}: ${virtual_portfolio_value:,.2f} ({total_return_pct:+.2f}%) | Realized: ${realized_pnl:,.2f} | Unrealized: ${unrealized_pnl:,.2f}")
 
         except Exception as e:
-            logger.error(f"❌ Error updating metrics: {e}")
+            logger.error(f"❌ Error updating metrics for {deployment_id}: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
+
+    async def _update_deployment_position(
+        self,
+        deployment_id: str,
+        symbol: str,
+        side: str,
+        quantity: float,
+        fill_price: float
+    ):
+        """
+        Update deployment-specific position tracking
+        
+        This maintains a separate position record for each deployment,
+        independent of the shared Alpaca account positions.
+        """
+        try:
+            # Get current position for this deployment
+            positions = await self.deployment_repo.get_deployment_positions(UUID(deployment_id))
+            current_pos = next((p for p in positions if p.symbol == symbol), None)
+
+            if side == 'buy':
+                if current_pos:
+                    # Add to existing position (weighted average)
+                    old_qty = float(current_pos.quantity)
+                    old_avg = float(current_pos.average_entry_price)
+                    new_qty = old_qty + quantity
+                    new_avg = ((old_qty * old_avg) + (quantity * fill_price)) / new_qty
+                    
+                    # Get current market price
+                    current_price = await alpaca_service.get_latest_price(symbol)
+                    if not current_price:
+                        current_price = fill_price  # Fallback to fill price
+                    
+                    market_value = new_qty * current_price
+                    cost_basis = new_qty * new_avg
+                    unrealized_pnl = market_value - cost_basis
+                    unrealized_pnl_pct = (unrealized_pnl / cost_basis * 100) if cost_basis > 0 else 0
+                    
+                    await self.deployment_repo.upsert_position(
+                        UUID(deployment_id),
+                        {
+                            'symbol': symbol,
+                            'quantity': new_qty,
+                            'average_entry_price': new_avg,
+                            'current_price': current_price,
+                            'market_value': market_value,
+                            'cost_basis': cost_basis,
+                            'unrealized_pnl': unrealized_pnl,
+                            'unrealized_pnl_pct': unrealized_pnl_pct
+                        }
+                    )
+                else:
+                    # New position
+                    current_price = await alpaca_service.get_latest_price(symbol) or fill_price
+                    market_value = quantity * current_price
+                    cost_basis = quantity * fill_price
+                    unrealized_pnl = market_value - cost_basis
+                    unrealized_pnl_pct = (unrealized_pnl / cost_basis * 100) if cost_basis > 0 else 0
+                    
+                    await self.deployment_repo.upsert_position(
+                        UUID(deployment_id),
+                        {
+                            'symbol': symbol,
+                            'quantity': quantity,
+                            'average_entry_price': fill_price,
+                            'current_price': current_price,
+                            'market_value': market_value,
+                            'cost_basis': cost_basis,
+                            'unrealized_pnl': unrealized_pnl,
+                            'unrealized_pnl_pct': unrealized_pnl_pct
+                        }
+                    )
+            
+            elif side == 'sell':
+                if current_pos:
+                    old_qty = float(current_pos.quantity)
+                    old_avg = float(current_pos.average_entry_price)
+                    
+                    # Calculate realized P&L for sold shares
+                    cost_basis_sold = quantity * old_avg
+                    proceeds = quantity * fill_price
+                    realized_pnl = proceeds - cost_basis_sold
+                    
+                    new_qty = old_qty - quantity
+                    
+                    if new_qty <= 0:
+                        # Position fully closed
+                        await self.deployment_repo.delete_position(UUID(deployment_id), symbol)
+                    else:
+                        # Partial close - update position
+                        current_price = await alpaca_service.get_latest_price(symbol) or fill_price
+                        market_value = new_qty * current_price
+                        cost_basis = new_qty * old_avg
+                        unrealized_pnl = market_value - cost_basis
+                        unrealized_pnl_pct = (unrealized_pnl / cost_basis * 100) if cost_basis > 0 else 0
+                        
+                        await self.deployment_repo.upsert_position(
+                            UUID(deployment_id),
+                            {
+                                'symbol': symbol,
+                                'quantity': new_qty,
+                                'average_entry_price': old_avg,  # Entry price doesn't change
+                                'current_price': current_price,
+                                'market_value': market_value,
+                                'cost_basis': cost_basis,
+                                'unrealized_pnl': unrealized_pnl,
+                                'unrealized_pnl_pct': unrealized_pnl_pct
+                            }
+                        )
+                else:
+                    logger.warning(f"⚠️  Trying to sell {symbol} but no position found for deployment {deployment_id}")
+
+        except Exception as e:
+            logger.error(f"❌ Error updating deployment position: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
 
 
 # Global trading engine instance

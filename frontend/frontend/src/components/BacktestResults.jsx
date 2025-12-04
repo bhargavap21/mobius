@@ -70,21 +70,21 @@ export default function BacktestResults({ results, insightsConfig }) {
           <div className="p-3 bg-white/5 rounded-lg border border-white/10">
             <p className="text-xs text-white/50 mb-1">Total Return</p>
             <p className={`text-2xl font-semibold ${getReturnColor(summary.total_return)}`}>
-              {summary.total_return > 0 ? '+' : ''}{summary.total_return}%
+              {summary.total_return > 0 ? '+' : ''}{Number(summary.total_return).toFixed(2)}%
             </p>
           </div>
 
           <div className="p-3 bg-white/5 rounded-lg border border-white/10">
             <p className="text-xs text-white/50 mb-1">Buy & Hold</p>
             <p className={`text-2xl font-semibold ${getReturnColor(summary.buy_hold_return)}`}>
-              {summary.buy_hold_return > 0 ? '+' : ''}{summary.buy_hold_return}%
+              {summary.buy_hold_return > 0 ? '+' : ''}{Number(summary.buy_hold_return).toFixed(2)}%
             </p>
           </div>
 
           <div className="p-3 bg-white/5 rounded-lg border border-white/10">
             <p className="text-xs text-white/50 mb-1">Win Rate</p>
             <p className="text-2xl font-semibold text-white">
-              {summary.win_rate}%
+              {Number(summary.win_rate).toFixed(2)}%
             </p>
           </div>
 
@@ -180,49 +180,49 @@ export default function BacktestResults({ results, insightsConfig }) {
           <div className="p-3 bg-white/5 rounded-lg border border-white/10">
             <p className="text-xs text-white/50 mb-1">Winning Trades</p>
             <p className="text-base font-semibold text-green-400">
-              {summary.winning_trades} ({((summary.winning_trades / summary.total_trades) * 100).toFixed(0)}%)
+              {summary.winning_trades || 0} ({summary.total_trades > 0 ? (((summary.winning_trades || 0) / summary.total_trades) * 100).toFixed(0) : 0}%)
             </p>
           </div>
 
           <div className="p-3 bg-white/5 rounded-lg border border-white/10">
             <p className="text-xs text-white/50 mb-1">Losing Trades</p>
             <p className="text-base font-semibold text-red-400">
-              {summary.losing_trades} ({((summary.losing_trades / summary.total_trades) * 100).toFixed(0)}%)
+              {summary.losing_trades || 0} ({summary.total_trades > 0 ? (((summary.losing_trades || 0) / summary.total_trades) * 100).toFixed(0) : 0}%)
             </p>
           </div>
 
           <div className="p-3 bg-white/5 rounded-lg border border-white/10">
             <p className="text-xs text-white/50 mb-1">Avg Win</p>
             <p className="text-base font-semibold text-green-400">
-              ${summary.avg_win.toFixed(2)}
+              ${(summary.avg_win || 0).toFixed(2)}
             </p>
           </div>
 
           <div className="p-3 bg-white/5 rounded-lg border border-white/10">
             <p className="text-xs text-white/50 mb-1">Avg Loss</p>
             <p className="text-base font-semibold text-red-400">
-              ${summary.avg_loss.toFixed(2)}
+              ${(summary.avg_loss || 0).toFixed(2)}
             </p>
           </div>
 
           <div className="p-3 bg-white/5 rounded-lg border border-white/10">
             <p className="text-xs text-white/50 mb-1">Max Win</p>
             <p className="text-base font-semibold text-green-400">
-              ${summary.max_win.toFixed(2)}
+              ${(summary.max_win || 0).toFixed(2)}
             </p>
           </div>
 
           <div className="p-3 bg-white/5 rounded-lg border border-white/10">
             <p className="text-xs text-white/50 mb-1">Max Loss</p>
             <p className="text-base font-semibold text-red-400">
-              ${summary.max_loss.toFixed(2)}
+              ${(summary.max_loss || 0).toFixed(2)}
             </p>
           </div>
 
           <div className="p-3 bg-white/5 rounded-lg border border-white/10">
             <p className="text-xs text-white/50 mb-1">Avg Days Held</p>
             <p className="text-base font-semibold text-white">
-              {summary.avg_days_held} days
+              {summary.avg_days_held || 0} days
             </p>
           </div>
 
@@ -242,8 +242,8 @@ export default function BacktestResults({ results, insightsConfig }) {
 
           <div className="p-3 bg-white/5 rounded-lg border border-white/10">
             <p className="text-xs text-white/50 mb-1">Profit Factor</p>
-            <p className={`text-base font-semibold ${summary.profit_factor >= 1 ? 'text-green-400' : 'text-red-400'}`}>
-              {summary.profit_factor.toFixed(2)}
+            <p className={`text-base font-semibold ${(summary.profit_factor || 0) >= 1 ? 'text-green-400' : 'text-red-400'}`}>
+              {(summary.profit_factor || 0).toFixed(2)}
             </p>
           </div>
         </div>
@@ -307,16 +307,16 @@ export default function BacktestResults({ results, insightsConfig }) {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-xs text-white/50">Price:</span>
-                      <span className="text-xs text-white">${trade.entry_price}</span>
+                      <span className="text-xs text-white">${Number(trade.entry_price).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-xs text-white/50">Shares:</span>
-                      <span className="text-xs text-white">{trade.shares}</span>
+                      <span className="text-xs text-white">{trade.shares || 'N/A'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-xs text-white/50">Value:</span>
                       <span className="text-xs text-white">
-                        ${(trade.entry_price * trade.shares).toFixed(2)}
+                        {trade.shares ? `$${(trade.entry_price * trade.shares).toFixed(2)}` : 'N/A'}
                       </span>
                     </div>
                   </div>
@@ -332,16 +332,16 @@ export default function BacktestResults({ results, insightsConfig }) {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-xs text-white/50">Price:</span>
-                      <span className="text-xs text-white">${trade.exit_price}</span>
+                      <span className="text-xs text-white">${Number(trade.exit_price).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-xs text-white/50">Shares:</span>
-                      <span className="text-xs text-white">{trade.shares}</span>
+                      <span className="text-xs text-white">{trade.shares || 'N/A'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-xs text-white/50">Value:</span>
                       <span className="text-xs text-white">
-                        ${(trade.exit_price * trade.shares).toFixed(2)}
+                        {trade.shares ? `$${(trade.exit_price * trade.shares).toFixed(2)}` : 'N/A'}
                       </span>
                     </div>
                   </div>
@@ -365,12 +365,14 @@ export default function BacktestResults({ results, insightsConfig }) {
                   </div>
                 </div>
                 <div className="flex items-start gap-2">
-                  <div className="flex-1">
-                    <p className="text-xs text-white/50">Capital Impact:</p>
-                    <p className="text-xs text-white">
-                      ${trade.capital_before.toLocaleString()} → ${trade.capital_after.toLocaleString()}
-                    </p>
-                  </div>
+                  {trade.capital_before && trade.capital_after && (
+                    <div className="flex-1">
+                      <p className="text-xs text-white/50">Capital Impact:</p>
+                      <p className="text-xs text-white">
+                        ${trade.capital_before.toLocaleString()} → ${trade.capital_after.toLocaleString()}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

@@ -61,6 +61,7 @@ class TradingBotCreate(TradingBotBase):
     generated_code: str
     backtest_results: Optional[Dict[str, Any]] = None
     insights_config: Optional[Dict[str, Any]] = None
+    evaluation_results: Optional[Dict[str, Any]] = None
     session_id: Optional[str] = None
     is_saved: Optional[bool] = False  # True = manually saved to "My Bots", False = auto-saved chat history
 
@@ -75,6 +76,7 @@ class TradingBotUpdate(BaseModel):
     generated_code: Optional[str] = None
     backtest_results: Optional[Dict[str, Any]] = None
     insights_config: Optional[Dict[str, Any]] = None
+    evaluation_results: Optional[Dict[str, Any]] = None
 
 
 class TradingBot(TradingBotBase):
@@ -85,6 +87,7 @@ class TradingBot(TradingBotBase):
     generated_code: str
     backtest_results: Optional[Dict[str, Any]] = None
     insights_config: Optional[Dict[str, Any]] = None
+    evaluation_results: Optional[Dict[str, Any]] = None
     session_id: Optional[str] = None
     is_favorite: bool = False
     is_saved: bool = False  # True = manually saved, False = auto-saved chat history

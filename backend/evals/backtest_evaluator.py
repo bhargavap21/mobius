@@ -282,15 +282,15 @@ class BacktestCorrectnessEvaluator(BaseEvaluator):
         Check trade data consistency.
 
         Verifies:
-        - No negative quantities
-        - Valid prices
-        - Matching symbols
+        - No negative quantities (shares)
+        - Valid entry and exit prices
+        - Required fields present
         """
         result = {"errors": [], "warnings": [], "details": {}}
 
         for i, trade in enumerate(trades):
-            # Check quantity
-            qty = trade.get("quantity", 0)
+            # Check quantity - backtest uses 'shares' field, not 'quantity'
+            qty = trade.get("shares", trade.get("quantity", 0))
             if qty < 0:
                 result["errors"].append(
                     f"Trade {i}: Negative quantity ({qty})"
@@ -300,15 +300,23 @@ class BacktestCorrectnessEvaluator(BaseEvaluator):
                     f"Trade {i}: Zero quantity trade"
                 )
 
-            # Check price
-            price = trade.get("price", 0)
-            if price <= 0:
+            # Check prices - backtest uses 'entry_price' and 'exit_price', not 'price'
+            entry_price = trade.get("entry_price", 0)
+            exit_price = trade.get("exit_price", 0)
+
+            if entry_price <= 0:
                 result["errors"].append(
-                    f"Trade {i}: Invalid price ({price})"
+                    f"Trade {i}: Invalid entry_price ({entry_price})"
                 )
 
-            # Check required fields
-            required = ["side", "symbol", "quantity"]
+            if exit_price <= 0:
+                result["errors"].append(
+                    f"Trade {i}: Invalid exit_price ({exit_price})"
+                )
+
+            # Check required fields for backtest trade format
+            # Backtest trades have: entry_date, exit_date, entry_price, exit_price, shares, symbol
+            required = ["entry_date", "exit_date", "entry_price", "exit_price", "shares"]
             missing = [f for f in required if f not in trade]
             if missing:
                 result["warnings"].append(

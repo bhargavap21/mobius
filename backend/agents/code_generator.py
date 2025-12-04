@@ -110,6 +110,8 @@ class CodeGeneratorAgent(BaseAgent):
             'rsi_exit_threshold': None,
             'take_profit': None,
             'stop_loss': None,
+            'take_profit_pct_shares': None,
+            'stop_loss_pct_shares': None,
         }
 
         query_lower = user_query.lower()
@@ -160,6 +162,39 @@ class CodeGeneratorAgent(BaseAgent):
             if match:
                 user_specified['stop_loss'] = float(match.group(1)) / 100.0
                 logger.info(f"🔒 User specified stop loss: {user_specified['stop_loss']*100}%")
+                break
+
+        # Check for percentage of shares to sell at take profit
+        tp_shares_patterns = [
+            r'sell\s+(\d+(?:\.\d+)?)%.*(?:profit|tp|take\s*profit)',
+            r'sell\s+(half|quarter|third)',
+            r'(?:profit|tp|take\s*profit).*sell\s+(\d+(?:\.\d+)?)%',
+        ]
+        for pattern in tp_shares_patterns:
+            match = re.search(pattern, query_lower)
+            if match:
+                value = match.group(1)
+                if value == 'half':
+                    user_specified['take_profit_pct_shares'] = 0.5
+                elif value == 'quarter':
+                    user_specified['take_profit_pct_shares'] = 0.25
+                elif value == 'third':
+                    user_specified['take_profit_pct_shares'] = 0.33
+                else:
+                    user_specified['take_profit_pct_shares'] = float(value) / 100.0
+                logger.info(f"🔒 User specified take profit sell %: {user_specified['take_profit_pct_shares']*100}%")
+                break
+
+        # Check for percentage of shares to sell at stop loss
+        sl_shares_patterns = [
+            r'sell\s+(\d+(?:\.\d+)?)%.*(?:loss|sl|stop\s*loss)',
+            r'(?:loss|sl|stop\s*loss).*sell\s+(\d+(?:\.\d+)?)%',
+        ]
+        for pattern in sl_shares_patterns:
+            match = re.search(pattern, query_lower)
+            if match:
+                user_specified['stop_loss_pct_shares'] = float(match.group(1)) / 100.0
+                logger.info(f"🔒 User specified stop loss sell %: {user_specified['stop_loss_pct_shares']*100}%")
                 break
 
         return user_specified
@@ -234,6 +269,10 @@ class CodeGeneratorAgent(BaseAgent):
                 if new_stop_loss != current_stop_loss:
                     exit_conditions['stop_loss'] = new_stop_loss
                     changes_made.append(f"Tightened stop loss from {current_stop_loss*100:.1f}% to {new_stop_loss*100:.1f}%")
+
+                # Never modify user-specified percentage shares
+                if user_specified['stop_loss_pct_shares'] is not None:
+                    exit_conditions['stop_loss_pct_shares'] = user_specified['stop_loss_pct_shares']
             elif win_rate < 40:
                 changes_made.append(f"⚠️ Low win rate ({win_rate:.1f}%) but cannot adjust stop loss (user specified {user_specified['stop_loss']*100}%)")
 
@@ -246,6 +285,10 @@ class CodeGeneratorAgent(BaseAgent):
                 if new_take_profit != current_take_profit:
                     exit_conditions['take_profit'] = new_take_profit
                     changes_made.append(f"Increased take profit from {current_take_profit*100:.1f}% to {new_take_profit*100:.1f}%")
+
+                # Never modify user-specified percentage shares
+                if user_specified['take_profit_pct_shares'] is not None:
+                    exit_conditions['take_profit_pct_shares'] = user_specified['take_profit_pct_shares']
 
         if not changes_made:
             changes_made.append("No automated changes made - all key parameters are user-specified or strategy is satisfactory")

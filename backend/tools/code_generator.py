@@ -216,6 +216,97 @@ Return ONLY valid JSON, no other text."""
         }
 
 
+def _validate_and_fix_method_signatures(code: str) -> str:
+    """
+    Validate and automatically fix method signatures to ensure compatibility with BaseStrategy.
+
+    This prevents the common bug where calculate_position_size has the wrong signature,
+    causing trades to never execute.
+
+    Args:
+        code: Generated strategy code
+
+    Returns:
+        Code with fixed method signatures
+    """
+    import re
+
+    # Pattern to detect wrong calculate_position_size signature
+    wrong_pattern = r'def calculate_position_size\(self,\s*symbol:\s*str,\s*current_price:\s*float\)\s*->\s*(?:int|float):'
+    correct_signature = 'def calculate_position_size(self, symbol: str, signal: Signal) -> int:'
+
+    # Check if wrong signature exists
+    if re.search(wrong_pattern, code):
+        logger.warning("⚠️  DETECTED WRONG SIGNATURE: calculate_position_size(self, symbol, current_price)")
+        logger.info("🔧 AUTO-FIXING: Replacing with correct signature calculate_position_size(self, symbol, signal)")
+
+        # Replace the signature
+        code = re.sub(wrong_pattern, correct_signature, code)
+
+        # Also need to fix the body - replace current_price parameter usage
+        # Find the function body and replace current_price with getting it from somewhere else
+        # Look for the pattern where current_price is used directly in the function
+
+        # Fix common pattern: shares = int(allocated_capital / current_price)
+        # Replace with: current_price = self.get_current_price(symbol)
+
+        # Insert price fetching line after function definition
+        def add_price_fetch(match):
+            func_def = match.group(0)
+            # Add price fetching right after the docstring or function def
+            indent = '        '  # 8 spaces for function body
+            price_fetch = f'\n{indent}# Get current price from signal or broker\n{indent}current_price = signal.price if hasattr(signal, "price") and signal.price else self.get_current_price(symbol)\n{indent}if current_price is None or current_price <= 0:\n{indent}    logger.error(f"❌ Invalid price for {{symbol}}: {{current_price}}")\n{indent}    return 0\n'
+
+            # Find where to insert (after docstring if exists, or after function signature)
+            lines = func_def.split('\n')
+            insert_idx = 1  # After function def line
+
+            # Check if there's a docstring
+            for i, line in enumerate(lines[1:], 1):
+                stripped = line.strip()
+                if stripped.startswith('"""') or stripped.startswith("'''"):
+                    # Find end of docstring
+                    if stripped.count('"""') == 2 or stripped.count("'''") == 2:
+                        insert_idx = i + 1
+                        break
+                    else:
+                        # Multi-line docstring, find closing
+                        for j in range(i+1, len(lines)):
+                            if '"""' in lines[j] or "'''" in lines[j]:
+                                insert_idx = j + 1
+                                break
+                        break
+                elif stripped and not stripped.startswith('#'):
+                    # First non-comment, non-blank line after def
+                    insert_idx = i
+                    break
+
+            lines.insert(insert_idx, price_fetch.rstrip())
+            return '\n'.join(lines)
+
+        # Apply the transformation to the calculate_position_size function
+        func_pattern = r'(def calculate_position_size\(self, symbol: str, signal: Signal\) -> int:.*?)(?=\n    def |\nclass |\Z)'
+        code = re.sub(func_pattern, add_price_fetch, code, flags=re.DOTALL)
+
+        logger.info("✅ Method signature fixed successfully!")
+    else:
+        logger.info("✅ Method signatures validated - no issues found")
+
+    # Fix common Position attribute error: position.qty -> position.quantity
+    if 'position.qty' in code or '.qty)' in code:
+        logger.warning("⚠️  DETECTED: Code uses position.qty (should be position.quantity)")
+        logger.info("🔧 AUTO-FIXING: Replacing position.qty with position.quantity")
+
+        # Replace all instances of position.qty with position.quantity
+        code = code.replace('position.qty', 'position.quantity')
+        # Also catch patterns like: int(float(position.qty))
+        code = re.sub(r'\.qty\)', '.quantity)', code)
+
+        logger.info("✅ Position attribute names fixed successfully!")
+
+    return code
+
+
 def generate_trading_bot_code(
     strategy: Dict[str, Any], include_backtest: bool = False
 ) -> Dict[str, Any]:
@@ -239,16 +330,19 @@ Generate a complete, production-ready Python trading bot based on this strategy:
 
 {json.dumps(strategy, indent=2)}
 
+**CRITICAL ARCHITECTURE REQUIREMENT:**
+The generated code MUST inherit from BaseStrategy class. This is a unified interface that works for BOTH backtesting and live trading.
+
 Requirements:
-1. Use the Alpaca API for trading (alpaca-py library)
-2. Include all necessary imports
-3. Implement entry and exit logic based on strategy
-4. Add proper error handling
-5. Include logging
-6. Calculate position sizes correctly
-7. Implement stop loss and take profit
-8. Add docstrings and comments
-9. Make it executable
+1. Import and extend BaseStrategy from backend.templates.strategy_base
+2. Implement the required abstract methods: initialize() and generate_signals()
+3. The broker is already provided (BacktestBroker or AlpacaBroker) - use self.broker
+4. Use self.broker methods: get_account(), get_position(), submit_order(), get_current_price()
+5. Keep code CONCISE (< 200 lines) - BaseStrategy handles indicators, position sizing, execution
+6. Only override methods if you need custom logic (default implementations exist)
+7. Add essential error handling and logging
+8. Add brief docstrings
+9. Make it production-ready but minimal
 
 **CRITICAL - Data Validation:**
 10. ALWAYS check for None/null values before comparisons or mathematical operations
@@ -256,6 +350,17 @@ Requirements:
 12. Use patterns like: `if rsi is not None and rsi < 30:` instead of `if rsi < 30:`
 13. Handle missing data gracefully with continue statements
 14. Never compare None with numbers - this will crash the backtest
+
+**CRITICAL - DO NOT HALLUCINATE METHODS:**
+15. BaseStrategy provides these methods: get_current_indicators(), get_portfolio_summary(), execute_signals()
+16. DO NOT call: register_indicator(), validate_signal(), get_position_size() unless you override them
+17. Indicators (RSI, SMA, EMA) are automatically calculated - just retrieve via get_current_indicators()
+18. Position sizing is handled by calculate_position_size() - override if needed
+
+**CRITICAL - METHOD SIGNATURES MUST MATCH BASE CLASS:**
+19. If overriding calculate_position_size, use EXACT signature: `def calculate_position_size(self, symbol: str, signal: Signal) -> int:`
+20. DO NOT use: `calculate_position_size(self, symbol: str, current_price: float)` - this will break execution
+21. The base class calls execute_signals() which calls calculate_position_size(symbol, signal) - your override must match
 
 **CRITICAL - TWO-PHASE EXIT LOGIC FOR PARTIAL EXITS AND TRAILING STOPS:**
 
@@ -369,76 +474,116 @@ def _reset_position_state(self):
     self.trailing_stop_price = None
 ```
 
-Structure:
+Structure (MUST follow this pattern):
 ```python
 import logging
-from alpaca.trading.client import TradingClient
-from alpaca.trading.requests import MarketOrderRequest
-from alpaca.trading.enums import OrderSide, TimeInForce
+from typing import Dict, List, Any
 from datetime import datetime
-import time
+from backend.templates.strategy_base import BaseStrategy, Signal
+from backend.brokers.base_broker import BaseBroker, OrderSide, OrderType
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class TradingBot:
-    def __init__(self, api_key: str, secret_key: str, paper: bool = True):
-        \"\"\"Initialize the trading bot\"\"\"
-        self.client = TradingClient(api_key, secret_key, paper=paper)
-        self.symbol = "{strategy.get('asset', 'AAPL')}"
-        # Add strategy parameters...
+class {strategy.get('name', 'TradingBot').replace(' ', '')}Strategy(BaseStrategy):
+    \"\"\"
+    {strategy.get('description', 'Trading strategy')}
 
-    def check_entry_conditions(self) -> bool:
-        \"\"\"Check if entry conditions are met\"\"\"
-        # Implement entry logic based on strategy
-        pass
+    Strategy: {strategy.get('name')}
+    Asset: {strategy.get('asset', 'N/A')}
+    \"\"\"
 
-    def check_exit_conditions(self, position) -> bool:
-        \"\"\"Check if exit conditions are met\"\"\"
-        # Implement exit logic (take profit, stop loss)
-        pass
+    def initialize(self):
+        \"\"\"Initialize strategy parameters and indicators\"\"\"
+        # Set strategy parameters from config
+        self.rsi_period = self.config.get('rsi_period', 14)
+        self.rsi_threshold = self.config.get('rsi_threshold', 30)
+        # Add more parameters as needed...
 
-    def execute_trade(self, action: str):
-        \"\"\"Execute buy or sell trade\"\"\"
-        # Implement trading logic
-        pass
+        logger.info(f"Initialized {{self.__class__.__name__}}")
+        logger.info(f"Trading symbols: {{self.symbols}}")
 
-    def run(self):
-        \"\"\"Main trading loop\"\"\"
-        logger.info(f"🚀 Starting {{self.symbol}} trading bot")
+    def generate_signals(self, current_data: Dict[str, Dict[str, float]]) -> List[Signal]:
+        \"\"\"
+        Generate trading signals based on current market data.
 
-        while True:
-            try:
-                # Check conditions and execute trades
-                pass
-            except Exception as e:
-                logger.error(f"Error: {{e}}")
+        Args:
+            current_data: Dict mapping symbol to current bar data
+                         Example: {{'AAPL': {{'open': 150, 'high': 152, 'low': 149, 'close': 151, 'volume': 1000000}}}}
 
-            time.sleep(60)  # Check every minute
+        Returns:
+            List of Signal objects
+        \"\"\"
+        signals = []
+
+        for symbol in self.symbols:
+            bar = current_data.get(symbol)
+            if not bar:
+                continue
+
+            # Get current indicators
+            indicators = self.get_current_indicators(symbol)
+            rsi = indicators.get('rsi')
+
+            if rsi is None:
+                continue
+
+            # Check entry conditions
+            position = self.broker.get_position(symbol)
+
+            if position is None and rsi < self.rsi_threshold:
+                signals.append(Signal(
+                    symbol=symbol,
+                    action='buy',
+                    reason=f'RSI ({{rsi:.2f}}) < {{self.rsi_threshold}}'
+                ))
+
+            # Check exit conditions
+            elif position is not None and rsi > 70:
+                signals.append(Signal(
+                    symbol=symbol,
+                    action='sell',
+                    reason=f'RSI ({{rsi:.2f}}) > 70'
+                ))
+
+        return signals
 
 
+# Example usage (for live trading):
 if __name__ == "__main__":
-    # Initialize with your API keys
-    bot = TradingBot(
-        api_key="YOUR_API_KEY",
-        secret_key="YOUR_SECRET_KEY",
+    from backend.brokers.alpaca_broker import AlpacaBroker
+    import os
+
+    # Initialize broker
+    broker = AlpacaBroker(
+        api_key=os.getenv('ALPACA_API_KEY'),
+        secret_key=os.getenv('ALPACA_SECRET_KEY'),
         paper=True
     )
-    bot.run()
+
+    # Initialize strategy
+    symbols = ['{strategy.get('asset', 'AAPL')}']  # or use strategy.get('assets') for portfolios
+    config = {{
+        'rsi_period': 14,
+        'rsi_threshold': 30,
+        # Add more config as needed...
+    }}
+
+    strategy_instance = {strategy.get('name', 'TradingBot').replace(' ', '')}Strategy(broker, symbols, config)
+
+    # Run strategy (implementation depends on your execution loop)
+    logger.info("🚀 Strategy initialized and ready to trade")
 ```
 
-Generate the COMPLETE, working code. Include all logic for:
-- {strategy.get('data_sources', [])} data sources
-- Entry conditions: {strategy.get('entry_conditions', [])}
-- Exit conditions: {strategy.get('exit_conditions', {})}
+Generate the COMPLETE, working code based on the strategy JSON above.
 
-Make it copy-paste ready!"""
+Make it copy-paste ready and production-quality!"""
 
         response = client.messages.create(
             model="claude-sonnet-4-5-20250929",
-            max_tokens=4096,
+            max_tokens=8000,  # Increased to allow complete code generation
             messages=[{"role": "user", "content": prompt}],
         )
 
@@ -465,6 +610,9 @@ Make it copy-paste ready!"""
         except SyntaxError as e:
             logger.warning(f"⚠️  Generated code has syntax error: {e}")
             is_valid = False
+
+        # Validate and fix method signatures (CRITICAL for execution)
+        code = _validate_and_fix_method_signatures(code)
 
         logger.info(f"✅ Generated {len(code)} characters of code")
 

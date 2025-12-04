@@ -93,6 +93,17 @@ async def create_deployment(
 
         logger.info(f"✅ Deployment created: {deployment.id}")
 
+        # Auto-activate deployment if status is 'running'
+        if deployment.status == 'running':
+            try:
+                success = await trading_engine.add_deployment(deployment.id)
+                if success:
+                    logger.info(f"✅ Auto-activated deployment {deployment.id}")
+                else:
+                    logger.warning(f"⚠️  Failed to auto-activate deployment {deployment.id}")
+            except Exception as e:
+                logger.error(f"❌ Error auto-activating deployment: {e}")
+
         # Convert to dict with JSON-serializable types
         return deployment.model_dump(mode='json')
 

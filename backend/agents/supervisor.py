@@ -13,10 +13,20 @@ from agents.intelligent_orchestrator import IntelligentOrchestrator
 # Import evaluation pipeline (optional - gracefully handle if not available)
 try:
     from services.eval_pipeline import run_evaluations
+    from services.eval_analytics import log_evaluation_result
     EVALS_AVAILABLE = True
 except ImportError:
     EVALS_AVAILABLE = False
     run_evaluations = None
+    log_evaluation_result = None
+
+# Import tracing for evaluation span
+try:
+    from services.tracing import trace_operation
+    TRACING_AVAILABLE = True
+except ImportError:
+    TRACING_AVAILABLE = False
+    trace_operation = None
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +70,7 @@ class SupervisorAgent(BaseAgent):
         Args:
             input_data: {
                 'user_query': str,
+                'enriched_query': str (optional, from clarification agent),
                 'days': int (optional),
                 'initial_capital': float (optional)
             }
@@ -76,6 +87,7 @@ class SupervisorAgent(BaseAgent):
             }
         """
         user_query = input_data.get('user_query', '')
+        enriched_query = input_data.get('enriched_query') or user_query  # Use enriched if available
 
         # Determine default backtest timeframe based on strategy type
         # Custom dataset strategies (Reddit, Twitter, etc.) default to 60 days (2 months)
@@ -258,6 +270,7 @@ class SupervisorAgent(BaseAgent):
 
             backtest_result = await self.backtest_runner.process({
                 'strategy': strategy,
+                'generated_code': code,  # PHASE 4: Pass generated code for execution
                 'feedback': feedback,
                 'iteration': iteration,
                 'days': days,
@@ -364,7 +377,8 @@ class SupervisorAgent(BaseAgent):
                     logger.error(f"Traceback: {traceback.format_exc()}")
 
             # STEP 3: Analysis
-            logger.info(f"\n🔍 Step 3: Strategy Analysis (session: {session_id[:8]})")
+            session_prefix = session_id[:8] if session_id else "no-session"
+            logger.info(f"\n🔍 Step 3: Strategy Analysis (session: {session_prefix})")
             logger.info(f"📊 About to start analysis with {summary.get('total_trades', 0)} trades")
 
             if progress:
@@ -467,22 +481,54 @@ class SupervisorAgent(BaseAgent):
         logger.info(f"   - Buy & Hold: {final_summary.get('buy_hold_return', 0)}%")
         logger.info(f"   - Sharpe Ratio: {final_summary.get('sharpe_ratio', 0)}")
 
-        # STEP 4: Run deterministic evaluators
+        # STEP 4: Run deterministic evaluators (wrapped in trace span for Phoenix visibility)
         evaluation_results = None
         if EVALS_AVAILABLE:
             try:
                 logger.info(f"\n🔍 Step 4: Running Evaluations")
-                evaluation_results = run_evaluations(
-                    user_input=user_query,
-                    strategy=strategy,
-                    backtest_results=backtest_results,
-                )
+
+                # Wrap in trace span so evaluation attributes appear in Phoenix
+                if TRACING_AVAILABLE and trace_operation:
+                    with trace_operation("strategy_evaluation", {
+                        "eval.strategy_name": strategy.get("name", "unknown"),
+                        "eval.strategy_asset": strategy.get("asset", "unknown"),
+                        "eval.total_trades": backtest_results.get("summary", {}).get("total_trades", 0) if backtest_results else 0,
+                    }):
+                        evaluation_results = run_evaluations(
+                            user_input=user_query,
+                            enriched_query=enriched_query,  # Pass enriched query
+                            strategy=strategy,
+                            backtest_results=backtest_results,
+                            generated_code=code,  # Pass generated code for code quality evaluation
+                            insights_config=insights_config,  # Pass visualization config for visual validation
+                        )
+                else:
+                    # No tracing available, run without span
+                    evaluation_results = run_evaluations(
+                        user_input=user_query,
+                        enriched_query=enriched_query,  # Pass enriched query
+                        strategy=strategy,
+                        backtest_results=backtest_results,
+                        generated_code=code,  # Pass generated code for code quality evaluation
+                        insights_config=insights_config,  # Pass visualization config for visual validation
+                    )
+
                 if evaluation_results.get('all_passed'):
                     logger.info(f"✅ All evaluations PASSED (score: {evaluation_results.get('average_score', 0):.2f})")
                 else:
                     logger.warning(f"⚠️ Evaluations FAILED: {evaluation_results.get('failed_evaluators', [])}")
                     for error in evaluation_results.get('errors', [])[:3]:
                         logger.warning(f"   - {error}")
+
+                # Log to analytics for bug pattern detection
+                if log_evaluation_result:
+                    log_evaluation_result(
+                        user_input=user_query,
+                        strategy=strategy,
+                        backtest_results=backtest_results,
+                        evaluation_results=evaluation_results,
+                        session_id=session_id,
+                    )
             except Exception as e:
                 logger.warning(f"⚠️ Evaluation pipeline failed: {e}")
                 evaluation_results = {"error": str(e), "all_passed": None}
