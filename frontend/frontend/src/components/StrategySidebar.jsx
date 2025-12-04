@@ -135,6 +135,7 @@ Requested changes: ${refinementRequest}`;
             rsi_oversold: currentStrategy.rsi_oversold,
             rsi_overbought: currentStrategy.rsi_overbought,
             sentiment_threshold: currentStrategy.sentiment_threshold,
+            backtest_days: currentStrategy.backtest_days,
           },
           user_query: currentStrategy.description || '',
           current_code: currentStrategy.code

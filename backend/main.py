@@ -889,6 +889,12 @@ async def refine_strategy(request: RefineStrategyRequest):
 
         logger.info(f"✅ Code refined. Changes: {', '.join(changes_made)}")
 
+        # Log actual RSI thresholds for verification
+        logger.info(f"🔍 RSI oversold (top-level): {refined_strategy.get('rsi_oversold')}")
+        logger.info(f"🔍 RSI overbought (top-level): {refined_strategy.get('rsi_overbought')}")
+        entry_params = refined_strategy.get('entry_conditions', {}).get('parameters', {})
+        logger.info(f"🔍 Entry RSI threshold (used by backtester): {entry_params.get('threshold')}")
+
         # Step 2: Run backtest on refined strategy
         logger.info("Step 2: Running backtest...")
 

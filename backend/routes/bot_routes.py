@@ -237,8 +237,24 @@ async def update_bot(
         HTTPException: If update fails or unauthorized
     """
     try:
+        # Debug: Log what we're updating
+        if update_data.strategy_config:
+            rsi_oversold = update_data.strategy_config.get('rsi_oversold')
+            entry_threshold = update_data.strategy_config.get('entry_conditions', {}).get('parameters', {}).get('threshold')
+            logger.info(f"🔧 Updating bot {bot_id}:")
+            logger.info(f"  RSI oversold (top-level): {rsi_oversold}")
+            logger.info(f"  Entry threshold (nested): {entry_threshold}")
+
         bot = await bot_repo.update(bot_id, user_id, update_data)
-        logger.info(f"✅ Bot updated: {bot.name} (ID: {bot.id})")
+
+        # Debug: Log what was saved
+        if bot.strategy_config:
+            rsi_oversold = bot.strategy_config.get('rsi_oversold')
+            entry_threshold = bot.strategy_config.get('entry_conditions', {}).get('parameters', {}).get('threshold')
+            logger.info(f"✅ Bot updated: {bot.name} (ID: {bot.id})")
+            logger.info(f"  Saved RSI oversold: {rsi_oversold}")
+            logger.info(f"  Saved entry threshold: {entry_threshold}")
+
         return bot
     except Exception as e:
         logger.error(f"❌ Bot update failed: {e}")

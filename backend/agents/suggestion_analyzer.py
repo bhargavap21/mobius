@@ -163,15 +163,29 @@ class SuggestionAnalyzerAgent(BaseAgent):
         )
         suggestions.extend(ai_suggestions)
 
+        # Filter out already-applied suggestions (where current_value == suggested_value)
+        filtered_suggestions = []
+        for suggestion in suggestions:
+            changes = suggestion.get('changes', {})
+            current = changes.get('current_value')
+            suggested = changes.get('suggested_value')
+
+            # Skip if already applied (current value matches suggested value)
+            if current == suggested:
+                logger.info(f"⏭️  Skipping already-applied suggestion: {suggestion.get('title')}")
+                continue
+
+            filtered_suggestions.append(suggestion)
+
         # Add IDs and sort by impact
-        for i, suggestion in enumerate(suggestions):
+        for i, suggestion in enumerate(filtered_suggestions):
             suggestion['id'] = f"sug_{i+1}"
 
         # Sort: high impact first
         impact_order = {'high': 0, 'medium': 1, 'low': 2}
-        suggestions.sort(key=lambda x: impact_order.get(x.get('impact', 'low'), 3))
+        filtered_suggestions.sort(key=lambda x: impact_order.get(x.get('impact', 'low'), 3))
 
-        return suggestions[:8]  # Return top 8 suggestions
+        return filtered_suggestions[:8]  # Return top 8 suggestions
 
     def _suggest_low_trade_fixes(
         self,
@@ -204,42 +218,49 @@ class SuggestionAnalyzerAgent(BaseAgent):
                 'applicable': True
             })
 
-        # Analyze RSI threshold if present
-        rsi_threshold = entry_params.get('rsi_threshold')
-        if rsi_threshold and rsi_threshold <= 30:
-            rsi_stats = data_analysis.get('rsi', {})
-            typical_low = rsi_stats.get('p25', 35)
+        # Analyze RSI threshold if present (check 'threshold' field when entry signal is RSI)
+        entry_conditions = strategy.get('entry_conditions', {})
+        if entry_conditions.get('type') == 'rsi' or entry_conditions.get('signal') == 'rsi':
+            rsi_threshold = entry_params.get('threshold') or strategy.get('rsi_oversold', 30)
 
+            if rsi_threshold <= 35:  # Only suggest if threshold is restrictive
+                rsi_stats = data_analysis.get('rsi', {})
+                typical_low = rsi_stats.get('p25', 35)
+
+                # Only suggest if typical_low is actually higher
+                if typical_low > rsi_threshold:
+                    suggestions.append({
+                        'category': 'entry',
+                        'title': f'Increase RSI oversold threshold from {rsi_threshold} to {int(typical_low)}',
+                        'description': f'Only {total_trades} trades triggered. RSI rarely drops below {rsi_threshold}.',
+                        'rationale': f'Historical data shows RSI stays above 30 most of the time. Try {int(typical_low)} for more opportunities.',
+                        'impact': 'high',
+                        'changes': {
+                            'parameter': 'rsi_oversold',
+                            'current_value': rsi_threshold,
+                            'suggested_value': int(typical_low),
+                            'parameter_path': 'rsi_oversold'
+                        },
+                        'applicable': True
+                    })
+
+        # Suggest timeframe extension only if current timeframe is less than 360
+        current_backtest_days = strategy.get('backtest_days', 180)
+        if current_backtest_days < 360:
             suggestions.append({
-                'category': 'entry',
-                'title': f'Increase RSI oversold threshold from {rsi_threshold} to {int(typical_low)}',
-                'description': f'Only {total_trades} trades triggered. RSI rarely drops below {rsi_threshold}.',
-                'rationale': f'Historical data shows RSI stays above 30 most of the time. Try {int(typical_low)} for more opportunities.',
-                'impact': 'high',
+                'category': 'timeframe',
+                'title': f'Extend backtest period from {current_backtest_days} to 360 days',
+                'description': f'Only {total_trades} trades in current {current_backtest_days}-day timeframe.',
+                'rationale': 'Longer timeframes provide more data points and trading opportunities.',
+                'impact': 'medium',
                 'changes': {
-                    'parameter': 'rsi_threshold',
-                    'current_value': rsi_threshold,
-                    'suggested_value': int(typical_low),
-                    'parameter_path': 'entry_conditions.parameters.rsi_threshold'
+                    'parameter': 'backtest_days',
+                    'current_value': current_backtest_days,
+                    'suggested_value': 360,
+                    'parameter_path': 'backtest_days'
                 },
                 'applicable': True
             })
-
-        # Suggest timeframe extension
-        suggestions.append({
-            'category': 'timeframe',
-            'title': 'Extend backtest period to 360 days',
-            'description': f'Only {total_trades} trades in current timeframe.',
-            'rationale': 'Longer timeframes provide more data points and trading opportunities.',
-            'impact': 'medium',
-            'changes': {
-                'parameter': 'backtest_days',
-                'current_value': 180,
-                'suggested_value': 360,
-                'parameter_path': 'backtest_days'
-            },
-            'applicable': True
-        })
 
         return suggestions
 

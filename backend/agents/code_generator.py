@@ -312,10 +312,93 @@ class CodeGeneratorAgent(BaseAgent):
 
         return refined_strategy
 
+    def _synchronize_strategy_parameters(self, strategy: dict, changes_made: list) -> None:
+        """
+        Synchronize top-level strategy parameters with nested entry/exit conditions.
+
+        UNIVERSAL SYNC: The backtester reads from nested paths like entry_conditions.parameters.threshold.
+        This function ensures ANY parameter changes propagate to where the backtester actually reads them.
+
+        Handles ALL parameter types:
+        - RSI thresholds (rsi_oversold → entry_conditions.parameters.threshold)
+        - Sentiment thresholds (sentiment_threshold → entry_conditions.parameters.sentiment_threshold)
+        - Stop loss/Take profit (top-level ↔ exit_conditions)
+        - Any other dual-location parameters
+
+        Args:
+            strategy: Strategy dict to synchronize (modified in place)
+            changes_made: List to append sync messages to
+        """
+        entry = strategy.get('entry_conditions', {})
+        exit_cond = strategy.get('exit_conditions', {})
+        entry_params = entry.setdefault('parameters', {})
+
+        # UNIVERSAL SYNC: RSI oversold → entry threshold
+        if strategy.get('rsi_oversold') is not None:
+            if entry.get('type') == 'rsi' or entry.get('signal') == 'rsi':
+                old_threshold = entry_params.get('threshold')
+                new_threshold = strategy['rsi_oversold']
+
+                if old_threshold != new_threshold:
+                    entry_params['threshold'] = new_threshold
+                    logger.info(f"  🔄 Synced entry_conditions.parameters.threshold: {old_threshold} → {new_threshold}")
+                    changes_made.append(f"Synced RSI entry threshold to {new_threshold}")
+
+        # UNIVERSAL SYNC: RSI overbought → exit threshold
+        if strategy.get('rsi_overbought') is not None:
+            # Pattern 1: exit_conditions has type/signal = 'rsi'
+            if exit_cond.get('type') == 'rsi' or exit_cond.get('signal') == 'rsi':
+                exit_params = exit_cond.setdefault('parameters', {})
+                old_threshold = exit_params.get('threshold')
+                new_threshold = strategy['rsi_overbought']
+
+                if old_threshold != new_threshold:
+                    exit_params['threshold'] = new_threshold
+                    logger.info(f"  🔄 Synced exit_conditions.parameters.threshold: {old_threshold} → {new_threshold}")
+                    changes_made.append(f"Synced RSI exit threshold to {new_threshold}")
+
+            # Pattern 2: custom_exit_conditions array
+            custom_exits = strategy.get('custom_exit_conditions', [])
+            for exit_condition in custom_exits:
+                if exit_condition.get('type') == 'rsi':
+                    exit_params = exit_condition.setdefault('parameters', {})
+                    old_threshold = exit_params.get('threshold')
+                    new_threshold = strategy['rsi_overbought']
+
+                    if old_threshold != new_threshold:
+                        exit_params['threshold'] = new_threshold
+                        logger.info(f"  🔄 Synced custom_exit_conditions RSI threshold: {old_threshold} → {new_threshold}")
+                        changes_made.append(f"Synced RSI exit threshold to {new_threshold}")
+
+        # UNIVERSAL SYNC: Sentiment threshold
+        if strategy.get('sentiment_threshold') is not None:
+            old_val = entry_params.get('sentiment_threshold')
+            new_val = strategy['sentiment_threshold']
+            if old_val != new_val:
+                entry_params['sentiment_threshold'] = new_val
+                logger.info(f"  🔄 Synced entry_conditions.parameters.sentiment_threshold: {old_val} → {new_val}")
+
+        # UNIVERSAL SYNC: Take profit and stop loss (bidirectional)
+        if exit_cond.get('take_profit') is not None and strategy.get('take_profit') is None:
+            strategy['take_profit'] = exit_cond['take_profit']
+        elif strategy.get('take_profit') is not None and exit_cond.get('take_profit') != strategy['take_profit']:
+            old_tp = exit_cond.get('take_profit')
+            exit_cond['take_profit'] = strategy['take_profit']
+            logger.info(f"  🔄 Synced exit_conditions.take_profit: {old_tp} → {strategy['take_profit']}")
+
+        if exit_cond.get('stop_loss') is not None and strategy.get('stop_loss') is None:
+            strategy['stop_loss'] = exit_cond['stop_loss']
+        elif strategy.get('stop_loss') is not None and exit_cond.get('stop_loss') != strategy['stop_loss']:
+            old_sl = exit_cond.get('stop_loss')
+            exit_cond['stop_loss'] = strategy['stop_loss']
+            logger.info(f"  🔄 Synced exit_conditions.stop_loss: {old_sl} → {strategy['stop_loss']}")
+
     async def refine_existing_code(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Refine existing strategy code based on user's refinement instructions
-        This modifies the existing code directly rather than regenerating from scratch
+
+        NEW APPROACH: Ask Claude for a small JSON diff instead of full strategy.
+        This prevents JSON truncation/parsing errors and is much more reliable.
 
         Args:
             input_data: {
@@ -338,56 +421,91 @@ class CodeGeneratorAgent(BaseAgent):
         current_code = input_data.get('current_code')
         refinement_instructions = input_data.get('refinement_instructions')
         iteration = input_data.get('iteration', 1)
-        use_intelligent_analysis = input_data.get('use_intelligent_analysis', False)
 
-        logger.info(f"Refining existing code (iteration {iteration}): {refinement_instructions[:100]}")
+        logger.info(f"🔧 Refining strategy (iteration {iteration}): {refinement_instructions[:100]}")
 
         try:
-            # Use Claude to understand refinement instructions and apply them
             from anthropic import Anthropic
             import os
             import json
+            import re
+            import copy
 
             client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
-            # Build strict JSON-only prompt for refinement
-            system_prompt = """You are a trading strategy refinement agent. You MUST respond with ONLY valid JSON matching the exact schema below. No prose, no markdown, no code fences, no backticks, no comments.
+            # Extract key strategy parameters for the prompt (summary only, not full JSON)
+            asset = current_strategy.get('asset', 'Unknown')
+            strategy_type = current_strategy.get('strategy_type', 'Unknown')
 
-OUTPUT SCHEMA (respond with ONLY this structure):
+            # Build parameter summary
+            param_summary = []
+            if current_strategy.get('rsi_period'):
+                param_summary.append(f"RSI Period: {current_strategy['rsi_period']}")
+            if current_strategy.get('rsi_oversold'):
+                param_summary.append(f"RSI Oversold: {current_strategy['rsi_oversold']}")
+            if current_strategy.get('rsi_overbought'):
+                param_summary.append(f"RSI Overbought: {current_strategy['rsi_overbought']}")
+
+            entry = current_strategy.get('entry_conditions', {})
+            if entry.get('signal'):
+                params = entry.get('parameters', {})
+                param_summary.append(f"Entry Signal: {entry['signal']}, Threshold: {params.get('threshold')}")
+
+            exit_cond = current_strategy.get('exit_conditions', {})
+            if exit_cond.get('stop_loss'):
+                param_summary.append(f"Stop Loss: {exit_cond['stop_loss']*100:.1f}%")
+            if exit_cond.get('take_profit'):
+                param_summary.append(f"Take Profit: {exit_cond['take_profit']*100:.1f}%")
+
+            # Compact system prompt for diff-based changes
+            system_prompt = """You are a trading strategy refinement agent. Respond with ONLY valid JSON, no markdown, no backticks, no prose.
+
+OUTPUT SCHEMA:
 {
-  "updated_strategy": { /* complete strategy object */ },
-  "changes_made": [ /* array of change descriptions as strings */ ],
-  "explanation": /* single string with brief reasoning */
+  "parameter_changes": [
+    {
+      "path": "rsi_oversold",
+      "new_value": 40,
+      "reason": "Loosen oversold threshold as requested"
+    }
+  ],
+  "backtest_days": 360,
+  "notes": "Brief explanation of changes"
 }
 
 RULES:
-1. Output ONLY valid JSON - no text before or after
-2. Use double quotes for all keys and strings
-3. No trailing commas, no NaN, no undefined
-4. Never add markdown code fences or backticks
-5. Keep strategy structure compatible with existing backtester"""
+1. "path" uses dot notation for nested fields or simple field name for top-level
+2. "new_value" must be correctly typed (int, float, bool, string)
+3. "parameter_changes" can be empty array if no parameter changes needed
+4. "backtest_days" is optional - only include if user mentions backtest period/timeframe
+5. Output ONLY valid JSON - no text before or after, no code fences
 
-            user_prompt = f"""CURRENT STRATEGY:
-{json.dumps(current_strategy, indent=2)}
+COMMON PARAMETERS (use top-level paths, sync handles nested):
+- RSI: "rsi_oversold" (20-40), "rsi_overbought" (60-80), "rsi_period" (int)
+- Sentiment: "sentiment_threshold" (decimals like 0.1, 0.2)
+- Risk: "exit_conditions.stop_loss" (decimals: 0.01 = 1%), "exit_conditions.take_profit" (decimals)
+- Asset: "asset" (string ticker like "AAPL")
+- Backtest: "backtest_days" (integer)
+
+CRITICAL: For RSI/sentiment thresholds, ONLY change top-level fields (rsi_oversold, sentiment_threshold).
+Do NOT include nested paths like entry_conditions.parameters.* - synchronization handles that automatically."""
+
+            user_prompt = f"""CURRENT STRATEGY SUMMARY:
+Asset: {asset}
+Type: {strategy_type}
+Parameters:
+{chr(10).join(f"  - {p}" for p in param_summary)}
 
 USER REQUEST:
 {refinement_instructions}
 
-PARAMETER CHANGE RULES:
-- "loosen RSI threshold" = INCREASE value (30→40 for oversold)
-- "tighten RSI threshold" = DECREASE value (40→30 for oversold)
-- "backtest period" = add TOP-LEVEL "backtest_days" field (integer)
-- Only modify what user requested, preserve everything else
-- RSI ranges: 20-40 (oversold), 60-80 (overbought)
-- Take profit/stop loss: decimal like 0.01 for 1%
+Identify which parameters to change and output ONLY the JSON diff."""
 
-Return ONLY the JSON object with updated_strategy, changes_made, and explanation."""
-
-            # Use lower temperature for more consistent JSON output
+            logger.info(f"🤖 Calling Claude for parameter diff...")
             response = client.messages.create(
                 model="claude-sonnet-4-20250514",
-                max_tokens=4000,
-                temperature=0.1,  # Very low for maximum consistency
+                max_tokens=1500,  # Much smaller - we only need a diff
+                temperature=0.1,
                 system=system_prompt,
                 messages=[{
                     "role": "user",
@@ -395,141 +513,109 @@ Return ONLY the JSON object with updated_strategy, changes_made, and explanation
                 }]
             )
 
-            response_text = response.content[0].text
-            logger.info(f"📝 Claude response length: {len(response_text)} chars")
-            logger.info(f"📝 First 300 chars: {response_text[:300]}")
-            logger.info(f"📝 Last 300 chars: {response_text[-300:]}")
+            response_text = response.content[0].text.strip()
+            logger.info(f"📝 Claude response ({len(response_text)} chars): {response_text[:200]}...")
 
-            # BULLETPROOF JSON extraction using brace counting
-            import re
-            import json
+            # Simple JSON extraction - strip code fences if present
+            if response_text.startswith("```"):
+                response_text = re.sub(r"^```[a-zA-Z0-9]*\s*", "", response_text)
+                response_text = re.sub(r"```$", "", response_text).strip()
 
-            def extract_json_object(text):
-                """Extract the first complete JSON object from text using brace counting"""
-                # Remove markdown code blocks if present
-                text = re.sub(r'```json\s*', '', text)
-                text = re.sub(r'```\s*', '', text)
-
-                # Find first opening brace
-                start = text.find('{')
-                if start == -1:
-                    return None
-
-                # Count braces to find matching closing brace
-                brace_count = 0
-                in_string = False
-                escape_next = False
-
-                for i in range(start, len(text)):
-                    char = text[i]
-
-                    if escape_next:
-                        escape_next = False
-                        continue
-
-                    if char == '\\':
-                        escape_next = True
-                        continue
-
-                    if char == '"' and not escape_next:
-                        in_string = not in_string
-                        continue
-
-                    if not in_string:
-                        if char == '{':
-                            brace_count += 1
-                        elif char == '}':
-                            brace_count -= 1
-                            if brace_count == 0:
-                                # Found complete JSON object
-                                return text[start:i+1]
-
-                return None
-
-            json_str = extract_json_object(response_text)
-
-            if not json_str:
-                logger.error(f"❌ Could not extract JSON object from response")
-                logger.error(f"Full response: {response_text}")
-                raise Exception("Could not find valid JSON object in Claude's response")
-
-            logger.info(f"✅ Extracted JSON object ({len(json_str)} chars)")
-
-            # Parse the JSON with fallback strategies
-            result_data = None
-            parse_errors = []
-
-            # Attempt 1: Parse as-is
+            # Parse JSON
             try:
-                result_data = json.loads(json_str)
-                logger.info("✅ Parsed JSON successfully on first attempt")
+                diff_data = json.loads(response_text)
             except json.JSONDecodeError as e:
-                parse_errors.append(f"Attempt 1 failed: {e}")
-                logger.warning(f"⚠️ JSON parse attempt 1 failed: {e}")
+                logger.error(f"❌ Invalid JSON from Claude: {e}")
+                logger.error(f"Raw response: {response_text}")
+                return {
+                    'success': False,
+                    'error': f'LLM returned invalid JSON: {e}',
+                    'raw_response': response_text[:500]
+                }
 
-                # Attempt 2: Remove comments and try again
-                try:
-                    # Remove /* */ comments
-                    cleaned = re.sub(r'/\*.*?\*/', '', json_str, flags=re.DOTALL)
-                    # Remove // comments
-                    cleaned = re.sub(r'//.*?$', '', cleaned, flags=re.MULTILINE)
-                    result_data = json.loads(cleaned)
-                    logger.info("✅ Parsed JSON after removing comments")
-                except json.JSONDecodeError as e2:
-                    parse_errors.append(f"Attempt 2 failed: {e2}")
+            # Extract diff components
+            parameter_changes = diff_data.get('parameter_changes', [])
+            backtest_days = diff_data.get('backtest_days')
+            notes = diff_data.get('notes', '')
 
-                    # Attempt 3: Fix trailing commas
+            logger.info(f"✅ Parsed diff: {len(parameter_changes)} parameter changes")
+
+            # Apply diff to strategy
+            updated_strategy = copy.deepcopy(current_strategy)
+            changes_made = []
+
+            def apply_path(obj: dict, path: str, value: Any):
+                """Apply a value to a nested dict using dot-notation path"""
+                parts = path.split('.')
+                current = obj
+                for key in parts[:-1]:
+                    if key not in current or not isinstance(current.get(key), dict):
+                        current[key] = {}
+                    current = current[key]
+                current[parts[-1]] = value
+
+            # Apply each parameter change
+            for change in parameter_changes:
+                path = change.get('path')
+                new_value = change.get('new_value')
+                reason = change.get('reason', '')
+
+                if path and new_value is not None:
+                    # Get old value for logging
                     try:
-                        # Remove trailing commas before } or ]
-                        fixed = re.sub(r',(\s*[}\]])', r'\1', cleaned)
-                        result_data = json.loads(fixed)
-                        logger.info("✅ Parsed JSON after fixing trailing commas")
-                    except json.JSONDecodeError as e3:
-                        parse_errors.append(f"Attempt 3 failed: {e3}")
+                        parts = path.split('.')
+                        old_val = current_strategy
+                        for part in parts:
+                            old_val = old_val.get(part)
+                    except:
+                        old_val = None
 
-            if not result_data:
-                error_msg = "; ".join(parse_errors)
-                logger.error(f"❌ All JSON parsing attempts failed: {error_msg}")
-                logger.error(f"Extracted JSON string (first 500 chars): {json_str[:500]}")
-                logger.error(f"Full response text: {response_text}")
-                raise Exception(f"Failed to parse JSON. Errors: {error_msg}")
+                    # Apply the change
+                    apply_path(updated_strategy, path, new_value)
 
-            updated_strategy = result_data.get('updated_strategy')
-            changes_made = result_data.get('changes_made', [])
-            explanation = result_data.get('explanation', '')
+                    # Log the change
+                    change_desc = f"Set {path}: {old_val} → {new_value}"
+                    if reason:
+                        change_desc += f" ({reason})"
+                    changes_made.append(change_desc)
+                    logger.info(f"  ✓ {change_desc}")
 
-            logger.info(f"✅ Refinement complete. Changes: {changes_made}")
-            if explanation:
-                logger.info(f"📝 Explanation: {explanation}")
+            # Apply backtest_days if specified
+            if backtest_days:
+                updated_strategy['backtest_days'] = backtest_days
+                changes_made.append(f"Set backtest period: {backtest_days} days")
+                logger.info(f"  ✓ Set backtest_days: {backtest_days}")
 
-            # Log what actually changed in the strategy
-            logger.info(f"🔍 Strategy before: {json.dumps(current_strategy, indent=2)[:200]}...")
-            logger.info(f"🔍 Strategy after: {json.dumps(updated_strategy, indent=2)[:200]}...")
+            if not changes_made:
+                changes_made = ["No parameter changes identified"]
+                logger.info("  ℹ️ No changes made")
 
-            # Validate that changes were actually made
-            if not changes_made or updated_strategy == current_strategy:
-                logger.warning("⚠️ No meaningful changes detected in refinement")
-                # Still return success but flag it
-                changes_made = ["No modifications needed - strategy already matches requirements"]
+            # CRITICAL: Synchronize top-level RSI fields with entry/exit conditions
+            # The backtester reads from entry_conditions.parameters.threshold, not top-level rsi_oversold
+            logger.info("🔄 Synchronizing strategy parameters...")
+            self._synchronize_strategy_parameters(updated_strategy, changes_made)
 
             # Regenerate code from updated strategy
+            logger.info("🔨 Regenerating code from updated strategy...")
             code_result = generate_trading_bot_code(updated_strategy)
             if not code_result.get('success'):
                 return {
                     'success': False,
-                    'error': 'Failed to generate code from refined strategy'
+                    'error': code_result.get('error', 'Failed to generate code from updated strategy')
                 }
+
+            logger.info(f"✅ Refinement complete: {len(changes_made)} changes applied")
 
             return {
                 'success': True,
                 'strategy': updated_strategy,
                 'code': code_result.get('code'),
                 'changes_made': changes_made,
-                'explanation': explanation
+                'explanation': notes
             }
 
         except Exception as e:
-            logger.error(f"Error refining code: {e}")
+            logger.error(f"❌ Error refining code: {e}")
             import traceback
             traceback.print_exc()
             return {
