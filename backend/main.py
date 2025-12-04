@@ -67,12 +67,12 @@ app = FastAPI(
 # Enable CORS - allow localhost and all Vercel deployments
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"https://.*\.vercel\.app",  # All Vercel preview/production domains (with subdomain)
     allow_origins=[
         "http://localhost:3000",
         "http://localhost:5173",
         "https://mobius-invest.vercel.app",  # Explicit production domain
     ],
+    allow_origin_regex=r"https://.*\.vercel\.app",  # All Vercel preview/production domains (with subdomain)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -879,7 +879,9 @@ async def refine_strategy(request: RefineStrategyRequest):
         })
 
         if not refine_result.get('success'):
-            raise HTTPException(status_code=400, detail="Failed to refine strategy code")
+            error_msg = refine_result.get('error', 'Failed to refine strategy code')
+            logger.error(f"❌ Refinement failed: {error_msg}")
+            raise HTTPException(status_code=400, detail=f"Refinement failed: {error_msg}")
 
         refined_strategy = refine_result['strategy']
         refined_code = refine_result['code']

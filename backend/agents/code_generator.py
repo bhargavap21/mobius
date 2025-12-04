@@ -350,82 +350,149 @@ class CodeGeneratorAgent(BaseAgent):
 
             client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
-            # Build intelligent prompt for code refinement
-            prompt = f"""You are a trading strategy code refinement expert with deep understanding of market data and backtesting.
+            # Build strict JSON-only prompt for refinement
+            system_prompt = """You are a trading strategy refinement agent. You MUST respond with ONLY valid JSON matching the exact schema below. No prose, no markdown, no code fences, no backticks, no comments.
 
-CURRENT STRATEGY CONFIG:
+OUTPUT SCHEMA (respond with ONLY this structure):
+{
+  "updated_strategy": { /* complete strategy object */ },
+  "changes_made": [ /* array of change descriptions as strings */ ],
+  "explanation": /* single string with brief reasoning */
+}
+
+RULES:
+1. Output ONLY valid JSON - no text before or after
+2. Use double quotes for all keys and strings
+3. No trailing commas, no NaN, no undefined
+4. Never add markdown code fences or backticks
+5. Keep strategy structure compatible with existing backtester"""
+
+            user_prompt = f"""CURRENT STRATEGY:
 {json.dumps(current_strategy, indent=2)}
 
-USER'S REFINEMENT REQUEST:
+USER REQUEST:
 {refinement_instructions}
 
-CURRENT STRATEGY DESCRIPTION:
-- Asset: {current_strategy.get('asset')}
-- Strategy Type: {current_strategy.get('strategy_type')}
-- Entry Conditions: {current_strategy.get('entry_conditions')}
-- Exit Conditions: {current_strategy.get('exit_conditions')}
+PARAMETER CHANGE RULES:
+- "loosen RSI threshold" = INCREASE value (30→40 for oversold)
+- "tighten RSI threshold" = DECREASE value (40→30 for oversold)
+- "backtest period" = add TOP-LEVEL "backtest_days" field (integer)
+- Only modify what user requested, preserve everything else
+- RSI ranges: 20-40 (oversold), 60-80 (overbought)
+- Take profit/stop loss: decimal like 0.01 for 1%
 
-YOUR TASK:
-1. Carefully analyze what the user wants to change
-2. Modify the strategy config JSON to implement those changes
-3. Apply data-driven reasoning when adjusting thresholds
-4. List all specific changes made
+Return ONLY the JSON object with updated_strategy, changes_made, and explanation."""
 
-IMPORTANT RULES FOR PARAMETER CHANGES:
-- "loosen RSI threshold" → INCREASE the threshold value (e.g., 30 → 40 for oversold)
-- "tighten RSI threshold" → DECREASE the threshold value (e.g., 40 → 30 for oversold)
-- "lower sentiment requirement" → DECREASE absolute threshold value (e.g., 0.5 → 0.3)
-- "higher sentiment requirement" → INCREASE absolute threshold value (e.g., 0.3 → 0.5)
-- "more sensitive" → adjust thresholds to trigger more easily
-- "less sensitive" → adjust thresholds to trigger less frequently
-- "use OR instead of AND" → change condition_logic from "and" to "or"
-- "use AND instead of OR" → change condition_logic from "or" to "and"
-- "change backtest period" → add/update TOP-LEVEL field "backtest_days" with integer value (e.g., 180 → 360)
-- "increase backtest timeframe" → add/update TOP-LEVEL field "backtest_days" to larger value
-
-CRITICAL: Backtest period changes
-- When user requests to change backtest period (e.g., "180 to 360 days"), you MUST add or update the "backtest_days" field at the TOP LEVEL of the strategy object
-- Example: If user says "change from 180 to 360 days", add: "backtest_days": 360
-- This is NOT in parameters, NOT in entry_conditions - it's a top-level field in the strategy JSON
-
-SMART THRESHOLD ADJUSTMENTS:
-- For RSI: typical ranges are 20-40 (oversold) and 60-80 (overbought)
-- For sentiment: typical ranges are -1.0 to +1.0, with |0.3| being moderate
-- For volume spikes: typical multipliers are 1.5x to 3.0x average volume
-- For moving averages: common periods are 20, 50, 100, 200 days
-- For backtest period: use integer days like 30, 90, 180, 360, 720 in TOP-LEVEL "backtest_days" field
-
-WHEN MAKING CHANGES:
-- Only modify what the user explicitly requested
-- Preserve all other parameters exactly as they are
-- Make reasonable incremental changes (don't jump from 30 to 80)
-- Ensure thresholds stay within valid ranges for their indicator type
-
-Respond in this exact JSON format:
-{{
-  "updated_strategy": {{ ... the modified strategy config with changes applied ... }},
-  "changes_made": ["Specific change 1 (e.g., 'Changed RSI oversold threshold from 30 to 40')", "Specific change 2", ...],
-  "explanation": "Brief explanation of the modifications and reasoning"
-}}"""
-
+            # Use lower temperature for more consistent JSON output
             response = client.messages.create(
                 model="claude-sonnet-4-20250514",
                 max_tokens=4000,
+                temperature=0.1,  # Very low for maximum consistency
+                system=system_prompt,
                 messages=[{
                     "role": "user",
-                    "content": prompt
+                    "content": user_prompt
                 }]
             )
 
             response_text = response.content[0].text
+            logger.info(f"📝 Claude response length: {len(response_text)} chars")
+            logger.info(f"📝 First 300 chars: {response_text[:300]}")
+            logger.info(f"📝 Last 300 chars: {response_text[-300:]}")
 
-            # Parse JSON response
+            # BULLETPROOF JSON extraction using brace counting
             import re
-            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-            if not json_match:
-                raise Exception("Could not parse refinement response")
+            import json
 
-            result_data = json.loads(json_match.group(0))
+            def extract_json_object(text):
+                """Extract the first complete JSON object from text using brace counting"""
+                # Remove markdown code blocks if present
+                text = re.sub(r'```json\s*', '', text)
+                text = re.sub(r'```\s*', '', text)
+
+                # Find first opening brace
+                start = text.find('{')
+                if start == -1:
+                    return None
+
+                # Count braces to find matching closing brace
+                brace_count = 0
+                in_string = False
+                escape_next = False
+
+                for i in range(start, len(text)):
+                    char = text[i]
+
+                    if escape_next:
+                        escape_next = False
+                        continue
+
+                    if char == '\\':
+                        escape_next = True
+                        continue
+
+                    if char == '"' and not escape_next:
+                        in_string = not in_string
+                        continue
+
+                    if not in_string:
+                        if char == '{':
+                            brace_count += 1
+                        elif char == '}':
+                            brace_count -= 1
+                            if brace_count == 0:
+                                # Found complete JSON object
+                                return text[start:i+1]
+
+                return None
+
+            json_str = extract_json_object(response_text)
+
+            if not json_str:
+                logger.error(f"❌ Could not extract JSON object from response")
+                logger.error(f"Full response: {response_text}")
+                raise Exception("Could not find valid JSON object in Claude's response")
+
+            logger.info(f"✅ Extracted JSON object ({len(json_str)} chars)")
+
+            # Parse the JSON with fallback strategies
+            result_data = None
+            parse_errors = []
+
+            # Attempt 1: Parse as-is
+            try:
+                result_data = json.loads(json_str)
+                logger.info("✅ Parsed JSON successfully on first attempt")
+            except json.JSONDecodeError as e:
+                parse_errors.append(f"Attempt 1 failed: {e}")
+                logger.warning(f"⚠️ JSON parse attempt 1 failed: {e}")
+
+                # Attempt 2: Remove comments and try again
+                try:
+                    # Remove /* */ comments
+                    cleaned = re.sub(r'/\*.*?\*/', '', json_str, flags=re.DOTALL)
+                    # Remove // comments
+                    cleaned = re.sub(r'//.*?$', '', cleaned, flags=re.MULTILINE)
+                    result_data = json.loads(cleaned)
+                    logger.info("✅ Parsed JSON after removing comments")
+                except json.JSONDecodeError as e2:
+                    parse_errors.append(f"Attempt 2 failed: {e2}")
+
+                    # Attempt 3: Fix trailing commas
+                    try:
+                        # Remove trailing commas before } or ]
+                        fixed = re.sub(r',(\s*[}\]])', r'\1', cleaned)
+                        result_data = json.loads(fixed)
+                        logger.info("✅ Parsed JSON after fixing trailing commas")
+                    except json.JSONDecodeError as e3:
+                        parse_errors.append(f"Attempt 3 failed: {e3}")
+
+            if not result_data:
+                error_msg = "; ".join(parse_errors)
+                logger.error(f"❌ All JSON parsing attempts failed: {error_msg}")
+                logger.error(f"Extracted JSON string (first 500 chars): {json_str[:500]}")
+                logger.error(f"Full response text: {response_text}")
+                raise Exception(f"Failed to parse JSON. Errors: {error_msg}")
 
             updated_strategy = result_data.get('updated_strategy')
             changes_made = result_data.get('changes_made', [])
