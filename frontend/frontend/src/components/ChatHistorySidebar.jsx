@@ -10,10 +10,20 @@ const ChatHistorySidebar = ({ onClose, onLoadBot, onNewChat, currentBotId }) => 
   const { getAuthHeaders, user, handleTokenExpired } = useAuth();
 
   useEffect(() => {
-    loadBots();
-  }, []);
+    // Only load bots if user is authenticated
+    if (user) {
+      loadBots();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   const loadBots = async () => {
+    // Don't try to load if no user
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError('');
 
