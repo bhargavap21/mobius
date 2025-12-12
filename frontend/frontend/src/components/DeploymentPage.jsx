@@ -1,6 +1,7 @@
 import { API_URL } from '../config'
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
+import DeploymentConfirmationModal from './DeploymentConfirmationModal'
 
 const DeploymentPage = ({
   strategy,
@@ -20,12 +21,14 @@ const DeploymentPage = ({
   const [deploying, setDeploying] = useState(false)
   const [deploymentId, setDeploymentId] = useState(null)
   const [error, setError] = useState(null)
+  const [showConfirmation, setShowConfirmation] = useState(false)
+  const [isPaperTrading, setIsPaperTrading] = useState(true)
 
   useEffect(() => {
     console.log('[DeploymentPage] currentBotId:', currentBotId)
   }, [currentBotId])
 
-  const handleDeploy = async () => {
+  const handleInitiateDeploy = () => {
     if (!isAuthenticated) {
       setError('Please sign in to deploy strategies')
       return
@@ -36,6 +39,12 @@ const DeploymentPage = ({
       return
     }
 
+    // Show confirmation modal
+    setShowConfirmation(true)
+  }
+
+  const handleConfirmedDeploy = async () => {
+    setShowConfirmation(false)
     setDeploying(true)
     setError(null)
 
@@ -53,7 +62,8 @@ const DeploymentPage = ({
           initial_capital: deploymentConfig.initialCapital,
           execution_frequency: deploymentConfig.executionFrequency,
           max_position_size: deploymentConfig.maxPositionSize,
-          daily_loss_limit: deploymentConfig.dailyLossLimit
+          daily_loss_limit: deploymentConfig.dailyLossLimit,
+          paper_trading: isPaperTrading
         })
       })
 
@@ -140,6 +150,17 @@ const DeploymentPage = ({
   return (
     <div className="min-h-screen bg-dark-bg">
       <main className="max-w-4xl mx-auto px-6 py-8">
+        {/* Confirmation Modal */}
+        <DeploymentConfirmationModal
+          isOpen={showConfirmation}
+          onClose={() => setShowConfirmation(false)}
+          onConfirm={handleConfirmedDeploy}
+          deploymentConfig={deploymentConfig}
+          strategy={strategy}
+          backtestResults={backtestResults}
+          isPaperTrading={isPaperTrading}
+        />
+
         <button
           onClick={onBackToDashboard}
           className="mb-6 px-4 py-2 text-sm rounded-lg border border-white/20 text-white/80 hover:border-accent hover:text-accent transition-colors"
@@ -147,7 +168,9 @@ const DeploymentPage = ({
           ← Back to Backtesting
         </button>
         <div className="mb-8">
-          <h2 className="text-3xl font-semibold text-white mb-2">Deploy to Paper Trading</h2>
+          <h2 className="text-3xl font-semibold text-white mb-2">
+            Deploy to {isPaperTrading ? 'Paper' : 'Live'} Trading
+          </h2>
           <p className="text-gray-400">
             Configure your deployment settings and go live with Alpaca
           </p>
@@ -188,6 +211,35 @@ const DeploymentPage = ({
                 </div>
               </>
             )}
+          </div>
+        </div>
+
+        {/* Trading Mode Toggle */}
+        <div className="rounded-2xl border border-white/10 bg-[#0e1117] p-6 mb-6">
+          <h3 className="text-sm font-light text-white mb-4">Trading Mode</h3>
+          <div className="flex gap-4">
+            <button
+              onClick={() => setIsPaperTrading(true)}
+              className={`flex-1 py-3 rounded-lg border-2 transition-all ${
+                isPaperTrading
+                  ? 'border-blue-500 bg-blue-500/10 text-blue-400'
+                  : 'border-white/10 text-white/50 hover:border-white/20'
+              }`}
+            >
+              <div className="text-sm font-medium">Paper Trading</div>
+              <div className="text-xs mt-1">Simulated funds - No real risk</div>
+            </button>
+            <button
+              onClick={() => setIsPaperTrading(false)}
+              className={`flex-1 py-3 rounded-lg border-2 transition-all ${
+                !isPaperTrading
+                  ? 'border-red-500 bg-red-500/10 text-red-400'
+                  : 'border-white/10 text-white/50 hover:border-white/20'
+              }`}
+            >
+              <div className="text-sm font-medium">Live Trading</div>
+              <div className="text-xs mt-1">Real money - Actual risk</div>
+            </button>
           </div>
         </div>
 
@@ -295,26 +347,45 @@ const DeploymentPage = ({
         </div>
 
         {/* Warning Box */}
-        <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/10 p-4 mb-6">
-          <div className="flex gap-3">
-            <div className="text-yellow-500 text-xl">!</div>
-            <div>
-              <p className="text-sm text-yellow-500 font-medium mb-1">Paper Trading Mode</p>
-              <p className="text-xs text-yellow-500/80">
-                This deployment uses Alpaca's paper trading environment with simulated funds.
-                No real money is at risk.
-              </p>
+        {isPaperTrading ? (
+          <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-4 mb-6">
+            <div className="flex gap-3">
+              <div className="text-blue-500 text-xl">ℹ</div>
+              <div>
+                <p className="text-sm text-blue-500 font-medium mb-1">Paper Trading Mode</p>
+                <p className="text-xs text-blue-500/80">
+                  This deployment uses Alpaca's paper trading environment with simulated funds.
+                  No real money is at risk. Perfect for testing your strategy.
+                </p>
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-4 mb-6">
+            <div className="flex gap-3">
+              <div className="text-red-500 text-xl">⚠</div>
+              <div>
+                <p className="text-sm text-red-500 font-medium mb-1">Live Trading Mode</p>
+                <p className="text-xs text-red-500/80">
+                  This deployment will execute REAL trades with REAL MONEY. All trades are final and
+                  cannot be undone. Please ensure you have thoroughly tested in paper trading first.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Deploy Button */}
         <button
-          onClick={handleDeploy}
+          onClick={handleInitiateDeploy}
           disabled={deploying || !isAuthenticated}
-          className="w-full py-4 rounded-lg bg-accent text-white font-medium hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className={`w-full py-4 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+            isPaperTrading
+              ? 'bg-blue-500 hover:bg-blue-600 text-white'
+              : 'bg-red-500 hover:bg-red-600 text-white'
+          }`}
         >
-          {deploying ? 'Deploying...' : 'Deploy Strategy'}
+          {deploying ? 'Deploying...' : `Deploy to ${isPaperTrading ? 'Paper' : 'Live'} Trading`}
         </button>
 
         {!isAuthenticated && (

@@ -202,8 +202,20 @@ class LiveTradingEngine:
 
             # Check daily loss limit
             if deployment.daily_loss_limit:
-                # TODO: Implement daily loss tracking
-                pass
+                daily_loss = await self._get_daily_loss(deployment_id)
+                if daily_loss and abs(daily_loss) >= deployment.daily_loss_limit:
+                    logger.warning(
+                        f"⚠️  Daily loss limit reached for deployment {deployment_id}: "
+                        f"${abs(daily_loss):.2f} >= ${deployment.daily_loss_limit:.2f}"
+                    )
+                    # Stop the deployment
+                    await self.deployment_repo.update_deployment_status(
+                        UUID(deployment_id),
+                        'stopped',
+                        stopped_at=datetime.utcnow()
+                    )
+                    await self.remove_deployment(deployment_id)
+                    return
 
             # Execute the strategy code to get signals
             signal = await self._run_strategy_code(
@@ -401,17 +413,14 @@ class LiveTradingEngine:
 
             logger.info(f"📈 Processing {action.upper()} signal for {symbol} (qty: {quantity})")
 
-            # Check position size limits
-            config = self.active_deployments[deployment_id]
-            deployment = config['deployment']
-
-            if deployment.max_position_size:
-                # Get current price to calculate position value
+            # Check position size limits for buy orders
+            if action == 'buy':
                 current_price = await alpaca_service.get_latest_price(symbol)
                 if current_price:
-                    position_value = current_price * quantity
-                    if position_value > deployment.max_position_size:
-                        logger.warning(f"⚠️  Position size ${position_value} exceeds limit ${deployment.max_position_size}")
+                    within_limit = await self._check_position_size_limit(
+                        deployment_id, symbol, quantity, current_price
+                    )
+                    if not within_limit:
                         return
 
             # Place the order
@@ -504,6 +513,95 @@ class LiveTradingEngine:
 
         except Exception as e:
             logger.error(f"❌ Error updating metrics: {e}")
+
+    async def _get_daily_loss(self, deployment_id: str) -> Optional[float]:
+        """
+        Calculate the daily loss for a deployment
+
+        Returns:
+            Daily loss amount (negative number) or None if no loss
+        """
+        try:
+            from datetime import datetime, time
+            import pytz
+
+            # Get today's start time (midnight ET)
+            et_tz = pytz.timezone('America/New_York')
+            now_et = datetime.now(et_tz)
+            today_start = et_tz.localize(
+                datetime.combine(now_et.date(), time(0, 0, 0))
+            )
+
+            # Get all trades for today
+            trades = await self.deployment_repo.get_trades_since(
+                UUID(deployment_id),
+                today_start
+            )
+
+            if not trades:
+                return None
+
+            # Calculate realized PnL from today's trades
+            daily_pnl = sum(
+                trade.get('realized_pnl', 0) or 0
+                for trade in trades
+                if trade.get('realized_pnl') is not None
+            )
+
+            # Also check unrealized PnL from current positions
+            account = await alpaca_service.get_account()
+            if account:
+                # Get today's change from unrealized PnL
+                unrealized_today = float(account.get('equity', 0)) - float(account.get('last_equity', 0))
+                daily_pnl += unrealized_today
+
+            # Return only if it's a loss (negative)
+            return daily_pnl if daily_pnl < 0 else None
+
+        except Exception as e:
+            logger.error(f"❌ Error calculating daily loss: {e}")
+            return None
+
+    async def _check_position_size_limit(
+        self,
+        deployment_id: str,
+        symbol: str,
+        quantity: float,
+        current_price: float
+    ) -> bool:
+        """
+        Check if a proposed trade would exceed the maximum position size limit
+
+        Returns:
+            True if trade is within limits, False if it would exceed
+        """
+        try:
+            config = self.active_deployments.get(deployment_id)
+            if not config:
+                return False
+
+            deployment = config['deployment']
+            max_position_size = deployment.max_position_size
+
+            if not max_position_size:
+                # No limit set
+                return True
+
+            # Calculate proposed position value
+            proposed_value = quantity * current_price
+
+            if proposed_value > max_position_size:
+                logger.warning(
+                    f"⚠️  Position size limit exceeded for {deployment_id}: "
+                    f"Proposed ${proposed_value:.2f} > Max ${max_position_size:.2f}"
+                )
+                return False
+
+            return True
+
+        except Exception as e:
+            logger.error(f"❌ Error checking position size limit: {e}")
+            return False
 
 
 # Global trading engine instance
