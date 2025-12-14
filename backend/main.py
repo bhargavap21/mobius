@@ -6,6 +6,7 @@ import logging
 import asyncio
 import json
 import re
+import numpy as np
 from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -481,18 +482,45 @@ async def _run_multi_agent_workflow(
                 })
             return
 
+        # Helper function to convert numpy/datetime to JSON-serializable types
+        def make_json_serializable(obj):
+            """Recursively convert numpy/datetime objects to JSON-serializable types"""
+            if isinstance(obj, dict):
+                return {k: make_json_serializable(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [make_json_serializable(item) for item in obj]
+            elif isinstance(obj, (np.integer, np.int64, np.int32)):
+                return int(obj)
+            elif isinstance(obj, (np.floating, np.float64, np.float32)):
+                return float(obj)
+            elif isinstance(obj, (np.ndarray,)):
+                return obj.tolist()
+            elif isinstance(obj, datetime):
+                return obj.isoformat()
+            elif isinstance(obj, (np.bool_,)):
+                return bool(obj)
+            else:
+                return obj
+
         # Save bot to database FIRST to get bot_id
         bot_id = None
         try:
             bot_repo = BotRepository()
+
+            # Convert backtest_results to JSON-serializable format
+            serializable_backtest = make_json_serializable(result['backtest_results'])
+            serializable_strategy = make_json_serializable(result['strategy'])
+            serializable_insights = make_json_serializable(result.get('insights_config'))
+            serializable_eval = make_json_serializable(result.get('evaluation_results'))
+
             bot_data = TradingBotCreate(
                 name=result['strategy'].get('name', 'Untitled Strategy'),
                 description=strategy_description[:200] if len(strategy_description) > 200 else strategy_description,
-                strategy_config=result['strategy'],
+                strategy_config=serializable_strategy,
                 generated_code=result['code'],
-                backtest_results=result['backtest_results'],
-                insights_config=result.get('insights_config'),
-                evaluation_results=result.get('evaluation_results'),
+                backtest_results=serializable_backtest,
+                insights_config=serializable_insights,
+                evaluation_results=serializable_eval,
                 session_id=session_id,
                 is_saved=False
             )
@@ -501,6 +529,8 @@ async def _run_multi_agent_workflow(
             logger.info(f"✅ Auto-saved strategy to chat history for user {user_id}, bot_id: {bot_id}")
         except Exception as save_error:
             logger.error(f"⚠️ Failed to auto-save strategy: {save_error}")
+            import traceback
+            logger.error(traceback.format_exc())
 
         # Create response data WITH bot_id
         response_data = {
