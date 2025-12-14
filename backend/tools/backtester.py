@@ -12,6 +12,7 @@ from alpaca.data.enums import Adjustment
 from alpaca.data.timeframe import TimeFrame
 from config import settings
 from tools.backtest_helpers import get_social_sentiment_for_date, get_news_for_date
+from tools.strategy_debugger import StrategyDebugger
 from pydantic import ValidationError
 from schemas.strategy import validate_strategy
 
@@ -174,7 +175,8 @@ class Backtester:
                 timeframe=timeframe,
                 start=start_date,
                 end=end_date,
-                adjustment=Adjustment.ALL  # Adjust for splits and dividends
+                adjustment=Adjustment.RAW,  # Use raw prices to avoid split/dividend adjustment issues with position tracking
+                feed="iex"  # Use free IEX data instead of paid SIP data
             )
 
             bars = self.data_client.get_stock_bars(request_params)
@@ -364,14 +366,21 @@ class Backtester:
 
         for i, (idx, row) in enumerate(df.iterrows()):
             price = row['close']
-            portfolio_value = capital + (shares * price if shares > 0 else 0)
+            position_value = shares * price if shares > 0 else 0
+            portfolio_value = capital + position_value
+
+            # Validation: portfolio_value should equal cash + position_value
+            expected_portfolio = round(capital, 2) + round(position_value, 2)
+            actual_portfolio = round(portfolio_value, 2)
+            if abs(expected_portfolio - actual_portfolio) > 0.01:
+                logger.warning(f"Portfolio mismatch on {idx.strftime('%Y-%m-%d')}: expected={expected_portfolio}, actual={actual_portfolio}")
 
             # Track portfolio value over time
             portfolio_history.append({
                 'date': idx.strftime('%Y-%m-%d'),
                 'portfolio_value': round(portfolio_value, 2),
                 'cash': round(capital, 2),
-                'position_value': round(shares * price, 2) if shares > 0 else 0,
+                'position_value': round(position_value, 2),
                 'price': round(price, 2)
             })
 
@@ -507,6 +516,9 @@ class Backtester:
                     shares = int(capital / price)
                     if shares > 0:
                         trade_number += 1
+                        capital_before_buy = capital
+                        cost = shares * price
+
                         position = {
                             'entry_price': price,
                             'entry_date': idx,
@@ -514,7 +526,7 @@ class Backtester:
                             'trade_number': trade_number,
                             'entry_reason': entry_reason
                         }
-                        capital -= shares * price
+                        capital -= cost
 
                         # Initialize two-phase exit state
                         original_shares = shares  # Store original for partial exit calculation
@@ -523,7 +535,7 @@ class Backtester:
                         highest_price_since_partial_exit = None
                         trailing_stop_price = None
 
-                        logger.debug(f"BUY {shares} shares at ${price:.2f} on {idx}: {entry_reason}")
+                        logger.debug(f"BUY {shares} shares at ${price:.2f} on {idx}: {entry_reason} | Capital: ${capital_before_buy:.2f} → ${capital:.2f} (cost: ${cost:.2f})")
 
             # Exit logic - TWO-PHASE EXIT for partial exits with trailing stops
             elif position is not None:
@@ -634,7 +646,9 @@ class Backtester:
                 # EXECUTE THE EXIT (common for both two-phase and standard)
                 # ============================================================
                 if exit_signal_met and shares_to_sell > 0:
-                    capital += shares_to_sell * price
+                    capital_before_sell = capital
+                    proceeds = shares_to_sell * price
+                    capital += proceeds
 
                     # Calculate PnL for shares sold
                     shares_pnl = shares_to_sell * (price - entry_price)
@@ -654,13 +668,13 @@ class Backtester:
                         'exit_reason': exit_reason + (f" (sold {shares_to_sell}/{original_shares} shares)" if is_partial_exit else ""),
                         'entry_reason': position.get('entry_reason', 'unknown'),
                         'days_held': (idx - position['entry_date']).days if position.get('entry_date') else 0,
-                        'capital_before': round(capital - shares_to_sell * price, 2),
+                        'capital_before': round(capital_before_sell, 2),
                         'capital_after': round(capital, 2),
                         'partial_exit': is_partial_exit
                     }
                     trades.append(trade)
 
-                    logger.debug(f"SELL {shares_to_sell} shares at ${price:.2f} on {idx}: {exit_reason}")
+                    logger.debug(f"SELL {shares_to_sell} shares at ${price:.2f} on {idx}: {exit_reason} | Capital: ${capital_before_sell:.2f} → ${capital:.2f} (proceeds: ${proceeds:.2f})")
 
                     # Update remaining shares
                     shares -= shares_to_sell
@@ -801,6 +815,29 @@ class Backtester:
             else:
                 point['buy_hold_value'] = initial_capital
 
+        # Validate portfolio movements - check for impossible jumps
+        max_single_day_jump = 0
+        max_jump_date = None
+        for i in range(1, len(portfolio_history)):
+            prev_val = portfolio_history[i-1]['portfolio_value']
+            curr_val = portfolio_history[i]['portfolio_value']
+            prev_price = portfolio_history[i-1]['price']
+            curr_price = portfolio_history[i]['price']
+
+            # Calculate portfolio and underlying asset daily returns
+            portfolio_pct_change = ((curr_val - prev_val) / prev_val) * 100 if prev_val > 0 else 0
+            price_pct_change = ((curr_price - prev_price) / prev_price) * 100 if prev_price > 0 else 0
+
+            # Flag if portfolio jumps more than 2x the underlying price movement (accounting for leverage from being fully invested)
+            if abs(portfolio_pct_change) > abs(price_pct_change) * 2.5:
+                if abs(portfolio_pct_change) > abs(max_single_day_jump):
+                    max_single_day_jump = portfolio_pct_change
+                    max_jump_date = portfolio_history[i]['date']
+                    logger.warning(f"Large portfolio jump detected on {max_jump_date}: portfolio changed {portfolio_pct_change:.2f}% while price changed {price_pct_change:.2f}%")
+
+        if max_jump_date:
+            logger.info(f"Largest single-day portfolio jump: {max_single_day_jump:.2f}% on {max_jump_date}")
+
         # Calculate Sharpe ratio (simplified - using daily returns)
         daily_returns = []
         for i in range(1, len(portfolio_history)):
@@ -911,6 +948,11 @@ class Backtester:
             f"Backtest complete: {len(trades)} trades, "
             f"{total_return:.2f}% return vs {buy_hold_return:.2f}% buy-hold"
         )
+
+        # Run strategy debugger to validate execution
+        debugger = StrategyDebugger(strategy, df)
+        debug_report = debugger.generate_debug_report(trades)
+        debugger.print_report(debug_report)
 
         # Log to tracing system
         if TRACING_AVAILABLE:

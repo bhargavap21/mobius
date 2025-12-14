@@ -481,36 +481,8 @@ async def _run_multi_agent_workflow(
                 })
             return
 
-        response_data = {
-            "success": True,
-            "session_id": session_id,
-            "strategy": result['strategy'],
-            "code": result['code'],
-            "backtest_results": result['backtest_results'],
-            "iterations": result['iterations'],
-            "iteration_history": result['iteration_history'],
-            "final_analysis": result['final_analysis'],
-            "insights_config": result.get('insights_config'),
-            "evaluation_results": result.get('evaluation_results'),  # Include evaluation results
-            "message": f"Strategy optimized through {result['iterations']} iterations"
-        }
-
-        # ARCHITECTURAL FIX: Store result and emit complete event BEFORE slow database save
-        # This prevents WebSocket timeout (30s) from firing during database operations
-
-        # Store result in job_storage IMMEDIATELY (this is fast, synchronous)
-        job_storage.store_result(session_id, response_data)
-        logger.info(f"💾 Result stored in job_storage for session {session_id[:8]}")
-
-        # Emit complete event IMMEDIATELY (before slow database operations)
-        from progress_manager import progress_manager
-        if progress_manager:
-            await progress_manager.emit_complete(session_id, result['iterations'])
-            logger.info(f"✅ Complete event emitted for session {session_id[:8]}")
-            # Small yield to let WebSocket grab the event from queue
-            await asyncio.sleep(0.05)
-
-        # Save bot to database synchronously (we need the bot_id immediately)
+        # Save bot to database FIRST to get bot_id
+        bot_id = None
         try:
             bot_repo = BotRepository()
             bot_data = TradingBotCreate(
@@ -525,14 +497,38 @@ async def _run_multi_agent_workflow(
                 is_saved=False
             )
             saved_bot = await bot_repo.create(user_id=user_id, bot_data=bot_data)
-            logger.info(f"✅ Auto-saved strategy to chat history for user {user_id}, bot_id: {saved_bot.id}")
-
-            # Update job_storage with bot_id IMMEDIATELY
-            response_data['bot_id'] = str(saved_bot.id)
-            job_storage.store_result(session_id, response_data)
-            logger.info(f"💾 Updated job_storage with bot_id: {saved_bot.id}")
+            bot_id = str(saved_bot.id)
+            logger.info(f"✅ Auto-saved strategy to chat history for user {user_id}, bot_id: {bot_id}")
         except Exception as save_error:
             logger.error(f"⚠️ Failed to auto-save strategy: {save_error}")
+
+        # Create response data WITH bot_id
+        response_data = {
+            "success": True,
+            "session_id": session_id,
+            "strategy": result['strategy'],
+            "code": result['code'],
+            "backtest_results": result['backtest_results'],
+            "iterations": result['iterations'],
+            "iteration_history": result['iteration_history'],
+            "final_analysis": result['final_analysis'],
+            "insights_config": result.get('insights_config'),
+            "evaluation_results": result.get('evaluation_results'),
+            "bot_id": bot_id,  # Include bot_id from database save
+            "message": f"Strategy optimized through {result['iterations']} iterations"
+        }
+
+        # Store result in job_storage with bot_id included
+        job_storage.store_result(session_id, response_data)
+        logger.info(f"💾 Result stored in job_storage for session {session_id[:8]} with bot_id: {bot_id}")
+
+        # Emit complete event
+        from progress_manager import progress_manager
+        if progress_manager:
+            await progress_manager.emit_complete(session_id, result['iterations'])
+            logger.info(f"✅ Complete event emitted for session {session_id[:8]}")
+            # Small yield to let WebSocket grab the event from queue
+            await asyncio.sleep(0.05)
 
         logger.info(f"✅ Workflow complete for session {session_id[:8]}")
 

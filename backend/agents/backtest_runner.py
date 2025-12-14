@@ -10,6 +10,8 @@ from agents.base_agent import BaseAgent
 from tools.backtester import backtest_strategy
 from tools.run_backtest import run_backtest_from_code
 
+logger = logging.getLogger(__name__)
+
 # Try to import code executor, gracefully fallback if Docker not available
 try:
     from services.code_executor import execute_strategy_in_container
@@ -17,8 +19,6 @@ try:
 except ImportError:
     DOCKER_AVAILABLE = False
     logger.warning("⚠️  Docker Python SDK not available - containerized execution disabled")
-
-logger = logging.getLogger(__name__)
 
 
 class BacktestRunnerAgent(BaseAgent):

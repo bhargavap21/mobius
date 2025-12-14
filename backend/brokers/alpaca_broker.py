@@ -158,6 +158,8 @@ class AlpacaBroker(BaseBroker):
             timeframe=alpaca_timeframe,
             start=start,
             end=end,
+            adjustment=Adjustment.RAW,  # Use raw prices to avoid split/dividend adjustment issues
+            feed="iex"  # Use free IEX data instead of paid SIP data
         )
 
         bars_data = self.data_client.get_stock_bars(request)

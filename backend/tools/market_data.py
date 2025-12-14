@@ -61,13 +61,14 @@ def get_stock_price(
         else:
             start = datetime.now() - timedelta(days=bars * 2)
 
-        # Request data (with split/dividend adjustment)
+        # Request data (with raw prices to avoid split/dividend adjustment issues)
         request = StockBarsRequest(
             symbol_or_symbols=symbol,
             timeframe=tf,
             start=start,
             limit=bars,
-            adjustment=Adjustment.ALL,  # Adjust for splits and dividends
+            adjustment=Adjustment.RAW,  # Use raw prices to avoid split/dividend adjustment issues
+            feed="iex"  # Use free IEX data instead of paid SIP data
         )
 
         bars_data = data_client.get_stock_bars(request)

@@ -222,6 +222,8 @@ class BacktestHarness:
                     timeframe=TimeFrame.Day,
                     start=start_date,
                     end=end_date,
+                    adjustment=Adjustment.RAW,  # Use raw prices to avoid split/dividend adjustment issues
+                    feed="iex"  # Use free IEX data instead of paid SIP data
                 )
 
                 bars = client.get_stock_bars(request)
