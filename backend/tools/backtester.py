@@ -586,23 +586,39 @@ class Backtester:
                     # ----------------------------------------------------------
                     # PHASE 2: Trailing stop on remaining position
                     # Only active AFTER partial exit is complete
+                    # ALSO check indicator signals to allow full exit
                     # ----------------------------------------------------------
                     elif trailing_stop_active:
-                        # Update highest price tracker (only tracks price AFTER partial exit)
-                        if highest_price_since_partial_exit is None:
-                            highest_price_since_partial_exit = price
-                        elif price > highest_price_since_partial_exit:
-                            highest_price_since_partial_exit = price
+                        # First check if indicator signals another exit (e.g. RSI > 70 again)
+                        for condition in exit_conditions_list:
+                            condition_met, reason = self.evaluate_condition(
+                                condition, row, df, i, symbol,
+                                sentiment_collector=collected_sentiments
+                            )
+                            if condition_met:
+                                exit_signal_met = True
+                                shares_to_sell = shares  # Exit ALL remaining shares
+                                exit_reason = f"{reason} (full exit of remaining position)"
+                                logger.debug(f"PHASE 2: Indicator re-triggered - selling all {shares} remaining shares")
+                                break
 
-                        # Calculate trailing stop price from highest price since partial exit
-                        trailing_stop_price = highest_price_since_partial_exit * (1 - stop_loss)
+                        # If no indicator signal, check trailing stop
+                        if not exit_signal_met:
+                            # Update highest price tracker (only tracks price AFTER partial exit)
+                            if highest_price_since_partial_exit is None:
+                                highest_price_since_partial_exit = price
+                            elif price > highest_price_since_partial_exit:
+                                highest_price_since_partial_exit = price
 
-                        # Check if trailing stop is breached
-                        if price <= trailing_stop_price:
-                            exit_signal_met = True
-                            shares_to_sell = shares  # Exit ALL remaining shares
-                            exit_reason = f"Trailing stop hit (${price:.2f} <= ${trailing_stop_price:.2f}, high was ${highest_price_since_partial_exit:.2f})"
-                            logger.debug(f"PHASE 2: Trailing stop triggered - selling all {shares} remaining shares")
+                            # Calculate trailing stop price from highest price since partial exit
+                            trailing_stop_price = highest_price_since_partial_exit * (1 - stop_loss)
+
+                            # Check if trailing stop is breached
+                            if price <= trailing_stop_price:
+                                exit_signal_met = True
+                                shares_to_sell = shares  # Exit ALL remaining shares
+                                exit_reason = f"Trailing stop hit (${price:.2f} <= ${trailing_stop_price:.2f}, high was ${highest_price_since_partial_exit:.2f})"
+                                logger.debug(f"PHASE 2: Trailing stop triggered - selling all {shares} remaining shares")
 
                 # ============================================================
                 # STANDARD EXIT LOGIC (no two-phase, no trailing stop)
