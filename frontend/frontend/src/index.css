@@ -1,32 +1,6 @@
 @import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-@theme {
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-
-  --color-dark-bg: #0a0a0a;
-  --color-dark-surface: #1a1a1a;
-  --color-dark-border: #2a2a2a;
-  --color-dark-hover: #252525;
-
-  --color-accent-*: initial;
-  --color-accent: #7c3aed;
-  --color-accent-primary: #7c3aed;
-  --color-accent-light: #8b5cf6;
-  --color-accent-dark: #5b21b6;
-  --color-accent-600: #9333ea;
-  --color-accent-400: #c084fc;
-  --color-accent-success: #10b981;
-  --color-accent-warning: #f59e0b;
-  --color-accent-danger: #ef4444;
-
-  --color-fg-*: initial;
-  --color-fg: #e5e7eb;
-  --color-fg-muted: #9ca3af;
-
-  --color-line: #23262f;
-}
-
 /* Purple accent for italic/emphasized text */
 em,
 .italic {
