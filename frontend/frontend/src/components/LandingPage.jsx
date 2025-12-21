@@ -1,6 +1,5 @@
 import { useState, lazy, Suspense, useMemo } from 'react'
 import { SiX, SiReddit, SiYoutube } from 'react-icons/si'
-import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import Login from './Login'
 import Signup from './Signup'
@@ -10,8 +9,8 @@ import { ManualWorkflowMockChaos } from './ManualWorkflowMockChaos'
 const ObservabilityGraph = lazy(() => import('./ObservabilityGraph'))
 
 export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOut, onShowBotLibrary }) {
-  const { isAuthenticated } = useAuth()
   const navigate = useNavigate()
+  const isAuthenticated = !!user
   const [showLogin, setShowLogin] = useState(false)
   const [showSignup, setShowSignup] = useState(false)
   const [email, setEmail] = useState('')
@@ -144,17 +143,15 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
           </div>
 
           {/* Right side - 3D Logo */}
-          <div className="w-1/2 h-full absolute right-[-20rem] top-14 flex items-center justify-center overflow-hidden" style={{ isolation: 'isolate' }}>
-            <div className="w-full h-full flex items-center justify-center overflow-hidden relative">
+          <div className="w-1/2 h-full absolute right-[-20rem] top-14 flex items-center justify-center pointer-events-none overflow-hidden" style={{ isolation: 'isolate' }}>
+            <div className="w-full h-full flex items-center justify-center overflow-hidden">
               <iframe
                 src='https://my.spline.design/mobiusmiamisunsetcopy-SKOxlmvEV8x6vDuzNWCJ8AFf/'
                 width='100%'
                 height='100%'
                 title="Mobius 3D Logo"
-                style={{ border: 'none', pointerEvents: 'none', background: 'transparent' }}
+                style={{ border: 'none', pointerEvents: 'auto', background: 'transparent' }}
               />
-              {/* Transparent overlay to block scroll events but show the 3D visual */}
-              <div className="absolute inset-0 pointer-events-auto" style={{ background: 'transparent' }} />
             </div>
           </div>
         </div>
