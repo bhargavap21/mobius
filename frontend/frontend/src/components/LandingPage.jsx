@@ -40,82 +40,33 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
 
   return (
     <div className="w-full bg-black">
-      {/* Navbar - always visible */}
+      {/* Navbar */}
       <div className="sticky top-0 z-50 bg-dark-surface/50 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
+        <div className="w-full px-6 py-6 flex items-center justify-between">
+          {/* Left: Logo and Brand */}
           <button
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            className="text-white hover:opacity-80 transition-opacity"
+            className="flex items-center gap-4 text-white hover:opacity-80 transition-opacity"
           >
-            <span className="text-2xl font-serif italic">Mobius</span>
+            <img
+              src="/logo.png"
+              alt="Mobius Logo"
+              className="h-16 w-16 brightness-125"
+            />
+            <span className="text-3xl font-light">Mobius</span>
           </button>
 
-        <div className="flex items-center gap-3">
-          {/* Dashboard & Community buttons - always visible */}
+          {/* Right: Get Started Button */}
           <button
-            onClick={onGetStarted}
-            className="px-4 py-2 text-sm font-light rounded-lg border border-white/20 text-white/80 hover:border-accent hover:text-accent transition-colors"
+            onClick={handleGetStarted}
+            className="relative px-6 py-2.5 bg-gradient-to-br from-violet-600 via-violet-500 to-purple-600 text-white text-sm font-semibold rounded-full hover:scale-[1.02] transition-all shadow-lg shadow-violet-500/50 overflow-hidden group"
           >
-            Dashboard
+            {/* Glossy overlay */}
+            <div className="absolute inset-0 bg-gradient-to-b from-white/20 via-transparent to-transparent rounded-full pointer-events-none" />
+            {/* Bottom shine */}
+            <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/10 to-transparent rounded-full pointer-events-none" />
+            <span className="relative">Get Started</span>
           </button>
-          <button
-            onClick={() => navigate('/community')}
-            className="px-4 py-2 text-sm font-light rounded-lg border border-white/20 text-white/80 hover:border-accent hover:text-accent transition-colors"
-          >
-            Community
-          </button>
-
-          {isAuthenticated ? (
-            // Authenticated user - show name and settings
-            <div className="flex items-center gap-2 pl-3 border-l border-gray-700">
-              <span className="text-sm text-gray-400">
-                {user?.full_name ? user.full_name.split(' ')[0] : user?.email}
-              </span>
-              <div className="relative group">
-                <button className="text-sm text-gray-400 hover:text-white p-1">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </button>
-
-                {/* Dropdown Menu */}
-                <div className="absolute right-0 top-full mt-1 w-32 bg-dark-surface rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                  <div className="py-1">
-                    <button
-                      onClick={onShowBotLibrary}
-                      className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-dark-bg hover:text-white transition-colors"
-                    >
-                      My Bots
-                    </button>
-                    <button
-                      onClick={onSignOut}
-                      className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-dark-bg hover:text-red-300 transition-colors"
-                    >
-                      Sign Out
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            // Unauthenticated user - show sign in and sign up buttons
-            <>
-              <button
-                onClick={() => setShowLogin(true)}
-                className="btn btn-secondary text-sm"
-              >
-                Sign In
-              </button>
-              <button
-                onClick={onShowSignup}
-                className="px-4 py-2 bg-white text-black text-sm font-medium rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                Sign Up
-              </button>
-            </>
-          )}
-        </div>
         </div>
       </div>
 
@@ -193,15 +144,17 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
           </div>
 
           {/* Right side - 3D Logo */}
-          <div className="w-1/2 h-full absolute right-[-20rem] top-14 flex items-center justify-center pointer-events-none overflow-hidden" style={{ isolation: 'isolate' }}>
-            <div className="w-full h-full flex items-center justify-center overflow-hidden">
+          <div className="w-1/2 h-full absolute right-[-20rem] top-14 flex items-center justify-center overflow-hidden" style={{ isolation: 'isolate' }}>
+            <div className="w-full h-full flex items-center justify-center overflow-hidden relative">
               <iframe
                 src='https://my.spline.design/mobiusmiamisunsetcopy-SKOxlmvEV8x6vDuzNWCJ8AFf/'
                 width='100%'
                 height='100%'
                 title="Mobius 3D Logo"
-                style={{ border: 'none', pointerEvents: 'auto', background: 'transparent' }}
+                style={{ border: 'none', pointerEvents: 'none', background: 'transparent' }}
               />
+              {/* Transparent overlay to block scroll events but show the 3D visual */}
+              <div className="absolute inset-0 pointer-events-auto" style={{ background: 'transparent' }} />
             </div>
           </div>
         </div>
@@ -340,6 +293,7 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
           /* logos ride along the mesh path */
           .logoRide {
             offset-path: path("M120 298 C 230 250, 330 340, 450 304 C 550 274, 620 332, 720 296 C 800 270, 850 280, 910 258");
+            -webkit-offset-path: path("M120 298 C 230 250, 330 340, 450 304 C 550 274, 620 332, 720 296 C 800 270, 850 280, 910 258");
             offset-rotate: 0deg;
             animation: ride 5.2s linear infinite;
             will-change: offset-distance, transform, opacity;
@@ -356,17 +310,6 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
             to { transform: translateX(920px); }
           }
         `}</style>
-      </section>
-
-      {/* Performance Comparison Graph */}
-      <section className="bg-black py-16 px-6">
-        <Suspense fallback={
-          <div className="h-96 flex items-center justify-center text-white/40">
-            Loading chart...
-          </div>
-        }>
-          <ObservabilityGraph />
-        </Suspense>
       </section>
 
       {/* Features Section */}
@@ -440,6 +383,17 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
         </div>
       </section>
 
+      {/* Performance Comparison Graph */}
+      <section className="bg-black py-16 px-6">
+        <Suspense fallback={
+          <div className="h-96 flex items-center justify-center text-white/40">
+            Loading chart...
+          </div>
+        }>
+          <ObservabilityGraph />
+        </Suspense>
+      </section>
+
       {/* Portfolio CTA Section */}
       <section className="relative bg-black py-32 overflow-hidden">
         {/* Aurora backdrop */}
@@ -469,97 +423,16 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
               </button>
             </div>
 
-            {/* Right: Phone Mockup */}
+            {/* Right: Laptop Image */}
             <div className="relative lg:pl-8">
-              {/* iPhone-style mockup */}
-              <div className="relative mx-auto w-[340px]">
-                {/* Phone frame */}
-                <div className="relative rounded-[3rem] border-[12px] border-gray-800 bg-black shadow-2xl">
-                  {/* Notch */}
-                  <div className="absolute left-1/2 top-0 z-10 h-7 w-40 -translate-x-1/2 rounded-b-2xl bg-gray-800" />
-
-                  {/* Screen content */}
-                  <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-b from-gray-900 to-black">
-                    {/* Status bar */}
-                    <div className="flex items-center justify-between px-8 pt-3 pb-2">
-                      <span className="text-xs text-white/90 font-medium">9:41</span>
-                      <div className="flex items-center gap-1">
-                        <svg className="h-3 w-3 text-white/90" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
-                        </svg>
-                        <svg className="h-3 w-3 text-white/90" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M17.778 8.222c-4.296-4.296-11.26-4.296-15.556 0A1 1 0 01.808 6.808c5.076-5.077 13.308-5.077 18.384 0a1 1 0 01-1.414 1.414zM14.95 11.05a7 7 0 00-9.9 0 1 1 0 01-1.414-1.414 9 9 0 0112.728 0 1 1 0 01-1.414 1.414zM12.12 13.88a3 3 0 00-4.242 0 1 1 0 01-1.415-1.415 5 5 0 017.072 0 1 1 0 01-1.415 1.415zM9 16a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
-                        </svg>
-                        <svg className="h-4 w-6 text-white/90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <rect x="1" y="6" width="18" height="12" rx="2" strokeWidth="2" />
-                          <path d="M19 10h2a1 1 0 011 1v2a1 1 0 01-1 1h-2" strokeWidth="2" />
-                        </svg>
-                      </div>
-                    </div>
-
-                    {/* Portfolio value */}
-                    <div className="px-6 pt-6 pb-4">
-                      <p className="text-xs text-white/50 font-medium">Total Portfolio Value</p>
-                      <h3 className="mt-1 text-4xl font-light text-white">$1,620.44</h3>
-                      <p className="mt-1 text-sm text-emerald-400 font-medium">+$124.32 (8.3%)</p>
-                    </div>
-
-                    {/* Main Chart */}
-                    <div className="px-6 pb-6">
-                      <svg className="w-full h-32" viewBox="0 0 300 120" fill="none">
-                        <defs>
-                          <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="rgb(16, 185, 129)" stopOpacity="0.3" />
-                            <stop offset="100%" stopColor="rgb(16, 185, 129)" stopOpacity="0" />
-                          </linearGradient>
-                        </defs>
-                        <path
-                          d="M0,80 L30,75 L60,70 L90,65 L120,68 L150,55 L180,50 L210,45 L240,42 L270,35 L300,30"
-                          stroke="rgb(16, 185, 129)"
-                          strokeWidth="2.5"
-                          fill="none"
-                        />
-                        <path
-                          d="M0,80 L30,75 L60,70 L90,65 L120,68 L150,55 L180,50 L210,45 L240,42 L270,35 L300,30 L300,120 L0,120 Z"
-                          fill="url(#chartGradient)"
-                        />
-                      </svg>
-                    </div>
-
-                    {/* AI Agents Section */}
-                    <div className="px-6 pb-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="text-sm font-medium text-white/90">AI Agents</h4>
-                        <span className="text-xs text-emerald-400 font-medium">3 Active</span>
-                      </div>
-                      <div className="flex gap-2">
-                        <div className="flex-1 rounded-xl bg-violet-500/20 border border-violet-500/30 px-3 py-2">
-                          <p className="text-xs text-violet-300 font-medium">Momentum</p>
-                        </div>
-                        <div className="flex-1 rounded-xl bg-emerald-500/20 border border-emerald-500/30 px-3 py-2">
-                          <p className="text-xs text-emerald-300 font-medium">Value</p>
-                        </div>
-                        <div className="flex-1 rounded-xl bg-blue-500/20 border border-blue-500/30 px-3 py-2">
-                          <p className="text-xs text-blue-300 font-medium">Growth</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Holdings */}
-                    <div className="px-6 pb-8">
-                      <h4 className="text-sm font-medium text-white/90 mb-3">Holdings</h4>
-                      <div className="space-y-2">
-                        <HoldingRow symbol="AAPL" shares="12" value="$2,124" change="+4.2%" positive />
-                        <HoldingRow symbol="TSLA" shares="8" value="$1,896" change="+12.8%" positive />
-                        <HoldingRow symbol="NVDA" shares="15" value="$6,420" change="+18.4%" positive />
-                        <HoldingRow symbol="GOOGL" shares="20" value="$2,680" change="-2.1%" positive={false} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
+              <div className="relative">
+                <img
+                  src="/laptop.png"
+                  alt="Trading platform interface"
+                  className="w-full h-auto"
+                />
                 {/* Glow effect */}
-                <div className="absolute inset-0 -z-10 rounded-[3rem] bg-gradient-to-br from-violet-500/30 to-emerald-500/20 blur-3xl" />
+                <div className="absolute inset-0 -z-10 rounded-3xl bg-gradient-to-br from-violet-500/30 to-emerald-500/20 blur-3xl" />
               </div>
             </div>
           </div>
@@ -662,29 +535,6 @@ function FloatingTab({ label, sub, position, rotate }) {
           <p className="text-xs font-medium text-white/90">{label}</p>
         </div>
         <p className="text-[10px] text-white/50">{sub}</p>
-      </div>
-    </div>
-  )
-}
-
-// Holding Row Component
-function HoldingRow({ symbol, shares, value, change, positive }) {
-  return (
-    <div className="flex items-center justify-between py-2 border-b border-white/5">
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500/20 to-violet-600/10 flex items-center justify-center">
-          <span className="text-xs font-bold text-violet-300">{symbol[0]}</span>
-        </div>
-        <div>
-          <p className="text-sm font-medium text-white/90">{symbol}</p>
-          <p className="text-xs text-white/40">{shares} shares</p>
-        </div>
-      </div>
-      <div className="text-right">
-        <p className="text-sm font-medium text-white/90">{value}</p>
-        <p className={`text-xs font-medium ${positive ? 'text-emerald-400' : 'text-red-400'}`}>
-          {change}
-        </p>
       </div>
     </div>
   )
@@ -898,143 +748,388 @@ function MicroRiskScreen() {
 // With Mobius visual components
 function MarketLikeEquityCurve() {
   const path = useMemo(() => {
+    // Seeded random for determinism
+    const rand = (i, offset = 0) => {
+      const x = Math.sin(i * 12.9898 + offset * 78.233) * 43758.5453
+      return x - Math.floor(x)
+    }
+
     const pts = []
-    let y = 280
-    for (let i = 0; i <= 60; i++) {
-      const x = 80 + i * 13
-      y += (Math.random() - 0.42) * 16
-      y = Math.max(120, Math.min(360, y))
+    let base = 210
+
+    for (let i = 0; i < 260; i++) {
+      const x = 60 + i * 3.2
+      const t = i / 260
+
+      // Volatility clusters
+      const vol = 1.6 + 2.2 * Math.sin(t * Math.PI * 2.4) ** 2
+
+      // Micro-wiggles
+      const noise = (rand(i, 1) - 0.5) * vol * 10
+
+      // Occasional spikes
+      const spike = rand(i, 9) > 0.988 ? (rand(i, 13) - 0.5) * 26 : 0
+
+      // Slow upward trend
+      const trend = t * 80
+
+      base += noise + spike * 0.7
+      base = Math.max(140, Math.min(340, base))
+
+      const y = base - trend
       pts.push(`${x},${y}`)
     }
+
     return `M ${pts.join(' L ')}`
   }, [])
 
   return (
-    <div className="absolute inset-0 flex items-center justify-center opacity-25">
+    <div className="absolute inset-0 flex items-center justify-center opacity-50">
       <svg
         viewBox="0 0 900 420"
         className="h-full w-auto"
-        style={{ filter: 'blur(0.6px)' }}
+        style={{ filter: 'blur(0.5px)' }}
       >
         <defs>
           <linearGradient id="eqGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="rgb(168,85,247)" stopOpacity="0.12" />
-            <stop offset="100%" stopColor="rgb(168,85,247)" stopOpacity="0" />
+            <stop offset="0%" stopColor="rgb(16,185,129)" stopOpacity="0.35" />
+            <stop offset="60%" stopColor="rgb(16,185,129)" stopOpacity="0.15" />
+            <stop offset="100%" stopColor="rgb(16,185,129)" stopOpacity="0" />
           </linearGradient>
+          <filter id="eqGlow">
+            <feGaussianBlur stdDeviation="4" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
         </defs>
-        <path d={`${path} L 900,420 L 80,420 Z`} fill="url(#eqGrad)" />
-        <path d={path} fill="none" stroke="rgba(168,85,247,0.4)" strokeWidth="1.8" />
+        <path d={`${path} L 900,420 L 60,420 Z`} fill="url(#eqGrad)" />
+        <path d={path} fill="none" stroke="rgba(16,185,129,0.85)" strokeWidth="2.5" filter="url(#eqGlow)" />
+        <path d={path} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="1.2" />
       </svg>
     </div>
   )
 }
 
 function LogoColoredGrainFlow() {
+  const rand = (i, offset = 0) => {
+    const x = Math.sin(i * 12.9898 + offset * 78.233) * 43758.5453
+    return x - Math.floor(x)
+  }
+
+  // Three color bands: YouTube (red), Reddit (orange), X (white)
+  const bands = [
+    { id: "yt", color: "rgba(239,68,68,0.85)", yOff: 18 },
+    { id: "reddit", color: "rgba(249,115,22,0.80)", yOff: 0 },
+    { id: "x", color: "rgba(255,255,255,0.70)", yOff: -18 },
+  ]
+
   return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-30">
+    <div className="pointer-events-none absolute inset-0 overflow-hidden opacity-25">
       <svg className="absolute inset-0 h-full w-full">
         <defs>
-          <radialGradient id="meshGrad1">
-            <stop offset="0%" stopColor="rgb(168,85,247)" stopOpacity="0.25" />
-            <stop offset="100%" stopColor="rgb(16,185,129)" stopOpacity="0.08" />
-          </radialGradient>
-          <filter id="noiseFilter">
-            <feTurbulence type="fractalNoise" baseFrequency="1.8" numOctaves="2" />
-            <feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.15 0" />
+          <filter id="grainFilter">
+            <feTurbulence type="fractalNoise" baseFrequency="2.2" numOctaves="3" />
+            <feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0.2 0" />
           </filter>
         </defs>
-        <path
-          d="M120 298 C 230 250, 330 340, 450 304 C 550 274, 620 332, 720 296 C 800 270, 850 280, 910 258"
-          stroke="url(#meshGrad1)"
-          strokeWidth="80"
-          fill="none"
-          opacity="0.5"
-          filter="url(#noiseFilter)"
-        />
+
+        {bands.map(({ id, color, yOff }) => (
+          <g key={id}>
+            {Array.from({ length: 720 }).map((_, i) => {
+              const t = i / 720
+              const x = 120 + t * 790
+              const wiggle = rand(i, 7) * 12 - 6
+              const y = 298 + yOff + wiggle
+
+              return (
+                <circle
+                  key={i}
+                  cx={x}
+                  cy={y}
+                  r={rand(i, 3) * 1.4 + 0.8}
+                  fill={color}
+                  filter="url(#grainFilter)"
+                  opacity={0.6 + rand(i, 5) * 0.3}
+                />
+              )
+            })}
+          </g>
+        ))}
       </svg>
     </div>
   )
 }
 
 function LogoStream() {
-  const logos = ['A', 'T', 'N', 'G', 'M']
+  const tokens = [
+    {
+      kind: "x",
+      Icon: SiX,
+      delay: 0,
+      color: "text-white",
+      glow: "drop-shadow(0 0 24px rgba(255,255,255,0.6))",
+      bg: "bg-white/10",
+      border: "border-white/30",
+      trailColor: "rgba(255,255,255,0.4)"
+    },
+    {
+      kind: "reddit",
+      Icon: SiReddit,
+      delay: 1.2,
+      color: "text-orange-500",
+      glow: "drop-shadow(0 0 24px rgba(249,115,22,0.7))",
+      bg: "bg-orange-500/10",
+      border: "border-orange-500/30",
+      trailColor: "rgba(249,115,22,0.5)"
+    },
+    {
+      kind: "youtube",
+      Icon: SiYoutube,
+      delay: 2.4,
+      color: "text-red-500",
+      glow: "drop-shadow(0 0 24px rgba(239,68,68,0.7))",
+      bg: "bg-red-500/10",
+      border: "border-red-500/30",
+      trailColor: "rgba(239,68,68,0.5)"
+    },
+    {
+      kind: "x",
+      Icon: SiX,
+      delay: 3.6,
+      color: "text-white",
+      glow: "drop-shadow(0 0 24px rgba(255,255,255,0.6))",
+      bg: "bg-white/10",
+      border: "border-white/30",
+      trailColor: "rgba(255,255,255,0.4)"
+    },
+    {
+      kind: "reddit",
+      Icon: SiReddit,
+      delay: 4.8,
+      color: "text-orange-500",
+      glow: "drop-shadow(0 0 24px rgba(249,115,22,0.7))",
+      bg: "bg-orange-500/10",
+      border: "border-orange-500/30",
+      trailColor: "rgba(249,115,22,0.5)"
+    },
+  ]
+
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      {logos.map((letter, i) => (
-        <div
-          key={i}
-          className="logoRide absolute flex h-7 w-7 items-center justify-center rounded-md border border-white/20 bg-white/5 text-xs font-bold text-white/70 backdrop-blur-sm"
-          style={{
-            animationDelay: `${i * 1.2}s`,
-          }}
-        >
-          {letter}
-        </div>
-      ))}
+      <svg className="absolute inset-0 h-full w-full" style={{ zIndex: 25 }}>
+        <defs>
+          {tokens.map((token, i) => (
+            <linearGradient key={`grad-${i}`} id={`trailGrad-${i}`} x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor={token.trailColor} stopOpacity="0" />
+              <stop offset="40%" stopColor={token.trailColor} stopOpacity="0.7" />
+              <stop offset="100%" stopColor={token.trailColor} stopOpacity="0" />
+            </linearGradient>
+          ))}
+        </defs>
+
+        {tokens.map((token, i) => (
+          <g key={`trail-group-${i}`}>
+            <path
+              className="logoRide"
+              d="M120 298 C 230 250, 330 340, 450 304 C 550 274, 620 332, 720 296 C 800 270, 850 280, 910 258"
+              stroke={`url(#trailGrad-${i})`}
+              strokeWidth="28"
+              fill="none"
+              opacity="0.6"
+              strokeLinecap="round"
+              style={{
+                animationDelay: `${token.delay}s`,
+                filter: `blur(8px) drop-shadow(0 0 12px ${token.trailColor})`,
+              }}
+            />
+          </g>
+        ))}
+      </svg>
+
+      {tokens.map((token, i) => {
+        const Icon = token.Icon
+        return (
+          <div
+            key={i}
+            className={`logoRide absolute flex h-16 w-16 items-center justify-center rounded-2xl border ${token.border} ${token.bg} backdrop-blur-md shadow-2xl`}
+            style={{
+              animationDelay: `${token.delay}s`,
+              filter: token.glow,
+              zIndex: 30,
+            }}
+          >
+            <Icon className={`h-9 w-9 ${token.color}`} />
+          </div>
+        )
+      })}
     </div>
   )
 }
 
 function AngledLaptop({ children }) {
   return (
-    <div className="relative" style={{ width: '280px', height: '180px' }}>
-      {/* Laptop bezel */}
-      <div className="absolute inset-0 rounded-lg border-4 border-gray-700 bg-gray-900 shadow-2xl overflow-hidden">
-        {/* Screen */}
-        <div className="absolute inset-1 overflow-hidden rounded-sm bg-black">
+    <div className="relative" style={{ width: '480px', height: '300px' }}>
+      {/* Very subtle shadow */}
+      <div className="absolute -inset-4 rounded-[32px] bg-black/30 blur-3xl opacity-50" style={{ transform: 'translateY(20px) scale(0.92)' }} />
+
+      {/* Laptop screen - glass-like with minimal border */}
+      <div
+        className="absolute inset-0 rounded-[24px] overflow-hidden backdrop-blur-sm"
+        style={{
+          background: 'linear-gradient(145deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.01) 100%)',
+          border: '1px solid rgba(255,255,255,0.08)',
+        }}
+      >
+        {/* Subtle edge highlight */}
+        <div className="absolute inset-0 rounded-[24px] opacity-20" style={{
+          background: 'linear-gradient(125deg, rgba(255,255,255,0.05) 0%, transparent 30%, transparent 70%, rgba(0,0,0,0.1) 100%)',
+        }} />
+
+        {/* Screen content area - minimal dark background */}
+        <div className="absolute inset-[6px] overflow-hidden rounded-[18px]" style={{
+          background: 'rgba(0,0,0,0.4)',
+        }}>
+          {/* Very subtle glass reflection */}
+          <div className="absolute inset-0 bg-gradient-to-br from-white/[0.03] via-transparent to-transparent opacity-50 pointer-events-none" />
+          <div className="absolute top-[10%] right-[15%] w-[35%] h-[25%] bg-white/[0.015] blur-2xl rounded-full pointer-events-none" />
+
           {children}
         </div>
       </div>
-      {/* Keyboard base */}
+
+      {/* Bottom keyboard base - very subtle */}
       <div
-        className="absolute left-[-10%] top-[100%] h-3 w-[120%] rounded-b-lg bg-gray-800"
-        style={{ transformOrigin: 'top center' }}
+        className="absolute left-[-6%] top-[100%] h-2.5 w-[112%] opacity-25"
+        style={{
+          background: 'linear-gradient(to bottom, rgba(255,255,255,0.03), rgba(255,255,255,0.01))',
+          borderRadius: '0 0 20px 20px',
+          transformOrigin: 'top center',
+          border: '1px solid rgba(255,255,255,0.03)',
+          borderTop: 'none',
+        }}
       />
     </div>
   )
 }
 
 function ComputerRealisticTradingScreen() {
+  const rand = (i, offset = 0) => {
+    const x = Math.sin(i * 12.9898 + offset * 78.233) * 43758.5453
+    return x - Math.floor(x)
+  }
+
+  // Generate realistic OHLC candle data
+  const candles = useMemo(() => {
+    const bars = []
+    let close = 150
+    for (let i = 0; i < 24; i++) {
+      const open = close
+      const change = (rand(i, 1) - 0.5) * 8
+      const hi = Math.max(open, open + change) + rand(i, 2) * 3
+      const lo = Math.min(open, open + change) - rand(i, 3) * 3
+      close = open + change
+      bars.push({ open, high: hi, low: lo, close })
+    }
+    return bars
+  }, [])
+
+  // Moving average
+  const maPoints = useMemo(() => {
+    const pts = []
+    for (let i = 0; i < candles.length; i++) {
+      const start = Math.max(0, i - 4)
+      const slice = candles.slice(start, i + 1)
+      const avg = slice.reduce((sum, c) => sum + c.close, 0) / slice.length
+      pts.push(avg)
+    }
+    return pts
+  }, [candles])
+
   return (
-    <div className="relative h-full w-full overflow-hidden bg-gradient-to-br from-gray-950 to-black p-2 text-[6px]">
-      {/* Tiny terminal header */}
-      <div className="mb-1 flex items-center gap-1 border-b border-white/10 pb-1">
-        <div className="h-1 w-1 rounded-full bg-red-400/70" />
-        <div className="h-1 w-1 rounded-full bg-yellow-400/60" />
-        <div className="h-1 w-1 rounded-full bg-emerald-400/60" />
-        <span className="ml-1 text-white/50">trading_bot.py</span>
+    <div className="relative h-full w-full overflow-hidden p-3" style={{
+      background: 'linear-gradient(to bottom right, rgba(0,0,0,0.5), rgba(0,0,0,0.3))'
+    }}>
+      {/* Header */}
+      <div className="mb-2 flex items-center justify-between border-b border-white/20 pb-2 text-[10px]">
+        <div className="flex items-center gap-2">
+          <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="font-mono text-white/80 font-medium">LIVE</span>
+        </div>
+        <span className="font-mono text-emerald-300 font-semibold tracking-wide">AAPL</span>
+        <span className="text-white/60 font-medium">1H</span>
       </div>
 
-      {/* Tiny code snippet */}
-      <div className="space-y-0.5 font-mono">
-        <div className="text-violet-400">
-          <span className="text-white/60">{'>'}</span> python run_strategy.py
-        </div>
-        <div className="text-emerald-400">
-          [INFO] Strategy loaded: RSI_Momentum
-        </div>
-        <div className="text-white/60">
-          [INFO] Backtesting 2020-2024...
-        </div>
-        <div className="text-emerald-400">
-          [SUCCESS] Total return: +64.2%
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="h-1 w-1 animate-pulse rounded-full bg-emerald-400" />
-          <span className="text-white/70">Deploying to Alpaca...</span>
-        </div>
+      {/* Price info */}
+      <div className="mb-3 flex items-baseline gap-3 text-[11px]">
+        <span className="font-mono text-white font-semibold">$172.45</span>
+        <span className="text-emerald-300 font-medium">+2.3%</span>
       </div>
 
-      {/* Tiny mini-chart */}
-      <div className="mt-2">
-        <svg className="h-8 w-full opacity-40" viewBox="0 0 100 30">
+      {/* Trading Chart */}
+      <div className="relative h-[calc(100%-32px)]">
+        <svg viewBox="0 0 240 140" className="h-full w-full" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="rgba(16,185,129,0.15)" />
+              <stop offset="100%" stopColor="rgba(16,185,129,0)" />
+            </linearGradient>
+          </defs>
+
+          {/* Grid lines */}
+          {[0, 35, 70, 105, 140].map((y) => (
+            <line key={y} x1="0" y1={y} x2="240" y2={y} stroke="rgba(255,255,255,0.08)" strokeWidth="0.5" />
+          ))}
+
+          {/* Candles */}
+          {candles.map((bar, i) => {
+            const x = 8 + i * 9.5
+            const scale = 140 / 30
+            const yOpen = 140 - (bar.open - 140) * scale
+            const yClose = 140 - (bar.close - 140) * scale
+            const yHigh = 140 - (bar.high - 140) * scale
+            const yLow = 140 - (bar.low - 140) * scale
+
+            const isGreen = bar.close >= bar.open
+            const color = isGreen ? "rgba(16,185,129,0.95)" : "rgba(239,68,68,0.95)"
+            const bodyTop = Math.min(yOpen, yClose)
+            const bodyHeight = Math.abs(yClose - yOpen) || 0.8
+
+            return (
+              <g key={i}>
+                {/* Wick */}
+                <line x1={x} y1={yHigh} x2={x} y2={yLow} stroke={color} strokeWidth="1" opacity="0.75" />
+                {/* Body */}
+                <rect x={x - 2.5} y={bodyTop} width="5" height={bodyHeight} fill={color} rx="1" />
+              </g>
+            )
+          })}
+
+          {/* Moving Average */}
           <path
-            d="M0,20 L20,18 L40,14 L60,16 L80,10 L100,8"
-            stroke="rgb(16,185,129)"
-            strokeWidth="0.8"
+            d={`M ${maPoints.map((avg, i) => {
+              const x = 8 + i * 9.5
+              const y = 140 - (avg - 140) * (140 / 30)
+              return `${i === 0 ? '' : 'L '}${x},${y}`
+            }).join(' ')}`}
             fill="none"
+            stroke="rgba(139,92,246,0.85)"
+            strokeWidth="1.5"
+            filter="drop-shadow(0 0 3px rgba(139,92,246,0.4))"
           />
         </svg>
+
+        {/* Volume bars */}
+        <div className="absolute bottom-0 left-0 right-0 flex items-end gap-[5.5px] px-2 h-4 opacity-30">
+          {candles.map((_, i) => (
+            <div
+              key={i}
+              className="flex-1 bg-white/40 rounded-t"
+              style={{ height: `${30 + rand(i, 7) * 70}%` }}
+            />
+          ))}
+        </div>
       </div>
     </div>
   )
