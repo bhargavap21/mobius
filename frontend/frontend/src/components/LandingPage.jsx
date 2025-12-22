@@ -144,14 +144,16 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
 
           {/* Right side - 3D Logo */}
           <div className="w-1/2 h-full absolute right-[-20rem] top-14 flex items-center justify-center pointer-events-none overflow-hidden" style={{ isolation: 'isolate' }}>
-            <div className="w-full h-full flex items-center justify-center overflow-hidden">
+            <div className="w-full h-full flex items-center justify-center overflow-hidden relative">
               <iframe
                 src='https://my.spline.design/mobiusmiamisunsetcopy-SKOxlmvEV8x6vDuzNWCJ8AFf/'
                 width='100%'
                 height='100%'
                 title="Mobius 3D Logo"
-                style={{ border: 'none', pointerEvents: 'auto', background: 'transparent' }}
+                style={{ border: 'none', pointerEvents: 'none', background: 'transparent' }}
               />
+              {/* Transparent overlay to block scroll interactions */}
+              <div className="absolute inset-0 pointer-events-auto" style={{ background: 'transparent' }} />
             </div>
           </div>
         </div>
@@ -178,7 +180,7 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
         <div className="relative mx-auto max-w-6xl px-6">
           <div className="text-center">
             <h2 className="text-4xl md:text-6xl font-light tracking-tight text-white">
-              Without Mobius, <span className="italic font-light text-violet-400">it's chaos.</span>
+              Without Mobius, <span className="italic font-light !text-violet-400">it's chaos.</span>
             </h2>
 
             <p className="mx-auto mt-3 max-w-2xl text-base md:text-lg text-white/60">
@@ -218,7 +220,7 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
             {/* header */}
             <div className="text-center">
               <h2 className="text-4xl md:text-6xl font-light tracking-tight text-white">
-                With Mobius, it's <span className="italic text-violet-400">effortless.</span>
+                With Mobius, <span className="italic !text-violet-400">it's effortless.</span>
               </h2>
               <p className="mx-auto mt-3 max-w-2xl text-base md:text-lg text-white/60">
                 Stream signals in. Get deployable code out.
@@ -437,54 +439,33 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
       </section>
 
       {/* Footer */}
-      <footer className="bg-black border-t border-white/5 py-16 px-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-4 gap-12">
-            <div className="md:col-span-1">
-              <h3 className="text-2xl font-serif italic text-white mb-4">Mobius</h3>
-              <p className="text-sm text-white/50">
-                AI-powered trading from strategy to deployment
-              </p>
-            </div>
-
-            <div>
-              <h4 className="text-sm font-medium text-white/90 mb-4">Product</h4>
-              <ul className="space-y-3">
-                <li><button onClick={() => scrollToSection('process')} className="text-sm text-white/50 hover:text-white/90 transition-colors">How it Works</button></li>
-                <li><button onClick={handleBuildBot} className="text-sm text-white/50 hover:text-white/90 transition-colors">Build Bot</button></li>
-                <li><button onClick={() => navigate('/community')} className="text-sm text-white/50 hover:text-white/90 transition-colors">Community</button></li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="text-sm font-medium text-white/90 mb-4">Company</h4>
-              <ul className="space-y-3">
-                <li><a href="#" className="text-sm text-white/50 hover:text-white/90 transition-colors">About</a></li>
-                <li><a href="#" className="text-sm text-white/50 hover:text-white/90 transition-colors">Blog</a></li>
-                <li><a href="#" className="text-sm text-white/50 hover:text-white/90 transition-colors">Careers</a></li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="text-sm font-medium text-white/90 mb-4">Connect</h4>
-              <div className="flex gap-4">
-                <a href="https://x.com" target="_blank" rel="noopener noreferrer" className="text-white/50 hover:text-white/90 transition-colors">
-                  <SiX className="w-5 h-5" />
-                </a>
-                <a href="https://reddit.com" target="_blank" rel="noopener noreferrer" className="text-white/50 hover:text-white/90 transition-colors">
-                  <SiReddit className="w-5 h-5" />
-                </a>
-                <a href="https://youtube.com" target="_blank" rel="noopener noreferrer" className="text-white/50 hover:text-white/90 transition-colors">
-                  <SiYoutube className="w-5 h-5" />
-                </a>
-              </div>
+      <footer className="bg-black border-t border-white/5 py-12">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex flex-col md:flex-row justify-between items-start gap-8 pb-8 border-b border-white/5">
+            {/* Legal Links */}
+            <div className="flex flex-wrap gap-6">
+              <a href="#" className="text-sm text-white/60 hover:text-white/90 transition-colors">About</a>
+              <a href="#" className="text-sm text-white/60 hover:text-white/90 transition-colors">Legal Documents & Disclosures</a>
             </div>
           </div>
 
-          <div className="mt-12 pt-8 border-t border-white/5">
-            <p className="text-center text-sm text-white/40">
-              © 2024 Mobius. All rights reserved.
-            </p>
+          {/* Disclaimer Text */}
+          <div className="grid md:grid-cols-3 gap-8 pt-8 text-xs text-white/40 leading-relaxed">
+            <div>
+              <p>
+                Mobius ("Mobius") is an AI-powered trading platform that provides algorithmic trading tools to US residents. By using this website, you accept our Terms of Use and Privacy Policy and other disclosures as described in Legal Documents & Disclosures. Mobius's AI advisory services are available only to residents of the United States in jurisdictions where Mobius is registered. Nothing on this website should be considered an offer, solicitation of an offer, or advice to buy or sell securities.
+              </p>
+            </div>
+            <div>
+              <p>
+                Past performance is no guarantee of future results. Any historical returns, expected returns or probability projections are hypothetical in nature and may not reflect actual future performance. Account holdings are for illustrative purposes only and are not investment recommendations. Registration with the SEC does not imply a certain level of skill or training.
+              </p>
+            </div>
+            <div>
+              <p>
+                Brokerage services are provided to Mobius Clients by Alpaca, an SEC registered broker-dealer and member FINRA/SIPC. For more information, see our Legal Documents & Disclosures. Contact: team@usemobius.com. For all information or inquiries regarding Mobius's Custodian, Alpaca Securities LLC, please visit: https://alpaca.markets/.
+              </p>
+            </div>
           </div>
         </div>
       </footer>

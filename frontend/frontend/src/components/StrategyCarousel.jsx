@@ -210,9 +210,8 @@ export default function StrategyCarousel() {
       <style>{`
         .marquee {
           width: max-content;
-          animation: marqueeMove 26s linear infinite;
+          animation: marqueeMove 12s linear infinite;
         }
-        .marquee:hover { animation-play-state: paused; }
         @keyframes marqueeMove {
           from { transform: translateX(0) rotateX(8deg); }
           to   { transform: translateX(-33.333%) rotateX(8deg); }
