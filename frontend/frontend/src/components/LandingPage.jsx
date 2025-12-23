@@ -463,7 +463,7 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
             </div>
             <div>
               <p>
-                Brokerage services are provided to Mobius Clients by Alpaca, an SEC registered broker-dealer and member FINRA/SIPC. For more information, see our Legal Documents & Disclosures. Contact: team@usemobius.com. For all information or inquiries regarding Mobius's Custodian, Alpaca Securities LLC, please visit: https://alpaca.markets/.
+                Brokerage services are provided to Mobius Clients by Alpaca, an SEC registered broker-dealer and member FINRA/SIPC. For more information, see our Legal Documents & Disclosures. Contact: team@joinmobius.com. For all information or inquiries regarding Mobius's Custodian, Alpaca Securities LLC, please visit: https://alpaca.markets/.
               </p>
             </div>
           </div>
