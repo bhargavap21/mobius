@@ -42,27 +42,23 @@ export default function GetStartedPage() {
         <div className="max-w-7xl mx-auto h-full px-6 flex items-center">
           {/* Left side - Content */}
           <div className="w-1/2 z-10" style={{ isolation: 'isolate', willChange: 'transform', transform: 'translateZ(0)' }}>
-            <div>
-              <h1 className="text-6xl md:text-7xl font-light tracking-tight text-white leading-[1.1]">
-                Your AI Trading Desk
-              </h1>
-              <p className="mt-6 text-xl md:text-2xl text-white/70 font-light">
-                AI That Turns Ideas Into Trades
-              </p>
-            </div>
-
-            {/* Email Input */}
-            <div className="flex gap-4 max-w-xl">
+            <h1 className="text-6xl md:text-7xl font-light text-white mb-8 leading-tight whitespace-nowrap">
+              Your AI Trading Desk
+            </h1>
+            <p className="text-2xl md:text-3xl lg:text-4xl text-gray-400 leading-relaxed mb-12">
+              AI That Turns Ideas Into Trades
+            </p>
+            <div className="flex items-center gap-0 max-w-3xl bg-gradient-to-r from-purple-900/20 to-blue-900/20 backdrop-blur-sm rounded-2xl p-2 border border-purple-500/20">
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Your Email Address"
-                className="flex-1 px-6 py-4 rounded-full bg-white/10 border border-white/20 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                className="flex-1 px-8 py-6 bg-transparent text-white placeholder-gray-400 outline-none text-xl"
               />
               <button
                 onClick={handleGetStarted}
-                className="px-8 py-4 rounded-full bg-white text-black font-semibold hover:bg-white/90 transition-colors"
+                className="px-10 py-6 bg-white text-black text-xl font-semibold rounded-xl hover:bg-gray-100 transition-all whitespace-nowrap"
               >
                 Get Started
               </button>
@@ -97,7 +93,7 @@ export default function GetStartedPage() {
           </div>
 
           {/* Right side - 3D Logo */}
-          <div className="w-1/2 h-full absolute right-[-20rem] top-14 flex items-center justify-center pointer-events-none overflow-hidden" style={{ isolation: 'isolate' }}>
+          <div className="w-1/2 h-full absolute right-[-20rem] top-0 flex items-start justify-center pointer-events-none overflow-hidden" style={{ isolation: 'isolate' }}>
             <div className="w-full h-full flex items-center justify-center overflow-hidden relative">
               <iframe
                 src='https://my.spline.design/mobiusmiamisunsetcopy-SKOxlmvEV8x6vDuzNWCJ8AFf/'

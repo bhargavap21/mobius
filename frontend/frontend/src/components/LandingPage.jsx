@@ -142,7 +142,7 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
           </div>
 
           {/* Right side - 3D Logo */}
-          <div className="w-1/2 h-full absolute right-[-20rem] top-14 flex items-center justify-center pointer-events-none overflow-hidden" style={{ isolation: 'isolate' }}>
+          <div className="w-1/2 h-full absolute right-[-20rem] top-0 flex items-start justify-center pointer-events-none overflow-hidden" style={{ isolation: 'isolate' }}>
             <div className="w-full h-full flex items-center justify-center overflow-hidden relative">
               <iframe
                 src='https://my.spline.design/mobiusmiamisunsetcopy-SKOxlmvEV8x6vDuzNWCJ8AFf/'
