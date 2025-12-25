@@ -5,6 +5,7 @@ import './index.css'
 import App from './App.jsx'
 import EmailConfirmation from './components/EmailConfirmation.jsx'
 import CommunityPage from './pages/CommunityPage.jsx'
+import GetStartedPage from './components/GetStartedPage.jsx'
 import { AuthProvider, useAuth } from './context/AuthContext.jsx'
 import { API_URL } from './config'
 
@@ -69,6 +70,7 @@ createRoot(document.getElementById('root')).render(
     <AuthProvider>
       <Routes>
         <Route path="/" element={<App />} />
+        <Route path="/get-started" element={<GetStartedPage />} />
         <Route path="/community" element={<CommunityPageWrapper />} />
         <Route path="/auth/confirm" element={<EmailConfirmation />} />
       </Routes>

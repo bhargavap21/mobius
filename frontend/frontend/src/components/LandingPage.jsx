@@ -25,15 +25,14 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
   }
 
   const handleGetStarted = () => {
+    // Navigate to get-started page (for navbar and "Stop guessing" section)
+    navigate('/get-started')
+  }
+
+  const handleHeroGetStarted = () => {
+    // Hero section Get Started does nothing for now
     if (email) {
-      // Store email in localStorage or handle it as needed
       localStorage.setItem('userEmail', email)
-    }
-    // Show signup/login or navigate to dashboard
-    if (isAuthenticated) {
-      onGetStarted?.()
-    } else {
-      setShowSignup(true)
     }
   }
 
@@ -102,12 +101,12 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleGetStarted()}
+                onKeyPress={(e) => e.key === 'Enter' && handleHeroGetStarted()}
                 placeholder="Your Email Address"
                 className="flex-1 px-8 py-6 bg-transparent text-white placeholder-gray-400 outline-none text-xl"
               />
               <button
-                onClick={handleGetStarted}
+                onClick={handleHeroGetStarted}
                 className="px-10 py-6 bg-white text-black text-xl font-semibold rounded-xl hover:bg-gray-100 transition-all whitespace-nowrap"
               >
                 Get Started
