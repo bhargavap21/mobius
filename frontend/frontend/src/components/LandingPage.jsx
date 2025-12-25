@@ -39,7 +39,7 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
   return (
     <div className="w-full bg-black">
       {/* Navbar */}
-      <div className="sticky top-0 z-50 bg-dark-surface/50 backdrop-blur-sm">
+      <div className="fixed top-0 left-0 right-0 z-50 bg-black/20 backdrop-blur-md border-b border-white/5">
         <div className="w-full px-6 py-6 flex items-center justify-between">
           {/* Left: Logo and Brand */}
           <button
@@ -69,7 +69,7 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
       </div>
 
       {/* Hero Section with 3D */}
-      <section className="w-full h-screen overflow-hidden relative bg-black">
+      <section className="w-full h-screen overflow-hidden relative bg-black pt-32">
         {/* Purple backdrop */}
         <div aria-hidden="true" className="pointer-events-none absolute inset-0">
           {/* left big blob */}
@@ -142,25 +142,33 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
           </div>
 
           {/* Right side - 3D Logo */}
-          <div className="w-1/2 h-full absolute right-[-20rem] top-0 flex items-start justify-center pointer-events-none overflow-hidden" style={{ isolation: 'isolate' }}>
-            <div className="w-full h-full flex items-center justify-center overflow-hidden relative">
-              <iframe
-                src='https://my.spline.design/mobiusmiamisunsetcopy-SKOxlmvEV8x6vDuzNWCJ8AFf/'
-                width='100%'
-                height='100%'
-                title="Mobius 3D Logo"
-                style={{ border: 'none', pointerEvents: 'none', background: 'transparent' }}
-              />
-              {/* Transparent overlay to block scroll interactions */}
-              <div className="absolute inset-0 pointer-events-auto" style={{ background: 'transparent' }} />
-            </div>
+          <div className="w-1/2 h-full absolute right-[-20rem] top-14 flex items-center justify-center pointer-events-none overflow-visible z-20" style={{ isolation: 'isolate', mixBlendMode: 'normal' }}>
+            <iframe
+              src='https://my.spline.design/mobiusmiamisunsetcopy-SKOxlmvEV8x6vDuzNWCJ8AFf/'
+              width='100%'
+              height='100%'
+              title="Mobius 3D Logo"
+              className="opacity-100"
+              style={{
+                border: 'none',
+                outline: 'none',
+                pointerEvents: 'none',
+                background: 'transparent',
+                backgroundColor: 'transparent',
+                boxShadow: 'none',
+                filter: 'none',
+                backdropFilter: 'none',
+                WebkitBackdropFilter: 'none',
+                mixBlendMode: 'normal'
+              }}
+            />
           </div>
         </div>
 
       </section>
 
       {/* Strategy Carousel - Full Width */}
-      <div className="relative w-full bg-black -mt-32 pb-12">
+      <div className="relative w-full bg-black pt-3 pb-12">
         <StrategyCarousel />
       </div>
 

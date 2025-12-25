@@ -1,6 +1,18 @@
 @import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
+/* Default zoom to 90% */
+html {
+  font-size: 90%;
+}
+
+body {
+  transform: scale(0.9);
+  transform-origin: top left;
+  width: 111.11%;
+  height: 111.11%;
+}
+
 /* Purple accent for italic/emphasized text */
 em,
 .italic {
