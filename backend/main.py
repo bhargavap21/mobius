@@ -52,6 +52,7 @@ from tools.politician_trades import (
 from routes.auth_routes import router as auth_router
 from routes.bot_routes import router as bot_router
 from routes.deployment_routes import router as deployment_router
+from routes.email_routes import router as email_router
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -83,6 +84,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(bot_router)
 app.include_router(deployment_router)
+app.include_router(email_router)
 
 # Initialize orchestrator and register tools
 orchestrator = get_orchestrator()

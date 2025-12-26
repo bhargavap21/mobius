@@ -14,6 +14,7 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
   const [showLogin, setShowLogin] = useState(false)
   const [showSignup, setShowSignup] = useState(false)
   const [email, setEmail] = useState('')
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false)
 
   const scrollToSection = (id) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
@@ -29,10 +30,42 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
     navigate('/get-started')
   }
 
-  const handleHeroGetStarted = () => {
-    // Hero section Get Started does nothing for now
+  const handleHeroGetStarted = async () => {
+    // Submit email to SendGrid and navigate
     if (email) {
-      localStorage.setItem('userEmail', email)
+      try {
+        const response = await fetch('http://localhost:8000/api/email/subscribe', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email }),
+        })
+
+        if (response.ok) {
+          console.log('✅ Email subscribed successfully')
+          localStorage.setItem('userEmail', email)
+
+          // Show success message
+          setShowSuccessMessage(true)
+
+          // Navigate after a brief delay to show the message
+          setTimeout(() => {
+            navigate('/get-started')
+          }, 1500)
+        } else {
+          console.error('Failed to subscribe email')
+          // Still navigate even if subscription fails
+          navigate('/get-started')
+        }
+      } catch (error) {
+        console.error('Error subscribing email:', error)
+        // Still navigate even if there's an error
+        navigate('/get-started')
+      }
+    } else {
+      // No email, just navigate
+      navigate('/get-started')
     }
   }
 
@@ -499,6 +532,18 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
             setShowLogin(false)
           }}
         />
+      )}
+
+      {/* Success Notification */}
+      {showSuccessMessage && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] animate-fade-in-up">
+          <div className="bg-gradient-to-r from-emerald-500 to-green-500 text-white px-8 py-4 rounded-2xl shadow-2xl shadow-emerald-500/50 flex items-center gap-3 border border-emerald-400/30">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            <p className="font-semibold">Thanks for subscribing! Redirecting...</p>
+          </div>
+        </div>
       )}
     </div>
   )
