@@ -4,6 +4,8 @@
 /* Default zoom to 90% */
 html {
   font-size: 90%;
+  background-color: #000;
+  min-height: 100%;
 }
 
 body {
@@ -11,6 +13,8 @@ body {
   transform-origin: top left;
   width: 111.11%;
   height: 111.11%;
+  background-color: #000;
+  min-height: 100vh;
 }
 
 /* Purple accent for italic/emphasized text */

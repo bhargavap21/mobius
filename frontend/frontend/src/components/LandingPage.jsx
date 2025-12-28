@@ -479,7 +479,7 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
       </section>
 
       {/* Footer */}
-      <footer className="bg-black border-t border-white/5 py-12">
+      <footer className="bg-black border-t border-white/5 py-12 pb-0">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex flex-col md:flex-row justify-between items-start gap-8 pb-8 border-b border-white/5">
             {/* Legal Links */}

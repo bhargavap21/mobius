@@ -28,6 +28,9 @@ function useDemoData() {
 export default function ObservabilityGraph({
   title = "Route-aware observability.",
   subtitle = "Monitor and analyze the performance and traffic of your projects.",
+  hideTooltip = false,
+  hideLegend = false,
+  hideAxes = false,
 }) {
   const data = useDemoData();
 
@@ -36,10 +39,12 @@ export default function ObservabilityGraph({
       aria-label="Observability graph"
       className="mx-auto mt-0 w-full max-w-6xl p-6 md:p-8"
     >
-      <header className="mb-8 text-center">
-        <h3 className="text-4xl md:text-5xl font-light tracking-tight text-white">{title}</h3>
-        <p className="mt-4 text-base text-white/60">See how Mobius AI-powered trading bots outperform manual trading strategies</p>
-      </header>
+      {title && (
+        <header className="mb-8 text-center">
+          <h3 className="text-4xl md:text-5xl font-light tracking-tight text-white">{title}</h3>
+          {subtitle && <p className="mt-4 text-base text-white/60">{subtitle}</p>}
+        </header>
+      )}
 
       {/* Glassmorphism card with neon aurora glow */}
       <div className="relative rounded-3xl border border-white/10 bg-white/[0.02] p-8 backdrop-blur-xl">
@@ -54,44 +59,68 @@ export default function ObservabilityGraph({
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ top: 12, right: 12, left: 0, bottom: 8 }}>
               <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} strokeDasharray="3 3" />
-              <XAxis
-                dataKey="name"
-                stroke="rgba(255,255,255,0.4)"
-                tickMargin={12}
-                style={{ fontFamily: 'Inter, sans-serif', fontSize: '13px', fontWeight: 300 }}
-              />
-              <YAxis
-                stroke="rgba(255,255,255,0.4)"
-                width={50}
-                domain={[0, 20000]}
-                ticks={[0, 5000, 10000, 15000, 20000]}
-                tickFormatter={(v) => `${v / 1000}k`}
-                tickMargin={12}
-                style={{ fontFamily: 'Inter, sans-serif', fontSize: '13px', fontWeight: 300 }}
-              />
-              <Tooltip
-                contentStyle={{
-                  background: "rgba(10, 10, 10, 0.95)",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  borderRadius: 16,
-                  color: "white",
-                  backdropFilter: "blur(12px)",
-                  boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
-                  fontFamily: 'Inter, sans-serif',
-                  fontWeight: 300,
-                }}
-                labelStyle={{ color: "rgba(255,255,255,0.6)", marginBottom: '8px' }}
-              />
-              <Legend
-                wrapperStyle={{
-                  color: "rgba(255,255,255,0.6)",
-                  fontFamily: 'Inter, sans-serif',
-                  fontSize: '14px',
-                  fontWeight: 300,
-                  paddingTop: '16px'
-                }}
-                iconType="circle"
-              />
+              {hideAxes ? (
+                <>
+                  <XAxis
+                    dataKey="name"
+                    stroke="rgba(255,255,255,0.4)"
+                    tick={false}
+                    axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                  />
+                  <YAxis
+                    stroke="rgba(255,255,255,0.4)"
+                    width={0}
+                    tick={false}
+                    axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                    domain={[0, 20000]}
+                  />
+                </>
+              ) : (
+                <>
+                  <XAxis
+                    dataKey="name"
+                    stroke="rgba(255,255,255,0.4)"
+                    tickMargin={12}
+                    style={{ fontFamily: 'Inter, sans-serif', fontSize: '13px', fontWeight: 300 }}
+                  />
+                  <YAxis
+                    stroke="rgba(255,255,255,0.4)"
+                    width={50}
+                    domain={[0, 20000]}
+                    ticks={[0, 5000, 10000, 15000, 20000]}
+                    tickFormatter={(v) => `${v / 1000}k`}
+                    tickMargin={12}
+                    style={{ fontFamily: 'Inter, sans-serif', fontSize: '13px', fontWeight: 300 }}
+                  />
+                </>
+              )}
+              {!hideTooltip && (
+                <Tooltip
+                  contentStyle={{
+                    background: "rgba(10, 10, 10, 0.95)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: 16,
+                    color: "white",
+                    backdropFilter: "blur(12px)",
+                    boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+                    fontFamily: 'Inter, sans-serif',
+                    fontWeight: 300,
+                  }}
+                  labelStyle={{ color: "rgba(255,255,255,0.6)", marginBottom: '8px' }}
+                />
+              )}
+              {!hideLegend && (
+                <Legend
+                  wrapperStyle={{
+                    color: "rgba(255,255,255,0.6)",
+                    fontFamily: 'Inter, sans-serif',
+                    fontSize: '14px',
+                    fontWeight: 300,
+                    paddingTop: '16px'
+                  }}
+                  iconType="circle"
+                />
+              )}
               {/* Neon purple for Mobius */}
               <Line
                 type="monotone"
