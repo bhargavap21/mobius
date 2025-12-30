@@ -216,84 +216,31 @@ export default function GetStartedPage() {
     <div className="fixed inset-0 w-full h-full overflow-auto">
       {/* Purple Gradient Background - Mobius Theme - Fixed to cover entire viewport */}
       <div className="fixed inset-0 z-0 pointer-events-none">
-        {/* Base gradient matching Mobius purple theme */}
-        <div
-          className="w-full h-full"
-          style={{
-            background: 'radial-gradient(circle at 50% 50%, rgba(168,85,247,0.3) 0%, rgba(139,92,246,0.2) 30%, rgba(109,40,217,0.1) 60%, rgba(0,0,0,1) 100%)',
-          }}
-        />
+        {/* Varied purple gradient blobs with different intensities */}
+        <div className="absolute inset-0">
+          {/* Top left - Darker purple */}
+          <div className="absolute -left-40 top-0 h-[600px] w-[600px] rounded-full bg-[radial-gradient(circle_at_center,rgba(88,28,135,0.4),rgba(109,40,217,0.2),transparent_70%)] blur-3xl" />
 
-        {/* Animated floating elements */}
-        <div className="absolute inset-0 overflow-hidden">
-          {/* Stars/particles */}
-          {[...Array(50)].map((_, i) => (
-            <div
-              key={i}
-              className="absolute rounded-full bg-white"
-              style={{
-                width: Math.random() * 3 + 1 + 'px',
-                height: Math.random() * 3 + 1 + 'px',
-                top: Math.random() * 100 + '%',
-                left: Math.random() * 100 + '%',
-                opacity: Math.random() * 0.5 + 0.1,
-                animation: `twinkle ${Math.random() * 3 + 2}s ease-in-out infinite`,
-                animationDelay: `${Math.random() * 2}s`,
-              }}
-            />
-          ))}
+          {/* Top right - Medium purple */}
+          <div className="absolute right-[-100px] top-[-50px] h-[500px] w-[500px] rounded-full bg-[radial-gradient(circle_at_center,rgba(139,92,246,0.35),transparent_65%)] blur-3xl" />
 
-          {/* Larger glowing orbs */}
-          <div
-            className="absolute w-64 h-64 rounded-full blur-3xl opacity-20"
-            style={{
-              background: 'radial-gradient(circle, rgba(168,85,247,0.8) 0%, transparent 70%)',
-              top: '20%',
-              left: '10%',
-              animation: 'float 8s ease-in-out infinite',
-            }}
-          />
-          <div
-            className="absolute w-48 h-48 rounded-full blur-3xl opacity-15"
-            style={{
-              background: 'radial-gradient(circle, rgba(139,92,246,0.8) 0%, transparent 70%)',
-              top: '60%',
-              right: '15%',
-              animation: 'float 10s ease-in-out infinite reverse',
-              animationDelay: '2s',
-            }}
-          />
-          <div
-            className="absolute w-56 h-56 rounded-full blur-3xl opacity-10"
-            style={{
-              background: 'radial-gradient(circle, rgba(109,40,217,0.8) 0%, transparent 70%)',
-              bottom: '10%',
-              left: '50%',
-              animation: 'float 12s ease-in-out infinite',
-              animationDelay: '4s',
-            }}
-          />
+          {/* Center - Light purple glow */}
+          <div className="absolute left-1/2 top-1/2 h-[800px] w-[800px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle_at_center,rgba(168,85,247,0.15),transparent_60%)] blur-3xl" />
+
+          {/* Left middle - Black to purple gradient */}
+          <div className="absolute left-0 top-1/3 h-[700px] w-[500px] rounded-full bg-[radial-gradient(circle_at_center,rgba(0,0,0,0.8),rgba(109,40,217,0.25),transparent_75%)] blur-3xl" />
+
+          {/* Bottom left - Darker accent */}
+          <div className="absolute -left-20 bottom-0 h-[550px] w-[550px] rounded-full bg-[radial-gradient(circle_at_center,rgba(76,29,149,0.45),rgba(88,28,135,0.2),transparent_70%)] blur-3xl" />
+
+          {/* Bottom right - Light purple */}
+          <div className="absolute right-0 bottom-[-100px] h-[600px] w-[600px] rounded-full bg-[radial-gradient(circle_at_center,rgba(168,85,247,0.25),rgba(139,92,246,0.1),transparent_65%)] blur-3xl" />
+
+          {/* Middle right - Black patch */}
+          <div className="absolute right-[-50px] top-1/2 h-[400px] w-[400px] rounded-full bg-[radial-gradient(circle_at_center,rgba(0,0,0,0.6),transparent_60%)] blur-3xl" />
         </div>
-
-        {/* Grain overlay */}
-        <div
-          className="absolute inset-0 opacity-[0.05] mix-blend-overlay"
-          style={{ backgroundImage: `url('https://grainy-gradients.vercel.app/noise.svg')` }}
-        />
       </div>
 
-      {/* Add keyframe animations */}
-      <style>{`
-        @keyframes twinkle {
-          0%, 100% { opacity: 0.1; transform: scale(1); }
-          50% { opacity: 0.8; transform: scale(1.2); }
-        }
-        @keyframes float {
-          0%, 100% { transform: translateY(0px) translateX(0px); }
-          33% { transform: translateY(-30px) translateX(20px); }
-          66% { transform: translateY(20px) translateX(-20px); }
-        }
-      `}</style>
 
       {/* Navbar */}
       <div className="fixed top-0 left-0 right-0 z-50 bg-black/20 backdrop-blur-md border-b border-white/5">
@@ -494,76 +441,83 @@ export default function GetStartedPage() {
       <div className="relative z-10 px-6 pb-32">
         <div className="max-w-7xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-            {/* Left Side - Contact Form */}
+            {/* Left Side - Live Q&A Chat Panel */}
             <div className="relative">
               <div className="bg-gradient-to-br from-gray-900/90 via-black/80 to-gray-900/90 backdrop-blur-xl rounded-3xl border border-white/10 p-6">
-                {/* Form Header */}
-                <div className="mb-6 pb-3 border-b border-white/10">
-                  <h3 className="text-sm text-white font-medium">Ask Us Anything</h3>
-                  <p className="text-xs text-gray-400 mt-1">We'll get back to you within 24 hours</p>
+                {/* Header */}
+                <div className="flex items-center justify-between mb-6 pb-4 border-b border-white/10">
+                  <h3 className="text-sm text-white font-medium">Mobius Q&A</h3>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                    <span className="text-xs text-green-400">Live</span>
+                  </div>
                 </div>
 
-                {/* Contact Form Fields */}
-                <div className="space-y-4">
-                  {/* Name Field */}
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-2">Name</label>
-                    <div className="bg-white/5 border border-white/10 rounded-lg p-3">
-                      <input
-                        type="text"
-                        placeholder="John Doe"
-                        className="w-full bg-transparent text-white text-sm outline-none placeholder-gray-500"
-                        disabled
-                      />
+                {/* Chat Messages */}
+                <div className="space-y-4 mb-6">
+                  {/* User Question 1 */}
+                  <div className="flex justify-end">
+                    <div className="bg-purple-500/20 border border-purple-500/30 rounded-2xl rounded-tr-sm px-4 py-3 max-w-[80%]">
+                      <p className="text-sm text-white">How does pricing work?</p>
                     </div>
                   </div>
 
-                  {/* Email Field */}
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-2">Email</label>
-                    <div className="bg-white/5 border border-white/10 rounded-lg p-3">
-                      <input
-                        type="email"
-                        placeholder="john@example.com"
-                        className="w-full bg-transparent text-white text-sm outline-none placeholder-gray-500"
-                        disabled
-                      />
+                  {/* Mobius Answer 1 */}
+                  <div className="flex justify-start">
+                    <div className="bg-white/5 border border-white/10 rounded-2xl rounded-tl-sm px-4 py-3 max-w-[85%]">
+                      <p className="text-sm text-gray-300">We offer flexible plans starting at $49/month. You get unlimited strategy creation, backtesting, and paper trading. Live trading requires a premium plan.</p>
                     </div>
                   </div>
 
-                  {/* Question Type */}
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-2">Question Type</label>
-                    <div className="bg-white/5 border border-white/10 rounded-lg p-3">
-                      <select className="w-full bg-transparent text-white text-sm outline-none" disabled>
-                        <option>Pricing</option>
-                        <option>Technical</option>
-                        <option>General</option>
-                      </select>
+                  {/* User Question 2 */}
+                  <div className="flex justify-end">
+                    <div className="bg-purple-500/20 border border-purple-500/30 rounded-2xl rounded-tr-sm px-4 py-3 max-w-[80%]">
+                      <p className="text-sm text-white">What data sources do you support?</p>
                     </div>
                   </div>
 
-                  {/* Message Field */}
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-2">Your Question</label>
-                    <div className="bg-white/5 border border-white/10 rounded-lg p-3">
-                      <textarea
-                        placeholder="How does Mobius handle risk management?"
-                        rows="3"
-                        className="w-full bg-transparent text-white text-sm outline-none placeholder-gray-500 resize-none"
-                        disabled
-                      />
+                  {/* Mobius Answer 2 */}
+                  <div className="flex justify-start">
+                    <div className="bg-white/5 border border-white/10 rounded-2xl rounded-tl-sm px-4 py-3 max-w-[85%]">
+                      <p className="text-sm text-gray-300">We integrate with Reddit, Twitter/X, financial news, and market data from Alpaca. You can combine social sentiment with technical indicators.</p>
                     </div>
                   </div>
+                </div>
 
-                  {/* Submit Button */}
-                  <button
-                    className="w-full bg-gradient-to-r from-purple-600 to-purple-500 text-white font-semibold py-3 rounded-lg hover:from-purple-500 hover:to-purple-400 transition-all"
+                {/* Suggested Topics */}
+                <div className="mb-4">
+                  <p className="text-xs text-gray-400 mb-3">Suggested topics:</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-full text-xs text-gray-300 hover:bg-white/10 transition-colors">
+                      Pricing
+                    </button>
+                    <button className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-full text-xs text-gray-300 hover:bg-white/10 transition-colors">
+                      Strategy builder
+                    </button>
+                    <button className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-full text-xs text-gray-300 hover:bg-white/10 transition-colors">
+                      Data sources
+                    </button>
+                    <button className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-full text-xs text-gray-300 hover:bg-white/10 transition-colors">
+                      Paper trading
+                    </button>
+                  </div>
+                </div>
+
+                {/* Input Row */}
+                <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3">
+                  <input
+                    type="text"
+                    placeholder="Ask anything..."
+                    className="flex-1 bg-transparent text-sm text-white placeholder-gray-500 outline-none"
                     disabled
-                  >
-                    Send Question
+                  />
+                  <button className="p-2 bg-purple-500/20 border border-purple-500/30 rounded-lg hover:bg-purple-500/30 transition-colors">
+                    <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
                   </button>
                 </div>
+
               </div>
             </div>
 
@@ -582,26 +536,21 @@ export default function GetStartedPage() {
               <p className="text-lg text-gray-400 mb-8 leading-relaxed">
                 This is your time to ask anything about Mobius, our technology, pricing, or how we can help solve your specific trading challenges. We're here to help you make an informed decision.
               </p>
+
+              {/* Book Discovery Call Button - Thick style */}
+              <a
+                href="https://calendly.com/dheerajt-uw/15-minute-discovery-call"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block px-16 py-6 bg-white text-black text-lg font-semibold rounded-xl hover:bg-gray-100 transition-all shadow-lg"
+              >
+                Book a Discovery Call
+              </a>
             </div>
           </div>
         </div>
       </div>
 
-      {/* CTA Button */}
-      <div className="relative z-10 px-6 pb-24">
-        <div className="text-center">
-          <a
-            href="https://calendly.com/dheerajt-uw/15-minute-discovery-call"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-block px-12 py-4 bg-gradient-to-r from-purple-600 to-purple-500 font-semibold rounded-full hover:from-purple-500 hover:to-purple-400 transition-all text-base shadow-lg shadow-purple-500/30"
-            style={{ color: '#ffffff' }}
-          >
-            Book a Discovery Call
-          </a>
-          <p className="text-sm text-gray-500 mt-4">Free 15-minute consultation • No commitment required</p>
-        </div>
-      </div>
     </div>
   )
 }
