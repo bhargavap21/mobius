@@ -338,6 +338,16 @@ export default function GetStartedPage() {
                 We start by understanding your trading experience, goals, and challenges.
                 Whether you're just getting started or looking to scale your trading, we'll discuss what you're hoping to achieve.
               </p>
+
+              {/* Book Discovery Call Button */}
+              <a
+                href="https://calendly.com/dheerajt-uw/15-minute-discovery-call"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block px-8 py-4 bg-white text-black text-base font-semibold rounded-xl hover:bg-gray-100 transition-all shadow-lg"
+              >
+                Book a Discovery Call
+              </a>
             </div>
           </div>
         </div>
@@ -362,6 +372,16 @@ export default function GetStartedPage() {
               <p className="text-lg text-gray-400 mb-8 leading-relaxed">
                 Get a personalized walkthrough of the Mobius platform. We'll show you how our AI agents analyze social sentiment, execute trades, and help you stay ahead of market trends.
               </p>
+
+              {/* Book a Demo Button */}
+              <a
+                href="https://calendly.com/dheerajt-uw/15-minute-discovery-call"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block px-8 py-4 bg-white text-black text-base font-semibold rounded-xl hover:bg-gray-100 transition-all shadow-lg"
+              >
+                Book a Demo
+              </a>
             </div>
 
             {/* Right Side - Dashboard Mockup */}
@@ -537,14 +557,14 @@ export default function GetStartedPage() {
                 This is your time to ask anything about Mobius, our technology, pricing, or how we can help solve your specific trading challenges. We're here to help you make an informed decision.
               </p>
 
-              {/* Book Discovery Call Button - Thick style */}
+              {/* Schedule Q&A Session Button */}
               <a
                 href="https://calendly.com/dheerajt-uw/15-minute-discovery-call"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-block px-16 py-6 bg-white text-black text-lg font-semibold rounded-xl hover:bg-gray-100 transition-all shadow-lg"
+                className="inline-block px-8 py-4 bg-white text-black text-base font-semibold rounded-xl hover:bg-gray-100 transition-all shadow-lg"
               >
-                Book a Discovery Call
+                Schedule Q&A Session
               </a>
             </div>
           </div>
