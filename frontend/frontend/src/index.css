@@ -12,7 +12,7 @@ body {
   transform: scale(0.9);
   transform-origin: top left;
   width: 111.11%;
-  height: 111.11%;
+  height: auto;
   background-color: #000;
   min-height: 100vh;
 }

@@ -204,6 +204,12 @@ export default function GetStartedPage() {
         console.log('✅ Email subscribed successfully')
         localStorage.setItem('userEmail', email)
         setIsSubmitted(true)
+
+        // Hide success message after 5 seconds
+        setTimeout(() => {
+          setIsSubmitted(false)
+          setEmail('')
+        }, 5000)
       }
     } catch (error) {
       console.error('Error subscribing email:', error)
@@ -237,6 +243,7 @@ export default function GetStartedPage() {
   return (
     <div className="fixed inset-0 w-full h-full overflow-auto">
       <style>{`
+        /* Remove all UnicornStudio badges and links */
         [data-us-project] a[href*="unicorn.studio"],
         [data-us-project] a,
         [data-us-project] + a,
@@ -244,7 +251,14 @@ export default function GetStartedPage() {
         a[target="_blank"][href*="unicorn"],
         div[data-us-project] > a,
         div[data-us-project] ~ a,
-        body > a[href*="unicorn.studio"] {
+        body > a[href*="unicorn.studio"],
+        a[href*="unicorn"],
+        [data-us-project] [href],
+        /* Target any fixed/sticky bottom elements */
+        [style*="position: fixed"][style*="bottom"],
+        [style*="position:fixed"][style*="bottom"],
+        div[style*="bottom: 0"],
+        div[style*="bottom:0"] {
           display: none !important;
           visibility: hidden !important;
           opacity: 0 !important;

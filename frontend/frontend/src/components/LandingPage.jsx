@@ -31,7 +31,7 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
   }
 
   const handleHeroGetStarted = async () => {
-    // Submit email to SendGrid and navigate
+    // Submit email to SendGrid and show confirmation
     if (email) {
       try {
         const response = await fetch('http://localhost:8000/api/email/subscribe', {
@@ -46,26 +46,19 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
           console.log('✅ Email subscribed successfully')
           localStorage.setItem('userEmail', email)
 
-          // Show success message
+          // Show success message - no navigation
           setShowSuccessMessage(true)
 
-          // Navigate after a brief delay to show the message
+          // Hide success message after 5 seconds
           setTimeout(() => {
-            navigate('/get-started')
-          }, 1500)
+            setShowSuccessMessage(false)
+          }, 5000)
         } else {
           console.error('Failed to subscribe email')
-          // Still navigate even if subscription fails
-          navigate('/get-started')
         }
       } catch (error) {
         console.error('Error subscribing email:', error)
-        // Still navigate even if there's an error
-        navigate('/get-started')
       }
-    } else {
-      // No email, just navigate
-      navigate('/get-started')
     }
   }
 
@@ -479,9 +472,9 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
       </section>
 
       {/* Footer */}
-      <footer className="bg-black border-t border-white/5 py-12 pb-0">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex flex-col md:flex-row justify-between items-start gap-8 pb-8 border-b border-white/5">
+      <footer className="bg-black border-t border-white/5 pt-8 pb-0">
+        <div className="max-w-7xl mx-auto px-6 pb-0">
+          <div className="flex flex-col md:flex-row justify-between items-start gap-8 pb-4 border-b border-white/5">
             {/* Legal Links */}
             <div className="flex flex-wrap gap-6">
               <a href="#" className="text-sm text-white/60 hover:text-white/90 transition-colors">About</a>
@@ -490,7 +483,7 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
           </div>
 
           {/* Disclaimer Text */}
-          <div className="grid md:grid-cols-3 gap-8 pt-8 text-xs text-white/40 leading-relaxed">
+          <div className="grid md:grid-cols-3 gap-8 pt-4 pb-4 text-xs text-white/40 leading-relaxed">
             <div>
               <p>
                 Mobius ("Mobius") is an AI-powered trading platform that provides algorithmic trading tools to US residents. By using this website, you accept our Terms of Use and Privacy Policy and other disclosures as described in Legal Documents & Disclosures. Mobius's AI advisory services are available only to residents of the United States in jurisdictions where Mobius is registered. Nothing on this website should be considered an offer, solicitation of an offer, or advice to buy or sell securities.
@@ -541,7 +534,7 @@ export default function LandingPage({ onGetStarted, onShowSignup, user, onSignOu
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
-            <p className="font-semibold">Thanks for subscribing! Redirecting...</p>
+            <p className="font-semibold">Thanks for subscribing! We'll be in touch soon.</p>
           </div>
         </div>
       )}
