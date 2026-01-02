@@ -212,8 +212,50 @@ export default function GetStartedPage() {
     }
   }
 
+  // Load UnicornStudio script
+  useEffect(() => {
+    if (!window.UnicornStudio || !window.UnicornStudio.isInitialized) {
+      const script = document.createElement('script')
+      script.type = 'text/javascript'
+      script.innerHTML = `
+        !function(){
+          if(!window.UnicornStudio){
+            window.UnicornStudio={isInitialized:!1};
+            var i=document.createElement("script");
+            i.src="https://cdn.jsdelivr.net/gh/hiunicornstudio/unicornstudio.js@v2.0.0/dist/unicornStudio.umd.js",
+            i.onload=function(){
+              window.UnicornStudio.isInitialized||(UnicornStudio.init(),window.UnicornStudio.isInitialized=!0)
+            },
+            (document.head || document.body).appendChild(i)
+          }
+        }();
+      `
+      document.body.appendChild(script)
+    }
+  }, [])
+
   return (
     <div className="fixed inset-0 w-full h-full overflow-auto">
+      <style>{`
+        [data-us-project] a[href*="unicorn.studio"],
+        [data-us-project] a,
+        [data-us-project] + a,
+        a[href*="unicorn.studio"],
+        a[target="_blank"][href*="unicorn"],
+        div[data-us-project] > a,
+        div[data-us-project] ~ a,
+        body > a[href*="unicorn.studio"] {
+          display: none !important;
+          visibility: hidden !important;
+          opacity: 0 !important;
+          pointer-events: none !important;
+          width: 0 !important;
+          height: 0 !important;
+          overflow: hidden !important;
+          position: absolute !important;
+          left: -9999px !important;
+        }
+      `}</style>
       {/* Purple Gradient Background - Mobius Theme - Fixed to cover entire viewport */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         {/* Varied purple gradient blobs with different intensities */}
@@ -260,8 +302,27 @@ export default function GetStartedPage() {
       </div>
 
       {/* Main Waitlist Container */}
-      <div className="relative z-10 flex items-center justify-center min-h-screen px-6 pt-24 pb-0">
-        <div className="w-full max-w-3xl text-center">
+      <div className="relative z-10 flex items-center justify-center min-h-screen px-6 pt-0 pb-0">
+        {/* UnicornStudio Background for waitlist section */}
+        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+          <div
+            data-us-project="cgoYEp8vO4mozGMauVTA"
+            style={{
+              width: '100vw',
+              height: '100vh',
+              minWidth: '1850px',
+              minHeight: '900px',
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-45%, -50%)',
+              mixBlendMode: 'screen',
+              opacity: '0.95'
+            }}
+          />
+        </div>
+
+        <div className="w-full max-w-3xl text-center relative z-10">
           {/* Title */}
           <h1 className="text-6xl md:text-7xl font-normal text-white mb-6 leading-tight">
             Join the Waitlist
