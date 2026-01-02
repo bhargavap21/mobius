@@ -368,9 +368,11 @@ export default function GetStartedPage() {
         </div>
       </div>
 
-      {/* First Section - Workflow Automation */}
-      <div className="relative z-10 px-6 pt-0 pb-32">
-        <div className="max-w-7xl mx-auto">
+      {/* Discovery Call Sections - Combined */}
+      <div className="relative z-10 px-6 pb-32">
+        <div className="max-w-7xl mx-auto space-y-24">
+
+          {/* Section 1 - Understanding Your Needs */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             {/* Left Side - Performance Graph */}
             <div className="relative">
@@ -411,12 +413,8 @@ export default function GetStartedPage() {
               </a>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Second Section - AI Assistant */}
-      <div className="relative z-10 px-6 pb-32">
-        <div className="max-w-7xl mx-auto">
+          {/* Section 2 - Platform Demo */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             {/* Left Side - Content */}
             <div>
@@ -515,12 +513,8 @@ export default function GetStartedPage() {
               </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Third Section - Sales & Marketing */}
-      <div className="relative z-10 px-6 pb-32">
-        <div className="max-w-7xl mx-auto">
+          {/* Section 3 - Q&A Session */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             {/* Left Side - Live Q&A Chat Panel */}
             <div className="relative">
@@ -625,10 +619,11 @@ export default function GetStartedPage() {
                 rel="noopener noreferrer"
                 className="inline-block px-8 py-4 bg-white text-black text-base font-semibold rounded-xl hover:bg-gray-100 transition-all shadow-lg"
               >
-                Schedule Q&A Session
+                Book a Discovery Call
               </a>
             </div>
           </div>
+
         </div>
       </div>
 
