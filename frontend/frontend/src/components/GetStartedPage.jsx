@@ -218,58 +218,52 @@ export default function GetStartedPage() {
     }
   }
 
-  // Load UnicornStudio script
+  // Load Vanta.js animation
   useEffect(() => {
-    if (!window.UnicornStudio || !window.UnicornStudio.isInitialized) {
-      const script = document.createElement('script')
-      script.type = 'text/javascript'
-      script.innerHTML = `
-        !function(){
-          if(!window.UnicornStudio){
-            window.UnicornStudio={isInitialized:!1};
-            var i=document.createElement("script");
-            i.src="https://cdn.jsdelivr.net/gh/hiunicornstudio/unicornstudio.js@v2.0.0/dist/unicornStudio.umd.js",
-            i.onload=function(){
-              window.UnicornStudio.isInitialized||(UnicornStudio.init(),window.UnicornStudio.isInitialized=!0)
-            },
-            (document.head || document.body).appendChild(i)
-          }
-        }();
-      `
-      document.body.appendChild(script)
+    // Load Three.js
+    const threeScript = document.createElement('script')
+    threeScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js'
+    threeScript.async = true
+
+    // Load Vanta.js Net effect
+    const vantaScript = document.createElement('script')
+    vantaScript.src = 'https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.net.min.js'
+    vantaScript.async = true
+
+    let vantaEffect
+
+    vantaScript.onload = () => {
+      // Wait a bit for DOM to be ready
+      setTimeout(() => {
+        const element = document.querySelector("#vanta-bg")
+        if (window.VANTA && element) {
+          vantaEffect = window.VANTA.NET({
+            el: "#vanta-bg",
+            mouseControls: true,
+            touchControls: true,
+            gyroControls: false,
+            minHeight: 200.00,
+            minWidth: 200.00,
+            scale: 1.00,
+            scaleMobile: 1.00,
+            color: 0x773fff
+          })
+        }
+      }, 100)
+    }
+
+    document.head.appendChild(threeScript)
+    threeScript.onload = () => {
+      document.head.appendChild(vantaScript)
+    }
+
+    return () => {
+      if (vantaEffect) vantaEffect.destroy()
     }
   }, [])
 
   return (
     <div className="fixed inset-0 w-full h-full overflow-auto">
-      <style>{`
-        /* Remove all UnicornStudio badges and links */
-        [data-us-project] a[href*="unicorn.studio"],
-        [data-us-project] a,
-        [data-us-project] + a,
-        a[href*="unicorn.studio"],
-        a[target="_blank"][href*="unicorn"],
-        div[data-us-project] > a,
-        div[data-us-project] ~ a,
-        body > a[href*="unicorn.studio"],
-        a[href*="unicorn"],
-        [data-us-project] [href],
-        /* Target any fixed/sticky bottom elements */
-        [style*="position: fixed"][style*="bottom"],
-        [style*="position:fixed"][style*="bottom"],
-        div[style*="bottom: 0"],
-        div[style*="bottom:0"] {
-          display: none !important;
-          visibility: hidden !important;
-          opacity: 0 !important;
-          pointer-events: none !important;
-          width: 0 !important;
-          height: 0 !important;
-          overflow: hidden !important;
-          position: absolute !important;
-          left: -9999px !important;
-        }
-      `}</style>
       {/* Purple Gradient Background - Mobius Theme - Fixed to cover entire viewport */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         {/* Varied purple gradient blobs with different intensities */}
@@ -315,26 +309,15 @@ export default function GetStartedPage() {
         </div>
       </div>
 
+      {/* Vanta.js Background */}
+      <div
+        id="vanta-bg"
+        className="fixed inset-0 z-0"
+        style={{ width: '100%', height: '100%' }}
+      />
+
       {/* Main Waitlist Container */}
-      <div className="relative z-10 flex items-center justify-center min-h-screen px-6 pt-0 pb-0">
-        {/* UnicornStudio Background for waitlist section */}
-        <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
-          <div
-            data-us-project="cgoYEp8vO4mozGMauVTA"
-            style={{
-              width: '100vw',
-              height: '100vh',
-              minWidth: '1850px',
-              minHeight: '900px',
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-45%, -50%)',
-              mixBlendMode: 'screen',
-              opacity: '0.95'
-            }}
-          />
-        </div>
+      <div className="relative z-10 flex items-center justify-center px-6 py-32">
 
         <div className="w-full max-w-3xl text-center relative z-10">
           {/* Title */}
@@ -384,7 +367,7 @@ export default function GetStartedPage() {
 
       {/* Discovery Call Sections - Combined */}
       <div className="relative z-10 px-6 pb-32">
-        <div className="max-w-7xl mx-auto space-y-24">
+        <div className="max-w-7xl mx-auto space-y-16">
 
           {/* Section 1 - Understanding Your Needs */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
